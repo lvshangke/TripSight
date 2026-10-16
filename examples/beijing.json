@@ -1,0 +1,155 @@
+{
+  "meta": {
+    "name": "北京 4 天（示例数据）",
+    "date_mode": "exact",
+    "start_date": "2026-10-12",
+    "end_date": "2026-10-15",
+    "pace": "normal",
+    "mode": "transit",
+    "budget_total": 2500
+  },
+  "places": [
+    {
+      "id": "gugong",
+      "name": "故宫博物院",
+      "lat": 39.9163,
+      "lon": 116.3972,
+      "duration_min": 210,
+      "priority": 5,
+      "must_go": true,
+      "ticket_price": 60,
+      "closed_weekdays": [
+        0
+      ],
+      "reservation_required": true,
+      "notes": "示例：闭馆日、预约信息仅为演示，请以官方为准"
+    },
+    {
+      "id": "tiananmen",
+      "name": "天安门广场",
+      "lat": 39.9087,
+      "lon": 116.3975,
+      "duration_min": 60,
+      "priority": 4
+    },
+    {
+      "id": "jingshan",
+      "name": "景山公园",
+      "lat": 39.9254,
+      "lon": 116.3969,
+      "duration_min": 90,
+      "priority": 3,
+      "ticket_price": 2
+    },
+    {
+      "id": "beihai",
+      "name": "北海公园",
+      "lat": 39.9255,
+      "lon": 116.3836,
+      "duration_min": 120,
+      "priority": 3,
+      "ticket_price": 10
+    },
+    {
+      "id": "shichahai",
+      "name": "什刹海",
+      "lat": 39.94,
+      "lon": 116.385,
+      "duration_min": 90,
+      "priority": 3
+    },
+    {
+      "id": "nanluoguxiang",
+      "name": "南锣鼓巷",
+      "lat": 39.937,
+      "lon": 116.403,
+      "duration_min": 90,
+      "priority": 2
+    },
+    {
+      "id": "tiantan",
+      "name": "天坛公园",
+      "lat": 39.8822,
+      "lon": 116.4066,
+      "duration_min": 150,
+      "priority": 4,
+      "ticket_price": 15
+    },
+    {
+      "id": "guobo",
+      "name": "国家博物馆",
+      "lat": 39.9054,
+      "lon": 116.4012,
+      "duration_min": 180,
+      "priority": 3,
+      "closed_weekdays": [
+        0
+      ],
+      "reservation_required": true
+    },
+    {
+      "id": "yiheyuan",
+      "name": "颐和园",
+      "lat": 39.9999,
+      "lon": 116.2755,
+      "duration_min": 180,
+      "priority": 5,
+      "must_go": true,
+      "ticket_price": 30,
+      "reservation_required": true
+    },
+    {
+      "id": "yuanmingyuan",
+      "name": "圆明园",
+      "lat": 40.008,
+      "lon": 116.305,
+      "duration_min": 120,
+      "priority": 2,
+      "ticket_price": 25
+    },
+    {
+      "id": "badaling",
+      "name": "八达岭长城",
+      "lat": 40.3598,
+      "lon": 116.02,
+      "duration_min": 300,
+      "priority": 4,
+      "ticket_price": 40,
+      "reservation_required": true
+    },
+    {
+      "id": "798",
+      "name": "798艺术区",
+      "lat": 39.9843,
+      "lon": 116.495,
+      "duration_min": 150,
+      "priority": 1
+    }
+  ],
+  "lodgings": [
+    {
+      "id": "hotel_wangfujing",
+      "name": "王府井附近酒店（示例）",
+      "lat": 39.914,
+      "lon": 116.411,
+      "price_min": 500,
+      "price_max": 800
+    },
+    {
+      "id": "hotel_qianmen",
+      "name": "前门附近酒店（示例）",
+      "lat": 39.899,
+      "lon": 116.398,
+      "price_min": 350,
+      "price_max": 550
+    },
+    {
+      "id": "hotel_xizhimen",
+      "name": "西直门附近酒店（示例）",
+      "lat": 39.941,
+      "lon": 116.355,
+      "price_min": 300,
+      "price_max": 450
+    }
+  ]
+}
