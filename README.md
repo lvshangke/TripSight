@@ -145,3 +145,30 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 - 想改规则，先用大白话写成测试，再让它实现。
 - 把 `DESIGN.md` 发给它，让它遵守里面的设计原则。
 - 用 git 保存每个能跑通的版本：`git init && git add . && git commit -m "第一个能跑的版本"`。
+
+## MCP 服务（第 1 步）
+
+`tripcore/mcp_server.py` 把 tripcore 包装成 11 个工具，供 nanobot 等 Agent 通过聊天调用：
+`new_trip` `add_place` `add_lodging` `lookup_coords` `schedule_days` `check_plan`
+`suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
+
+- 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
+- 所有修改走“提案 → 确认 → 套用”，`undo` 可撤销。
+- 依赖：`pip install -r requirements.txt`（mcp 需 <2）。
+
+nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env 里的，`cwd` 换成本项目目录）：
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "tripcore": {
+        "command": "/Users/你的用户名/miniforge3/envs/trip_env/bin/python",
+        "args": ["-m", "tripcore.mcp_server"],
+        "cwd": "/Users/你的用户名/Desktop/tripcore",
+        "env": { "TRIPCORE_CONTACT": "你的邮箱" }
+      }
+    }
+  }
+}
+```
