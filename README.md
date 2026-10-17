@@ -149,7 +149,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 ## MCP 服务（第 1 步）
 
 `tripcore/mcp_server.py` 把 tripcore 包装成 17 个工具，供 nanobot 等 Agent 通过聊天调用：
-`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `remove_food` `get_weather` `schedule_days` `check_plan`
+`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
 - 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
@@ -198,3 +198,8 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - 营业时间按日期判断时支持季节条件（`3~10月`、`10月11日起`、`11月15日起周一闭馆`）；条件复杂就返回“待核实”。
 - `find_food(店名)`：用户自己想吃的店。高德按店名搜索，并用代码算出离已排行程里哪一天、哪个景点最近，作为建议位置（超过 3 km 会警告）；`choose_food` 可指定 `day` / `after_place_id` 改位置。
 - `Trip.meta.travelers`（人数，默认 1，`new_trip(travelers=…)` / `set_travelers`）：`show_trip` 按人数估算门票和已选餐厅，住宿按整间价不乘人数。
+
+## 地图页（`export_map`）
+
+生成 `~/.tripcore/map.html`（与 `trip.json` 同目录），浏览器直接打开：按天分色的编号标记、同一天按顺序连线（直线，标注交通方式、分钟数、是“高德路线”还是“估算”）、住宿 🏨、用餐点 🍜；点标记看营业时间及来源、预约与备选、人均参考；顶部按钮可按天显示/隐藏。
+底图是高德通用瓦片（`webrd0{s}.is.autonavi.com`，仅供个人使用，不是官方 JS API），坐标由 WGS84 自动转成 GCJ-02。Leaflet 1.9.4（BSD-2，见 `tripcore/assets/LEAFLET-LICENSE`）内嵌在页面里，只有瓦片需要联网。页面里的数据由代码生成，文字在浏览器端转义。

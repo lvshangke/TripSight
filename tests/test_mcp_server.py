@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 24
+    assert len(names) == 25
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -551,3 +551,34 @@ def test_set_travelers():
         s.set_travelers(0)
     with pytest.raises(s.ToolError):
         s.new_trip(travelers=0)
+
+
+def test_export_map_writes_self_contained_page(monkeypatch, tmp_path):
+    s.new_trip(start_date="2026-10-19", end_date="2026-10-20", city="北京", name="测</script><b>试")
+    s.add_place("故宫", 39.9163, 116.3972, opening_hours="周二至周日 08:30-17:00", hours_source="amap",
+                reservation_required=True)
+    s.add_place("颐和园", 39.9999, 116.2755)
+    s.add_lodging("酒店A", 39.91, 116.40, choose=True)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: NamedFoodAmap())
+    r = s.find_food("老店")
+    s.choose_food(r["candidates"][0]["candidate_id"])
+    out = s.export_map()
+    path = s.trip_path().with_name("map.html")
+    assert str(path) in out and path.exists()
+    html = path.read_text(encoding="utf-8")
+    assert "L.map" in html and "appmaptile" in html and "故宫" in html and "老店" in html and "酒店A" in html
+    assert "<b>试" not in html.split("<title>")[1].split("</title>")[0]      # 标题被转义
+    assert "测<\\/script>" in html                                           # 数据里的 </ 被转义，不会提前结束 script
+    assert "https://unpkg" not in html and "cdn" not in html.lower().replace("cdnjs", "")  # 脚本内嵌，不依赖 CDN
+
+
+def test_map_coordinates_are_gcj02():
+    from tripcore.mapview import build_map_data
+    from tripcore.coords import wgs84_to_gcj02
+    s.new_trip(num_days=1)
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.schedule_days()
+    pos = build_map_data(s._load())["days"][0]["stops"][0]["pos"]
+    g = wgs84_to_gcj02(39.9163, 116.3972)
+    assert abs(pos[0] - g[0]) < 1e-5 and abs(pos[1] - g[1]) < 1e-5

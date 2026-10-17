@@ -26,6 +26,7 @@ from .amap import AmapClient, AmapError
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
+from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .models import DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
@@ -621,6 +622,20 @@ def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Op
     return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是高德参考值。"
 
 
+def export_map() -> str:
+    """生成地图页 map.html（景点按天分色并按顺序连线，另有住宿、用餐点；点标记可看营业时间等）。
+    返回文件路径。让用户在浏览器里打开即可，不需要再做别的事。需要先 schedule_days 才有行程线。"""
+    trip = _load()
+    path = trip_path().with_name("map.html")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_map_html(trip), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"写入地图文件失败：{e}")
+    note = "" if trip.plan else "（还没有分天，地图上只有空白底图）"
+    return f"地图已生成：{path}{note}\n在浏览器里打开即可（macOS 可用 open 命令）；底图需要联网。"
+
+
 def set_travelers(n: int) -> str:
     """设置出行人数（门票、餐饮按人数估算）。"""
     if not (1 <= n <= 50):
@@ -998,7 +1013,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 
