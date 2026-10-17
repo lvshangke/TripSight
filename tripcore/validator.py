@@ -108,7 +108,12 @@ def validate(trip: Trip) -> list[Issue]:
                     Issue(
                         "RESERVATION_NOT_BOOKED",
                         "warning",
-                        f"「{p.name}」需要提前预约，目前标记为未预约。",
+                        f"「{p.name}」需要提前预约，目前标记为未预约。"
+                        + (
+                            "如果约不上，备选：" + "、".join(trip.place(b).name for b in p.backups if any(x.id == b for x in trip.places)) + "。"
+                            if any(any(x.id == b for x in trip.places) for b in p.backups)
+                            else "还没有设置备选景点。"
+                        ),
                         day.index,
                         p.id,
                     )

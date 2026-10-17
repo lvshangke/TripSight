@@ -74,6 +74,9 @@ class Place(BaseModel):
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
     source: str = Field(default="user", description="来源：user / agent / 某个网址等")
+    opening_hours: str = Field(default="", description="营业时间原文（如高德返回的本周营业时间）")
+    hours_source: str = Field(default="", description="营业时间的来源：amap / 官网网址 / user；空表示未核实")
+    backups: list[str] = Field(default_factory=list, description="备选景点的 id：这个景点去不成（如没约上）时换成它们")
 
     @model_validator(mode="after")
     def _check_weekdays(self) -> "Place":

@@ -42,6 +42,7 @@ class PlaceHit:
     rating: Optional[float] = None
     cost: Optional[float] = None      # 高德“人均消费”，仅餐饮/酒店/景点/影院有，是参考值不是实时价
     opentime_today: str = ""
+    opentime_week: str = ""
     tel: str = ""
 
 
@@ -147,7 +148,8 @@ class AmapClient:
                 district=_text(poi.get("adname")), category=_text(poi.get("type")),
                 amap_id=_text(poi.get("id")),
                 rating=_num(biz.get("rating")), cost=_num(biz.get("cost")),
-                opentime_today=_text(biz.get("opentime_today")), tel=_text(biz.get("tel")),
+                opentime_today=_text(biz.get("opentime_today")),
+                opentime_week=_text(biz.get("opentime_week")), tel=_text(biz.get("tel")),
             ))
         return hits
 

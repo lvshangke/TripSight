@@ -254,3 +254,31 @@ def test_lodging_price_source_tag():
     s.add_lodging("乙", 39.9, 116.4)
     t = s._load()
     assert "价格来源:rollinggo 2026-10-25" in t.lodgings[0].notes and "价格来源" not in t.lodgings[1].notes
+
+
+def test_hours_need_a_source_and_backups_are_validated():
+    _setup_trip()
+    with pytest.raises(s.ToolError, match="来源"):
+        s.add_place("馆", 39.9, 116.4, opening_hours="周二至周日 9:00-17:00")
+    with pytest.raises(s.ToolError, match="不存在"):
+        s.add_place("馆", 39.9, 116.4, backups=["p99"])
+    s.add_place("馆", 39.9, 116.4, opening_hours="周二至周日 9:00-17:00", hours_source="amap",
+                reservation_required=True, backups=["p2"])
+    t = s._load()
+    assert t.place("p5").hours_source == "amap" and t.place("p5").backups == ["p2"]
+    with pytest.raises(s.ToolError):
+        s.update_place("p5", backups=["p5"])            # 不能备选自己
+    s.update_place("p5", backups=["p3"])
+    assert s._load().place("p5").backups == ["p3"]
+
+
+def test_unbooked_issue_lists_backups_and_removal_cleans_them():
+    _setup_trip()
+    s.add_place("馆", 39.9, 116.4, reservation_required=True, backups=["p2"])
+    s.schedule_days()
+    msgs = [i["message"] for i in s.check_plan()["issues"] if i["code"] == "RESERVATION_NOT_BOOKED"]
+    assert msgs and "备选：天坛" in msgs[0]
+    s.remove_place("p2")
+    assert s._load().place("p5").backups == []
+    msgs = [i["message"] for i in s.check_plan()["issues"] if i["code"] == "RESERVATION_NOT_BOOKED"]
+    assert msgs and "还没有设置备选景点" in msgs[0]

@@ -183,3 +183,5 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - 内部坐标统一为 WGS84，和高德交互时在 `tripcore/coords.py` 里与 GCJ-02 互转。
 - `cost_reference` 是高德的“人均消费”参考值，不是实时房价，也不一定是门票。
 - 目前所有高德代码只用假数据测试过，还没有用真实 key 联调。
+
+景点新增 `opening_hours` / `hours_source`（营业时间及来源）和 `backups`（备选景点；预约没约上时 `check_plan` 会提示）。高德每次调用会记到 `~/.tripcore/amap_calls.log`（不含 key）。

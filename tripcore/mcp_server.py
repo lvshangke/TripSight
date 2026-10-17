@@ -183,21 +183,32 @@ def add_place(
     notes: str = "",
     source: str = "agent",
     verified: bool = False,
+    opening_hours: str = "",
+    hours_source: str = "",
+    backups: Optional[list[str]] = None,
 ) -> str:
     """添加一个景点。lat/lon 必须来自 lookup_coords 或用户，绝不能自己编。
     ticket_price（元）、duration_min、closed_weekdays 如果没有可靠来源，请保持默认（门票填 0），
     不要凭印象编数字；verified=False 时会在备注里标“待核实”，用户确认过的数据才传 verified=True。
-    closed_weekdays：闭馆的星期，0=周一 … 6=周日。"""
+    closed_weekdays：闭馆的星期，0=周一 … 6=周日。
+    opening_hours：营业时间原文，必须同时写 hours_source（amap，或网页网址，或 user），没有来源就留空。
+    backups：备选景点的 id 列表（需要预约、可能约不上时设置）。"""
+    trip = _load()
+    for b in backups or []:
+        if all(p.id != b for p in trip.places):
+            raise ToolError(f"备选景点 {b} 不存在，请先添加或确认 id。")
+    if opening_hours and not hours_source:
+        raise ToolError("填营业时间必须同时填来源 hours_source（amap / 网址 / user）。")
     if not verified:
         notes = (notes + " " if notes else "") + "[门票/时长/闭馆日待核实]"
-    trip = _load()
     pid = _next_id("p", [p.id for p in trip.places])
     try:
         place = Place(
             id=pid, name=name, lat=lat, lon=lon, duration_min=duration_min,
             priority=priority, must_go=must_go, ticket_price=ticket_price,
             closed_weekdays=closed_weekdays or [], reservation_required=reservation_required,
-            notes=notes, source=source,
+            notes=notes, source=source, opening_hours=opening_hours, hours_source=hours_source,
+            backups=backups or [],
         )
     except ValidationError as e:
         raise ToolError(f"景点参数不合法：{e}")
@@ -261,6 +272,7 @@ def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
                 "name": h.name, "lat": round(h.lat, 6), "lon": round(h.lon, 6), "address": h.address,
                 "district": h.district, "category": h.category, "rating": h.rating,
                 "cost_reference": h.cost, "opentime_today": h.opentime_today,
+                "opentime_week": h.opentime_week,
             } for h in hits]
             top = cands[0]
             return {"found": True, "source": "amap", "name": top["name"], "lat": top["lat"], "lon": top["lon"],
@@ -297,6 +309,9 @@ def update_place(
     closed_weekdays: Optional[list[int]] = None,
     reservation_required: Optional[bool] = None,
     notes: Optional[str] = None,
+    opening_hours: Optional[str] = None,
+    hours_source: Optional[str] = None,
+    backups: Optional[list[str]] = None,
 ) -> str:
     """修改景点的资料（只改传入的字段）。这不改变它在行程里的位置；改完后请再 schedule_days。
     坐标/价格必须来自工具或用户。"""
@@ -308,9 +323,15 @@ def update_place(
     changes = {k: v for k, v in dict(
         name=name, lat=lat, lon=lon, duration_min=duration_min, priority=priority, must_go=must_go,
         ticket_price=ticket_price, closed_weekdays=closed_weekdays,
-        reservation_required=reservation_required, notes=notes).items() if v is not None}
+        reservation_required=reservation_required, notes=notes, opening_hours=opening_hours,
+        hours_source=hours_source, backups=backups).items() if v is not None}
     if not changes:
         raise ToolError("没有传入要修改的字段。")
+    for b in changes.get("backups", []):
+        if b == place_id or all(p.id != b for p in trip.places):
+            raise ToolError(f"备选景点 {b} 不存在或就是它自己。")
+    if changes.get("opening_hours") and not (changes.get("hours_source") or trip.place(place_id).hours_source):
+        raise ToolError("填营业时间必须同时填来源 hours_source（amap / 网址 / user）。")
 
     def mutate(t: Trip) -> None:
         old = t.place(place_id)
@@ -341,6 +362,8 @@ def remove_place(place_id: str) -> str:
 
     def mutate(t: Trip) -> None:
         t.places = [p for p in t.places if p.id != place_id]
+        for p in t.places:
+            p.backups = [b for b in p.backups if b != place_id]
         if t.plan:
             for d in t.plan.days:
                 d.items = [it for it in d.items if it.place_id != place_id]
