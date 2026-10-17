@@ -265,6 +265,7 @@ class WeatherSnap(BaseModel):
     night_temp: Optional[float] = None
     fetched: str = Field(default="", description="抓取日期 YYYY-MM-DD")
     source: str = Field(default="amap", description="预报来源：amap / open-meteo")
+    location: str = Field(default="", description="多个地点的行程里，预报对应哪一带（景点名）；单地点时为空")
 
 
 class Stay(BaseModel):

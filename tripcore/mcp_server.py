@@ -24,7 +24,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from .amap import AmapClient, AmapError
 from .openmeteo import OpenMeteoClient, WeatherError
-from .weather import bad_weather, fmt_snap
+from .weather import bad_weather, fmt_snap, weather_spots
 from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
@@ -1057,33 +1057,54 @@ def get_weather() -> str:
         return "还没有设置具体出行日期，无法查询天气。日期确定后再查。"
     amap_client, om_client = _amap(), _openmeteo()
     city = _load_context().get("city")
+    spots = weather_spots(trip)
+    multi = len(spots) > 1
+    day_spot = {i: sp for sp in spots for i in sp.days}
     notes: list[str] = []
-    cast: dict[str, tuple[Any, str]] = {}
-    if amap_client is not None and city:
+    cast: dict[str, tuple[Any, str]] = {}          # 日期 → (预报, 来源)
+
+    def from_amap() -> None:
+        if amap_client is None:
+            notes.append("没有配置高德 key")
+            return
+        if not city:
+            notes.append("不知道目的地城市（new_trip 时填 city 才能用高德天气）")
+            return
         try:
             code = amap_client.adcode(city)
-            if code:
-                for w in amap_client.forecast(code):
-                    cast[w.date] = (w, "amap")
-            else:
+            if not code:
                 notes.append(f"高德找不到城市「{city}」")
+                return
+            for w in amap_client.forecast(code):
+                cast.setdefault(w.date, (w, "amap"))
+            if multi:
+                notes.append(f"行程跨多个地点，高德只能按城市「{city}」查，其中远处地点的预报仅供参考")
         except AmapError as e:
             notes.append(f"高德天气查询失败：{e}")
-    elif amap_client is None:
-        notes.append("没有配置高德 key")
-    else:
-        notes.append("不知道目的地城市（new_trip 时填 city 才能用高德天气）")
-    if om_client is not None and any(k not in cast for k in wanted):
-        pts = [(p.lat, p.lon) for p in trip.places] or [(l.lat, l.lon) for l in trip.lodgings]
-        if pts:
-            lat, lon = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+
+    def from_open_meteo() -> None:
+        if om_client is None:
+            return
+        for sp in spots:
+            need = [k for k, i in wanted.items() if i in sp.days and k not in cast]
+            if not need:
+                continue
             try:
-                for w in om_client.forecast(lat, lon):
-                    cast.setdefault(w.date, (w, "open-meteo"))
+                fc = {w.date: w for w in om_client.forecast(sp.lat, sp.lon)}
             except WeatherError as e:
-                notes.append(str(e))
-        else:
-            notes.append("还没有景点或住宿坐标，无法用 Open-Meteo")
+                notes.append(f"「{sp.label}」一带：{e}")
+                continue
+            for k in need:
+                if k in fc:
+                    cast[k] = (fc[k], "open-meteo")
+
+    if multi:      # 多个地点：按地点分别用 Open-Meteo（按坐标，含海拔），查不到的再用高德补
+        from_open_meteo()
+        if any(k not in cast for k in wanted):
+            from_amap()
+    else:
+        from_amap()
+        from_open_meteo()
     if amap_client is None and om_client is None:
         raise ToolError("没有可用的天气来源（没有高德 key，也没有启用 Open-Meteo）。")
     lines, hit = [], 0
@@ -1099,8 +1120,10 @@ def get_weather() -> str:
             continue
         w, src = got
         hit += 1
+        sp_ = day_spot.get(d.index)
         snap = WeatherSnap(day_weather=w.day_weather, night_weather=w.night_weather, day_temp=w.day_temp,
-                           night_temp=w.night_temp, fetched=today, source=src)
+                           night_temp=w.night_temp, fetched=today, source=src,
+                           location=(sp_.label if multi and sp_ and src == "open-meteo" else ""))
         snaps[dt.isoformat()] = snap
         tips = []
         if bad_weather(w.day_weather, w.night_weather, w.day_temp):

@@ -39,7 +39,7 @@ def test_client_wraps_network_errors(monkeypatch):
 def _trip(start="2026-10-18", end="2026-10-19"):
     s.new_trip(start_date=start, end_date=end, city="西安")
     s.add_place("公园", 39.9, 116.4, category="风景名胜;公园广场")
-    s.add_place("乙", 39.99, 116.3)
+    s.add_place("乙", 39.905, 116.405)
     s.schedule_days()
 
 
@@ -84,3 +84,41 @@ def test_no_source_at_all_errors(monkeypatch):
     monkeypatch.setattr(s, "_amap", lambda: None)
     with pytest.raises(s.ToolError):
         s.get_weather()
+
+
+class SpotOM:
+    """按坐标返回不同天气：近的点晴，远的点（山上）下雨。"""
+
+    def __init__(self):
+        self.calls = []
+
+    def forecast(self, lat, lon, days=16):
+        self.calls.append((round(lat, 2), round(lon, 2)))
+        rainy = lat > 35
+        return [WeatherDay(d, "1", "小雨" if rainy else "晴", "", 5 if rainy else 20, 2) for d in ("2026-10-18", "2026-10-19")]
+
+
+def test_multi_location_trip_queries_each_spot(monkeypatch):
+    s.new_trip(start_date="2026-10-18", end_date="2026-10-19", city="西安")
+    s.add_place("市区景点", 34.26, 108.95, category="风景名胜;公园广场")
+    s.add_place("远处的山", 34.55, 110.08, category="风景名胜")      # 约 100 km 外
+    s.schedule_days()
+    om = SpotOM()
+    monkeypatch.setattr(s, "_amap", lambda: WeatherAmap(["2026-10-18", "2026-10-19"]))   # 高德有，但多地点时不能用它
+    monkeypatch.setattr(s, "_openmeteo", lambda: om)
+    s.get_weather()
+    t = s._load()
+    assert len(set(om.calls)) == 2                              # 两个位置各查一次
+    assert all(w.source == "open-meteo" and w.location for w in t.weather.values())
+    assert {w.location for w in t.weather.values()} == {"市区景点", "远处的山"}
+    assert "「远处的山」一带" in s.show_trip()
+
+
+def test_multi_location_falls_back_to_amap_with_note(monkeypatch):
+    s.new_trip(start_date="2026-10-18", end_date="2026-10-19", city="西安")
+    s.add_place("甲", 34.26, 108.95)
+    s.add_place("乙", 34.55, 110.08)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: WeatherAmap(["2026-10-18", "2026-10-19"]))
+    out = s.get_weather()                                       # Open-Meteo 被测试关闭
+    assert "仅供参考" in out and s._load().weather["2026-10-18"].source == "amap"

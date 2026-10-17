@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional
 
-from .models import Place
+from .geo import haversine_km
+from .models import Place, Trip
+from .routeplace import entry
 
 _INDOOR_WORDS = ("博物馆", "美术馆", "展览馆", "科技馆", "图书馆", "纪念馆", "艺术馆", "文化宫", "剧院", "影院", "商场", "购物中心", "水族馆")
 _OUTDOOR_WORDS = ("公园", "广场", "风景名胜", "旅游景点", "城墙", "古迹", "步行街", "商业街", "古镇", "山", "湖", "海滩", "动物园", "植物园", "寺庙", "道教")
@@ -42,7 +45,8 @@ def fmt_snap(w) -> str:
     night = ""
     if w.night_weather or w.night_temp is not None:
         night = "，夜间" + (w.night_weather or "") + (f" {w.night_temp:.0f}°C" if w.night_temp is not None else "")
-    return f"{day}{night}（{SOURCE_NAMES.get(w.source, w.source)}预报，{w.fetched} 查询，之后可能变化）"
+    where = f"「{w.location}」一带，" if getattr(w, "location", "") else ""
+    return f"{day}{night}（{where}{SOURCE_NAMES.get(w.source, w.source)}预报，{w.fetched} 查询，之后可能变化）"
 
 
 def bad_weather(day_weather: str, night_weather: str, day_temp: Optional[float]) -> list[str]:
@@ -54,3 +58,49 @@ def bad_weather(day_weather: str, night_weather: str, day_temp: Optional[float])
     if day_temp is not None and day_temp >= 35:
         out.append("高温")
     return out
+
+
+GROUP_KM = 10.0     # 相距不超过这个距离的各天，合并成同一个天气位置
+
+
+@dataclass
+class WeatherSpot:
+    lat: float
+    lon: float
+    label: str               # 离重心最近的景点名，用来说明“哪一带”
+    days: list[int]          # 第几天（0 起）
+
+
+def weather_spots(trip: Trip) -> list[WeatherSpot]:
+    """每天按当天景点的重心确定天气位置，相近的天合并；没安排景点的天沿用当天酒店或全程重心。"""
+    if trip.plan is None:
+        return []
+    allp = [(p.name, *_pt(p)) for p in trip.places]
+    if not allp and not trip.lodgings:
+        return []
+    overall = (sum(a[1] for a in allp) / len(allp), sum(a[2] for a in allp) / len(allp)) if allp else (trip.lodgings[0].lat, trip.lodgings[0].lon)
+    per_day: list[tuple[int, float, float, str]] = []
+    for day in trip.plan.days:
+        names = [(trip.place(it.place_id).name, *_pt(trip.place(it.place_id))) for it in day.items]
+        if names:
+            la, lo = sum(n[1] for n in names) / len(names), sum(n[2] for n in names) / len(names)
+            label = min(names, key=lambda n: haversine_km(la, lo, n[1], n[2]))[0]
+        else:
+            lod = trip.lodging_for_day(day.index)
+            la, lo = (lod.lat, lod.lon) if lod else overall
+            label = lod.name if lod else ""
+        per_day.append((day.index, la, lo, label))
+    spots: list[WeatherSpot] = []
+    for idx, la, lo, label in per_day:
+        for sp in spots:
+            if haversine_km(sp.lat, sp.lon, la, lo) <= GROUP_KM:
+                sp.days.append(idx)
+                break
+        else:
+            spots.append(WeatherSpot(la, lo, label, [idx]))
+    return spots
+
+
+def _pt(p: Place) -> tuple[float, float]:
+    e = entry(p)
+    return e.lat, e.lon
