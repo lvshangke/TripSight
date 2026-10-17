@@ -145,8 +145,9 @@ def new_trip(
     latest_end: Optional[str] = None,
     budget_total: Optional[float] = None,
     city: Optional[str] = None,
+    travelers: int = 1,
 ) -> str:
-    """创建一个新行程（会覆盖当前行程）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
+    """创建一个新行程（会覆盖当前行程）。travelers 是出行人数（用户没说就先问）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
     日期可不填；填 start_date+end_date 为确定日期，填 earliest_start+latest_end 为大致范围。"""
     sd, ed = _parse_date(start_date, "start_date"), _parse_date(end_date, "end_date")
     es, le = _parse_date(earliest_start, "earliest_start"), _parse_date(latest_end, "latest_end")
@@ -160,7 +161,7 @@ def new_trip(
         meta = TripMeta(
             name=name, num_days=num_days, pace=Pace(pace), mode=mode,  # type: ignore[arg-type]
             date_mode=date_mode, start_date=sd, end_date=ed,
-            earliest_start=es, latest_end=le, budget_total=budget_total,
+            earliest_start=es, latest_end=le, budget_total=budget_total, travelers=travelers,
         )
     except (ValidationError, ValueError) as e:
         raise ToolError(f"参数不合法：{e}")
@@ -540,8 +541,53 @@ def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: st
             "note": "评分/人均为高德参考值；营业时间为空表示高德无数据，需核实。请用户选择后调用 choose_food。"}
 
 
-def choose_food(candidate_id: str) -> str:
-    """把用户选定的候选餐厅记为这一天的用餐点（候选来自最近一次 suggest_food）。
+def find_food(name: str) -> dict[str, Any]:
+    """用户自己想吃的店：按店名在高德搜索（限定目的地城市），并按已排好的行程，用代码算出离哪一天哪个景点最近，
+    作为建议的安排位置 suggested。这只是候选，不改行程；请把候选和建议位置展示给用户确认，
+    再调用 choose_food(candidate_id)（想换位置就传 day / after_place_id）。需要 AMAP_KEY。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法搜索餐厅。")
+    trip = _load()
+    city = _load_context().get("city")
+    try:
+        hits = client.search_places(name, city, limit=5)
+    except AmapError as e:
+        raise ToolError(f"搜索失败：{e}")
+    stops = []
+    if trip.plan:
+        for d in trip.plan.days:
+            for it in d.items:
+                stops.append((d.index, trip.place(it.place_id)))
+    stored, shown = {}, []
+    for i, h in enumerate(hits, 1):
+        cid = f"f{i}"
+        entry = {"candidate_id": cid, "name": h.name, "address": h.address, "lat": h.lat, "lon": h.lon,
+                 "rating": h.rating, "cost_per_person": h.cost,
+                 "opening_hours": h.opentime_week or h.opentime_today, "amap_id": h.amap_id}
+        sug = None
+        if stops:
+            di, pl = min(stops, key=lambda x: haversine_km(x[1].lat, x[1].lon, h.lat, h.lon))
+            dist = int(haversine_km(pl.lat, pl.lon, h.lat, h.lon) * 1000)
+            sug = {"day": di + 1, "after_place_id": pl.id, "after_place": pl.name, "distance_m": dist}
+            if dist > 3000:
+                sug["warning"] = "离所有景点都超过 3 公里，需要单独安排交通，请和用户确认是否真的要排。"
+            entry.update(day=di, after_place_id=pl.id, distance_m=dist)
+        stored[cid] = entry
+        shown.append({**{k: entry[k] for k in ("candidate_id", "name", "address", "rating", "cost_per_person", "opening_hours")},
+                      "suggested": sug})
+    fp = _food_path()
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8")
+    note = "请用户确认是不是想去的那家店。" if hits else "高德没有找到这家店，请换个说法，或请用户提供地址。"
+    if not stops:
+        note += " 还没有分天，无法建议位置，请先 schedule_days。"
+    return {"query": name, "candidates": shown, "note": note}
+
+
+def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Optional[str] = None) -> str:
+    """把用户选定的候选餐厅记为用餐点（候选来自最近一次 suggest_food / find_food）。
+    默认用候选里的建议位置；用户想换到别的天或别的景点后面，传 day（第几天，从 1 开始）和 after_place_id。
     只能在用户明确选定后调用；用餐点不占景点容量，可用 undo 撤销。"""
     fp = _food_path()
     try:
@@ -550,21 +596,38 @@ def choose_food(candidate_id: str) -> str:
         stored = {}
     c = stored.get(candidate_id)
     if c is None:
-        raise ToolError("没有这个候选，请先调用 suggest_food，并使用它返回的 candidate_id。")
+        raise ToolError("没有这个候选，请先调用 suggest_food 或 find_food，并使用它返回的 candidate_id。")
+    day0 = (day - 1) if day is not None else c.get("day")
+    pid = after_place_id or c.get("after_place_id")
+    if day0 is None or pid is None:
+        raise ToolError("没有可用的安排位置，请先 schedule_days，或传入 day 和 after_place_id。")
     trip = _load()
+    if trip.plan is None or not (0 <= day0 < len(trip.plan.days)):
+        raise ToolError("day 超出行程天数。")
     try:
-        trip.place(c["after_place_id"])
+        pl = trip.place(pid)
     except KeyError as e:
         raise ToolError(str(e))
-    if any(m.name == c["name"] and m.day == c["day"] for m in trip.meals):
-        raise ToolError(f"「{c['name']}」已经在第 {c['day'] + 1} 天的用餐点里了。")
+    if any(m.name == c["name"] and m.day == day0 for m in trip.meals):
+        raise ToolError(f"「{c['name']}」已经在第 {day0 + 1} 天的用餐点里了。")
+    dist = int(haversine_km(pl.lat, pl.lon, c["lat"], c["lon"]) * 1000)
     mid = _next_id("m", [m.id for m in trip.meals])
-    meal = Meal(id=mid, day=c["day"], after_place_id=c["after_place_id"], name=c["name"], lat=c["lat"], lon=c["lon"],
+    meal = Meal(id=mid, day=day0, after_place_id=pid, name=c["name"], lat=c["lat"], lon=c["lon"],
                 address=c.get("address") or "", cost_per_person=c.get("cost_per_person"), rating=c.get("rating"),
                 opening_hours=c.get("opening_hours") or "", hours_source="amap" if c.get("opening_hours") else "",
-                distance_m=c.get("distance_m"))
+                distance_m=dist)
     _save(commit(trip, lambda t: t.meals.append(meal)))
-    return f"已把「{meal.name}」记为第 {meal.day + 1} 天的用餐点（{meal.id}）。人均和评分是高德参考值。"
+    extra = "（离该景点较远，注意交通）" if dist > 3000 else ""
+    return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是高德参考值。"
+
+
+def set_travelers(n: int) -> str:
+    """设置出行人数（门票、餐饮按人数估算）。"""
+    if not (1 <= n <= 50):
+        raise ToolError("人数需要在 1~50 之间。")
+    trip = _load()
+    _save(commit(trip, lambda t: setattr(t.meta, "travelers", n)))
+    return f"已设置出行人数为 {n} 人。"
 
 
 def remove_food(meal_id: str) -> str:
@@ -917,9 +980,15 @@ def _render(trip: Trip) -> str:
         out.append("未安排：" + "；".join(f"{trip.place(u.place_id).name}：{u.reason}" for u in trip.plan.unscheduled))
     c = estimate_cost(trip)
     costs = [ml.cost_per_person for ml in trip.meals if ml.cost_per_person is not None]
+    n = m.travelers
     if costs:
-        out.append(f"餐饮（已选 {len(trip.meals)} 处，人均参考合计 {sum(costs):.0f} 元/人，未乘人数、不计入下面的粗略费用）")
-    out.append(f"粗略费用（仅门票+住宿）：{c.total:.0f} {m.currency}")
+        out.append(f"餐饮（已选 {len(trip.meals)} 处）人均参考合计 {sum(costs):.0f} 元/人")
+    out.append(f"粗略费用（仅门票+住宿，门票按 1 人计）：{c.total:.0f} {m.currency}")
+    if n > 1 or costs:
+        food = sum(costs) * n
+        total = c.tickets * n + food + c.lodging
+        out.append(f"按 {n} 人估算：门票 {c.tickets * n:.0f} + 已选餐厅 {food:.0f} + 住宿 {c.lodging:.0f}（按整间/整晚价，未乘人数）"
+                   f" = 约 {total:.0f} {m.currency}（未含交通和未选的餐食，均为参考值）")
     return "\n".join(out)
 
 
@@ -929,7 +998,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, choose_food, remove_food, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

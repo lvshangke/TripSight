@@ -149,7 +149,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 ## MCP 服务（第 1 步）
 
 `tripcore/mcp_server.py` 把 tripcore 包装成 17 个工具，供 nanobot 等 Agent 通过聊天调用：
-`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `choose_food` `remove_food` `get_weather` `schedule_days` `check_plan`
+`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
 - 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
@@ -196,3 +196,5 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - `fill_hours`：给没有营业时间的景点从高德补（名字相符且 1.5 km 内才采用，来源 amap，不覆盖已有数据）。
 - 沿途美食：`suggest_food(day, after_place_id)` 用高德周边搜索（默认 800 m、餐饮类）返回候选，不改行程；用户选定后 `choose_food` 才写入 `Trip.meals`（不占景点容量、不参与排程，可撤销）。评分、人均是参考值。
 - 营业时间按日期判断时支持季节条件（`3~10月`、`10月11日起`、`11月15日起周一闭馆`）；条件复杂就返回“待核实”。
+- `find_food(店名)`：用户自己想吃的店。高德按店名搜索，并用代码算出离已排行程里哪一天、哪个景点最近，作为建议位置（超过 3 km 会警告）；`choose_food` 可指定 `day` / `after_place_id` 改位置。
+- `Trip.meta.travelers`（人数，默认 1，`new_trip(travelers=…)` / `set_travelers`）：`show_trip` 按人数估算门票和已选餐厅，住宿按整间价不乘人数。

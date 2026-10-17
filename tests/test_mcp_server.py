@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 22
+    assert len(names) == 24
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -511,3 +511,43 @@ def test_seasonal_hours():
     assert h("周一至周日 08:30-18:00;10月11日起 08:30-17:30", date(2026, 10, 5)) == "08:30-18:00"
     assert h("4~10月 08:00-18:00", date(2026, 12, 1)) is None   # 条件不适用且没有别的信息
     assert h("1月 08:00 3月 09:00", date(2026, 1, 5)) is None    # 条件过于复杂，不猜
+
+
+class NamedFoodAmap(FakeAmap):
+    def search_places(self, query, city=None, limit=5):
+        # 故宫 (39.9163,116.3972) 附近一家，和一家很远的
+        return [PlaceHit("老店", 39.9170, 116.3980, rating=4.6, cost=60),
+                PlaceHit("远店", 39.7000, 116.9000, rating=4.9, cost=40)]
+
+
+def test_find_food_suggests_nearest_slot_and_cost_uses_travelers(monkeypatch):
+    s.new_trip(num_days=2, travelers=2, city="北京")
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.add_place("颐和园", 39.9999, 116.2755)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: NamedFoodAmap())
+    r = s.find_food("老店")
+    near, far = r["candidates"]
+    assert near["suggested"]["after_place"] == "故宫" and near["suggested"]["distance_m"] < 300
+    assert "warning" in far["suggested"]
+    s.choose_food(near["candidate_id"])
+    m = s._load().meals[0]
+    assert m.after_place_id == "p1" and m.cost_per_person == 60
+    out = s.show_trip()
+    assert "按 2 人估算" in out and "已选餐厅 120" in out
+    # 换到另一天的另一个景点后面
+    s.choose_food(far["candidate_id"], day=2, after_place_id="p2")
+    assert s._load().meals[1].after_place_id == "p2" and s._load().meals[1].distance_m > 3000
+    with pytest.raises(s.ToolError):
+        s.choose_food(far["candidate_id"], day=9, after_place_id="p2")
+
+
+def test_set_travelers():
+    s.new_trip()
+    assert s._load().meta.travelers == 1
+    s.set_travelers(3)
+    assert s._load().meta.travelers == 3
+    with pytest.raises(s.ToolError):
+        s.set_travelers(0)
+    with pytest.raises(s.ToolError):
+        s.new_trip(travelers=0)

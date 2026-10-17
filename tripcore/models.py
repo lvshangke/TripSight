@@ -191,6 +191,7 @@ class TripMeta(BaseModel):
     pace: Pace = Pace.NORMAL
     mode: TravelMode = "transit"
     budget_total: Optional[float] = Field(default=None, ge=0)
+    travelers: int = Field(default=1, ge=1, le=50, description="出行人数（门票、餐饮按人数估算）")
     currency: str = "CNY"
     transport_prefs: TransportPrefs = Field(default_factory=TransportPrefs)
 
