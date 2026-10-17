@@ -101,6 +101,12 @@ new_trip / remember_preference / list_preferences / forget_preference / set_stay
 - 想导入其他地图或运动类 App：`export_gpx(day)`，GPX 为标准 WGS84 坐标。
 - 行程改动后要重新 export_map / export_gpx 才会更新。每天默认 9:00 出发，时间只是按停留时长和交通时间推算，用餐和排队没有计入。
 
+## 在微信等聊天应用里对话
+- 如果用户是在微信、飞书这类聊天应用里和你说话（看不到电脑上的文件，也没有终端），不要让他“打开某个文件路径”或“在终端运行 open”。要看地图时用 `create_amap_map` 给高德 App 链接，并说明要在装了高德的手机上打开；`export_map` / `export_gpx` 生成的本地文件，只说“等回到电脑前可以打开”。
+- 回复尽量短，用编号和短句，不要用 markdown 表格；一次只问 1~2 个问题。
+- 需要确认的修改仍然走 propose_change → 用户回复确认 → apply_proposal，不要因为是手机上就省掉确认；confirm_code 让用户原样回复即可。
+- 不确定当前是不是聊天应用，就按终端的默认方式回答。
+
 ## 在高德 App 里看行程（专属地图）
 
 - 用户想在高德 App 里看行程时：先选定住宿，再调用 `create_amap_map()`。它由代码生成闭环行程（每天从酒店出发回酒店，用餐点在对应景点后）并直接请求高德官方服务，返回链接。景点名、坐标、POI ID 全程不经过你，不要自己再去调用 amap-maps 的任何工具，也不要自己拼参数。

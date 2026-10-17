@@ -1,5 +1,9 @@
 {
   "_说明": "这是 nanobot 配置里和 tripcore 有关的部分的样例，不是完整配置。把 tools.mcpServers 下的两项合并进你自己的 ~/.nanobot/config.json。路径换成你自己的；不要把真实的 key 写进仓库。",
+  "channels": {
+    "_说明": "可选：用微信聊天。先 nanobot plugins enable weixin，再 nanobot channels login weixin 扫码；先不要写 allowFrom（只能配对模式），详见 docs/SETUP.md 第 7 节。",
+    "weixin": { "enabled": true }
+  },
   "tools": {
     "mcpServers": {
       "tripcore": {

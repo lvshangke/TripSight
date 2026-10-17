@@ -41,6 +41,22 @@ python scripts/install_skills.py --check    # 检查已安装的是否和仓库�
 
 `~/.tripcore/`：`trip.json`（行程）、`proposals.json`（待确认的提案）、`candidates.json`（游记候选）、`map.html`、`gpx/`、`amap_calls.log`（高德调用记录，不含 key）。环境变量 `TRIPCORE_FILE` 可改行程文件位置。
 
+## 7. 可选：用微信和它聊天
+
+nanobot 自带 `weixin` 渠道（二维码登录的个人微信，长轮询，不需要装微信电脑版）。tripcore 的工具和 skill 不用改，只是多了一个对话入口。以下步骤**必须由你本人在自己的电脑上完成**（扫码登录、批准配对）：
+
+1. 启用渠道：`nanobot plugins enable weixin`
+2. 在 `~/.nanobot/config.json` 里加上（见 `nanobot/config.example.json`）：`"channels": {"weixin": {"enabled": true}}`。先**不要写 `allowFrom`**，这样是“只能配对”模式：第一次给机器人发私聊消息时，它只回一个配对码，没有批准前不会执行任何工具。
+3. 登录：`nanobot channels login weixin`，用微信扫终端里的二维码（重新登录加 `--force`）。登录状态等同账号访问权限，不要放进仓库，也不要给别人。
+4. 启动：`nanobot gateway`，保持运行。
+5. 用微信给机器人发一条私聊消息，会收到配对码。在你自己电脑上执行 `nanobot agent -m "/pairing approve 配对码"`（只批准你自己的码）。再发一次消息就能对话了。
+6. 之后想用固定白名单，可以把日志里看到的你的微信 ID 写进 `allowFrom`。
+
+注意：
+- **行程数据在 tripcore 里，是全局的一份**（`~/.tripcore/trip.json`），所以电脑终端和微信看到的是同一个行程，偏好也共用；但 nanobot 的聊天记录按渠道分开。只批准你自己的微信，不要用 `["*"]`，否则任何人都能改你的行程。
+- 微信里看不到电脑上的文件路径。想看地图，用 `create_amap_map` 生成高德 App 链接；本地的 `map.html` 只能回电脑上打开。
+- 微信聊天里不渲染 markdown 表格，skill 里已提示用短句和编号。
+
 ## 改 skill 时
 
 以仓库里的 `skills/` 为准，改完用 `scripts/install_skills.py` 同步到 nanobot（或用 `--link` 一次链好）。
