@@ -31,3 +31,10 @@ def beijing() -> Trip:
 def _isolated_state(tmp_path, monkeypatch):
     """所有测试都用临时目录保存行程/偏好，绝不碰真实的 ~/.tripcore。"""
     monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "trip.json"))
+
+
+@pytest.fixture(autouse=True)
+def _no_network_weather(monkeypatch):
+    """测试里默认不启用 Open-Meteo（不联网）；需要的测试自己替换。"""
+    from tripcore import mcp_server
+    monkeypatch.setattr(mcp_server, "_openmeteo", lambda: None)

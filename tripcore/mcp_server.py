@@ -23,6 +23,8 @@ from typing import Any, Optional
 from pydantic import TypeAdapter, ValidationError
 
 from .amap import AmapClient, AmapError
+from .openmeteo import OpenMeteoClient, WeatherError
+from .weather import bad_weather, fmt_snap
 from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
@@ -1037,27 +1039,53 @@ def remove_food(meal_id: str) -> str:
     return f"已取消用餐点「{m.name}」。"
 
 
+def _openmeteo():
+    """Open-Meteo（免费、无需 key）。测试里会替换这个函数；返回 None 表示不用它。"""
+    return OpenMeteoClient()
+
+
 def get_weather() -> str:
-    """查行程各天的天气预报（高德，需要 AMAP_KEY）。只有设置了具体日期、且日期在高德预报范围内（约未来 4 天）
-    的那几天才有结果；其余天直接说明“暂无预报”，不要自行编造天气。"""
-    client = _amap()
-    if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查天气。")
+    """查行程各天的天气预报。只有设置了具体日期的那几天才查。
+    来源：先用高德（国内，约未来 4 天，需要 AMAP_KEY 和目的地 city）；高德没有的日期、或境外目的地，
+    改用 Open-Meteo（免费，全球，最长约 16 天）。每天的预报都标明来源和查询日期。超出所有来源范围的天直接说“暂无预报”，
+    不要自行编造天气，也不要用往年气候代替。"""
     trip = _load()
     if trip.plan is None:
         raise ToolError("还没有分天，请先 schedule_days。")
-    if not any(trip.day_date(d.index) for d in trip.plan.days):
+    wanted = {trip.day_date(d.index).isoformat(): d.index for d in trip.plan.days if trip.day_date(d.index)}
+    if not wanted:
         return "还没有设置具体出行日期，无法查询天气。日期确定后再查。"
+    amap_client, om_client = _amap(), _openmeteo()
     city = _load_context().get("city")
-    if not city:
-        raise ToolError("不知道目的地城市，new_trip 时请填写 city。")
-    try:
-        code = client.adcode(city)
-        if not code:
-            raise ToolError(f"高德找不到城市「{city}」。")
-        cast = {w.date: w for w in client.forecast(code)}
-    except AmapError as e:
-        raise ToolError(f"查询天气失败：{e}")
+    notes: list[str] = []
+    cast: dict[str, tuple[Any, str]] = {}
+    if amap_client is not None and city:
+        try:
+            code = amap_client.adcode(city)
+            if code:
+                for w in amap_client.forecast(code):
+                    cast[w.date] = (w, "amap")
+            else:
+                notes.append(f"高德找不到城市「{city}」")
+        except AmapError as e:
+            notes.append(f"高德天气查询失败：{e}")
+    elif amap_client is None:
+        notes.append("没有配置高德 key")
+    else:
+        notes.append("不知道目的地城市（new_trip 时填 city 才能用高德天气）")
+    if om_client is not None and any(k not in cast for k in wanted):
+        pts = [(p.lat, p.lon) for p in trip.places] or [(l.lat, l.lon) for l in trip.lodgings]
+        if pts:
+            lat, lon = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+            try:
+                for w in om_client.forecast(lat, lon):
+                    cast.setdefault(w.date, (w, "open-meteo"))
+            except WeatherError as e:
+                notes.append(str(e))
+        else:
+            notes.append("还没有景点或住宿坐标，无法用 Open-Meteo")
+    if amap_client is None and om_client is None:
+        raise ToolError("没有可用的天气来源（没有高德 key，也没有启用 Open-Meteo）。")
     lines, hit = [], 0
     snaps: dict[str, WeatherSnap] = {}
     today = date.today().isoformat()
@@ -1065,28 +1093,29 @@ def get_weather() -> str:
         dt = trip.day_date(d.index)
         if dt is None:
             continue
-        w = cast.get(dt.isoformat())
-        if w is None:
-            lines.append(f"第{d.index + 1}天 {dt.isoformat()}：暂无预报（超出高德预报范围）")
+        got = cast.get(dt.isoformat())
+        if got is None:
+            lines.append(f"第{d.index + 1}天 {dt.isoformat()}：暂无预报（超出可用来源的预报范围）")
             continue
+        w, src = got
         hit += 1
-        snaps[dt.isoformat()] = WeatherSnap(day_weather=w.day_weather, night_weather=w.night_weather,
-                                            day_temp=w.day_temp, night_temp=w.night_temp, fetched=today)
+        snap = WeatherSnap(day_weather=w.day_weather, night_weather=w.night_weather, day_temp=w.day_temp,
+                           night_temp=w.night_temp, fetched=today, source=src)
+        snaps[dt.isoformat()] = snap
         tips = []
-        txt = w.day_weather + w.night_weather
-        if "雨" in txt or "雪" in txt:
-            tips.append("有雨雪，户外景点建议与室内景点调换或备好雨具")
-        if w.day_temp is not None and w.day_temp >= 35:
-            tips.append("高温，户外安排避开正午")
+        if bad_weather(w.day_weather, w.night_weather, w.day_temp):
+            tips.append("有雨雪或高温，户外景点建议与室内景点调换、备好雨具或避开正午")
         if w.night_temp is not None and w.night_temp <= 0:
             tips.append("低温，注意保暖")
-        lines.append(f"第{d.index + 1}天 {dt.isoformat()}：白天{w.day_weather} {w.day_temp:.0f}°C，夜间{w.night_weather} {w.night_temp:.0f}°C"
-                     + ("；" + "；".join(tips) if tips else ""))
+        lines.append(f"第{d.index + 1}天 {dt.isoformat()}：{fmt_snap(snap)}" + ("；" + "；".join(tips) if tips else ""))
     if snaps:  # 天气只是缓存，不算一次修改：不进历史、不让提案失效
         _save(trip.model_copy(update={"weather": {**trip.weather, **snaps}}))
+    out = "\n".join(lines)
+    if notes:
+        out += "\n（" + "；".join(notes) + "）"
     if hit == 0:
-        return "出行日期不在高德天气预报范围内（仅约未来 4 天），暂不提供天气。\n" + "\n".join(lines)
-    return "\n".join(lines) + "\n（已记录，之后 show_trip / check_trip 会按这份预报提醒哪天的户外安排受影响；如要调整，请用 propose_change 提出，由用户确认。）"
+        return "出行日期不在可用天气来源的预报范围内（高德约未来 4 天，Open-Meteo 约 16 天），暂不提供天气。\n" + out
+    return out + "\n（已记录，之后 show_trip / check_plan 会按这份预报提醒哪天的户外安排受影响；如要调整，请用 propose_change 提出，由用户确认。）"
 
 
 def _point(trip: Trip, pid: str):
@@ -1458,9 +1487,7 @@ def _render(trip: Trip) -> str:
             out.append(f"  ⏱ {'；'.join(_why)}，可玩约 {_we - _ws} 分钟")
         _w = trip.weather.get(d.isoformat()) if d else None
         if _w:
-            out.append(f"  🌤 {_w.day_weather} {_w.day_temp:.0f}°C / 夜间{_w.night_weather} {_w.night_temp:.0f}°C（高德预报，{_w.fetched} 查询，之后可能变化）"
-                       if _w.day_temp is not None and _w.night_temp is not None else
-                       f"  🌤 {_w.day_weather} / 夜间{_w.night_weather}（高德预报，{_w.fetched} 查询）")
+            out.append("  🌤 " + fmt_snap(_w))
         if not st.places:
             out.append("  （空）")
             continue

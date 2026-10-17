@@ -12,7 +12,7 @@ from .connections import arrival_day, day_window, departure_day
 from .metrics import PACE_LIMITS, day_stats, estimate_cost
 from .models import Trip
 from .stays import hint_text
-from .weather import bad_weather, is_outdoor
+from .weather import SOURCE_NAMES, bad_weather, is_outdoor
 
 Severity = Literal["error", "warning", "info"]
 
@@ -128,7 +128,7 @@ def validate(trip: Trip) -> list[Issue]:
                             "warning",
                             f"{label}（{d.isoformat()}）预报{w.day_weather}"
                             + (f" {w.day_temp:.0f}°C" if w.day_temp is not None else "")
-                            + f"（{'、'.join(bad)}，{w.fetched} 查询），「{p.name}」是户外安排，建议与室内景点调换或备好雨具/避开正午。",
+                            + f"（{'、'.join(bad)}；{SOURCE_NAMES.get(w.source, w.source)}，{w.fetched} 查询），「{p.name}」是户外安排，建议与室内景点调换或备好雨具/避开正午。",
                             day.index,
                             p.id,
                         )

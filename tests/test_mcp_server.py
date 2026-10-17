@@ -414,7 +414,7 @@ def test_weather_only_within_forecast_range(monkeypatch):
     out = s.get_weather()
     assert "小雨" in out and "暂无预报" in out
     monkeypatch.setattr(s, "_amap", lambda: WeatherAmap(["2027-01-01"]))
-    assert "不在高德天气预报范围" in s.get_weather()
+    assert "不在可用天气来源的预报范围" in s.get_weather()
     s.new_trip(num_days=2, city="西安")
     s.add_place("甲", 39.9, 116.4)
     s.schedule_days()

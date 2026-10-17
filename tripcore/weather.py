@@ -33,6 +33,18 @@ def is_outdoor(p: Place) -> Optional[bool]:
     return outdoor_from_category(p.category)
 
 
+SOURCE_NAMES = {"amap": "高德", "open-meteo": "Open-Meteo"}
+
+
+def fmt_snap(w) -> str:
+    """一天预报的一行文字（含来源和查询日期）。夜间天气没有时只写气温。"""
+    day = f"白天{w.day_weather}" + (f" {w.day_temp:.0f}°C" if w.day_temp is not None else "")
+    night = ""
+    if w.night_weather or w.night_temp is not None:
+        night = "，夜间" + (w.night_weather or "") + (f" {w.night_temp:.0f}°C" if w.night_temp is not None else "")
+    return f"{day}{night}（{SOURCE_NAMES.get(w.source, w.source)}预报，{w.fetched} 查询，之后可能变化）"
+
+
 def bad_weather(day_weather: str, night_weather: str, day_temp: Optional[float]) -> list[str]:
     """对户外安排不利的天气因素（文字），没有则为空列表。"""
     out = []
