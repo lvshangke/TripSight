@@ -30,7 +30,7 @@ from .gpx import build_gpx
 from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
-from .connections import day_window, leave_by, ready_time, terminal_point, transfer_minutes, transfer_target
+from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
@@ -446,7 +446,10 @@ def refine_routes(day: Optional[int] = None) -> str:
         key = leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode)
         all_keys.add(key)
         cached = trip.route_overrides.get(key)
-        if (cached is not None and cached.path_checked) or key in new_legs:
+        when = terminal_depart_time(trip, "arrival") if a.id == "arrival" else (
+            terminal_depart_time(trip, "departure") if b.id == "departure" else None)
+        stamp = f"{when:%Y-%m-%d %H}" if when is not None else ""
+        if (cached is not None and cached.path_checked and cached.depart_at == stamp) or key in new_legs:
             skipped += 1
             continue
         if requested >= MAX_ROUTE_REQUESTS:
@@ -459,13 +462,19 @@ def refine_routes(day: Optional[int] = None) -> str:
         try:
             pr = trip.meta.transport_prefs
             kw = _transit_kwargs(pr) if req_mode == "transit" else {}
+            night_note = ""
+            if when is not None and req_mode == "transit":
+                if is_night(when) and pr.taxi_ok and f"{a.id}>{b.id}" not in trip.leg_modes:
+                    req_mode, night_note = "drive", f"{when:%H:%M} 出发属深夜（约 23:00–05:30），公共交通多已停运，按打车计算"
+                else:
+                    kw["depart"] = when
             r = client.route(req_mode, a.lat, a.lon, b.lat, b.lon, city, **kw)
         except AmapError as e:
             failures.append(f"{a.name} → {b.name}：{e}")
             continue
         new_legs[key] = Leg(from_id=a.id, to_id=b.id, mode=r.mode, distance_km=r.distance_km,  # type: ignore[arg-type]
                             minutes=r.minutes, detail_level="route", path=[list(pt) for pt in r.path],
-                            path_checked=True, note=_route_note(r))
+                            path_checked=True, depart_at=stamp, note="；".join(x for x in (_route_note(r), night_note) if x))
 
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))

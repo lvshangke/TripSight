@@ -120,3 +120,22 @@ def day_window(trip: Trip, day_index: int) -> tuple[int, int, list[str]]:
         why.append(f"{trip.departure.dep_time:%H:%M} 离开，要提前 {LEAD_BUFFER[trip.departure.kind]} 分钟到场 + 去机场/车站路上约 {mins} 分钟（{src}），"
                    f"最晚 {_minute_of_day(lv) // 60:02d}:{_minute_of_day(lv) % 60:02d} 就要从酒店出发")
     return start, max(start, end), why
+
+
+NIGHT_START_MIN = 23 * 60        # 经验规则：约 23:00–05:30 公共交通多已停运（不是真实末班车时间，会在说明里标注）
+NIGHT_END_MIN = 5 * 60 + 30
+
+
+def is_night(when: datetime) -> bool:
+    m = when.hour * 60 + when.minute
+    return m >= NIGHT_START_MIN or m < NIGHT_END_MIN
+
+
+def terminal_depart_time(trip: Trip, which: str) -> Optional[datetime]:
+    """机场/车站这一段预计从哪个时间出发：到达=出站后；离开=按目前估计的路程倒推。"""
+    c = getattr(trip, which)
+    if c is None:
+        return None
+    if which == "arrival":
+        return c.arr_time + timedelta(minutes=EXIT_BUFFER[c.kind])
+    return c.dep_time - timedelta(minutes=LEAD_BUFFER[c.kind] + transfer_minutes(trip, "departure")[0])

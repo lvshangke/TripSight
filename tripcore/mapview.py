@@ -67,6 +67,13 @@ def _leg_entry(leg, a_name, a, b_name, b) -> dict[str, Any]:
             "link": amap_link(a_name, a.lat, a.lon, b_name, b.lat, b.lon, leg.mode)}
 
 
+def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
+    icon = {"flight": "✈", "train": "🚄"}.get(c.kind, "🚌")
+    return {"type": "term", "icon": icon, "role": role, "time": when.strftime("%H:%M"), "name": tp.name,
+            "pos": _gcj(tp.lat, tp.lon), "lines": [f"{c.number or c.kind}：{c.from_name} → {c.to_name}",
+                                                  f"{c.dep_time:%m-%d %H:%M} → {c.arr_time:%m-%d %H:%M}"]}
+
+
 def build_map_data(trip: Trip) -> dict[str, Any]:
     days: list[dict[str, Any]] = []
     lodging = trip.chosen_lodging
@@ -85,7 +92,10 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             if trip.arrival and arrival_day(trip) == day.index:
                 tp, tg, tl = terminal_point(trip, "arrival"), transfer_target(trip, "arrival"), terminal_leg(trip, "arrival")
                 if tp and tg and tl:
+                    timeline.append(_term_entry(trip.arrival, "到达", trip.arrival.arr_time, tp))
                     timeline.append(_leg_entry(tl, tp.name, tp, tg.name, tg))
+                    if lodging and not st.places:
+                        timeline.append({"type": "hotel", "role": "到达", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
             if lodging and st.places:
                 timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
                 if st.lodging_out:
@@ -120,7 +130,11 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             if trip.departure and departure_day(trip) == day.index:
                 tp, tg, tl = terminal_point(trip, "departure"), transfer_target(trip, "departure"), terminal_leg(trip, "departure")
                 if tp and tg and tl:
+                    if lodging and not st.places:
+                        timeline.append({"type": "hotel", "role": "出发", "time": _hm(leave_by(trip).hour * 60 + leave_by(trip).minute),
+                                         "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
                     timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp))
+                    timeline.append(_term_entry(trip.departure, "离开", trip.departure.dep_time, tp))
             if w_why and t > w_end:
                 timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）
@@ -202,6 +216,7 @@ function show(di) {
       row.className = 'it';
       let icon, pos = e.show || e.pos, title, sub = '';
       if (e.type === 'hotel') { icon = emo('🏨'); title = e.name; row.innerHTML = '<div class="h"><span class="tm">'+e.time+'</span><span class="nm">🏨 '+esc(e.role)+'：'+esc(e.name)+'</span></div>'; }
+      else if (e.type === 'term') { icon = emo(e.icon); title = e.role+'：'+e.name; row.innerHTML = '<div class="h"><span class="tm">'+e.time+'</span><span class="nm">'+e.icon+' '+esc(e.role)+'：'+esc(e.name)+'</span></div><div class="sub">'+e.lines.map(esc).join('<br>')+'</div>'; }
       else if (e.type === 'meal') { icon = emo('🍜'); title = '用餐：'+e.name; row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 '+esc(e.name)+'</span></div><div class="sub">'+e.lines.map(esc).join('<br>')+'</div>'; }
       else { icon = pin(e.n, d.color); title = e.n+'. '+e.name; row.innerHTML = '<div class="h"><span class="tm">'+e.arrive+'</span><span class="nm">'+e.n+'. '+esc(e.name)+'</span></div><div class="sub">停留 '+e.stay+' 分钟，约 '+e.leave+' 离开<br>'+e.lines.map(esc).join('<br>')+'</div>'; }
       const isEnd = e.type === 'hotel' && e.role === '返回';

@@ -173,7 +173,7 @@ class FakeAmap:
     def search_places(self, query, city=None, limit=5):
         return self.hits
 
-    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
         self.route_calls.append(mode)
         if self.fail_routes:
             raise AmapError("没有找到路线")
@@ -585,7 +585,7 @@ def test_map_coordinates_are_gcj02():
 
 
 class PathAmap(FakeAmap):
-    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
         self.route_calls.append(mode)
         mid = ((a_lat + b_lat) / 2 + 0.002, (a_lon + b_lon) / 2)
         r = RouteResult(mode, 3.0, 20, path=[(a_lat, a_lon), mid, (b_lat, b_lon)])
@@ -804,7 +804,7 @@ class AirportAmap:
                 PlaceHit(name="北京首都国际机场T3航站楼", lat=40.0799, lon=116.6031, address="顺义区",
                          category="交通设施服务;机场相关;机场出发/到达")]
 
-    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
         from tripcore.amap import RouteResult
         return RouteResult(mode=mode, distance_km=30.0, minutes=60, path=[(a_lat, a_lon), (b_lat, b_lon)])
 
@@ -849,3 +849,42 @@ def test_map_template_handles_every_timeline_type(monkeypatch):
     html = build_map_html(s._load())
     for ty in types - {'stop'}:      # stop 是默认分支
         assert f"e.type === '{ty}'" in html, ty
+
+
+class RecordingAirportAmap(AirportAmap):
+    def __init__(self):
+        self.calls = []
+
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
+        self.calls.append((mode, kw.get("depart")))
+        from tripcore.amap import RouteResult
+        return RouteResult(mode=mode, distance_km=30.0, minutes=45 if mode == "drive" else 90, path=[(a_lat, a_lon), (b_lat, b_lon)])
+
+
+def test_night_terminal_legs_use_taxi_and_daytime_ones_pass_depart_time(monkeypatch):
+    _arrival_trip()
+    fake = RecordingAirportAmap()
+    monkeypatch.setattr(s, "_amap", lambda: fake)
+    s.set_connection("arrival", "flight", "上海", "北京", "2026-10-18 22:05", "2026-10-19 00:35", terminal_name="首都国际机场")
+    s.set_connection("departure", "flight", "北京", "上海", "2026-10-21 18:00", "2026-10-21 20:10", terminal_name="首都国际机场")
+    s.refine_routes()
+    legs = [v for k, v in s._load().route_overrides.items() if k.startswith("arrival@") or ">departure@" in k]
+    arr = next(v for v in legs if v.from_id == "arrival")
+    dep = next(v for v in legs if v.to_id == "departure")
+    assert arr.mode == "drive" and "深夜" in arr.note          # 00:35 到 → 约 01:20 出发：按打车
+    assert dep.mode == "transit"                               # 白天离开：公共交通，且传了出发时间
+    assert any(m == "transit" and d is not None for m, d in fake.calls)
+    n = len(fake.calls)
+    s.refine_routes()
+    assert len(fake.calls) == n                                # 时间没变，不重复请求
+
+
+def test_map_shows_terminal_markers_even_on_empty_departure_day(monkeypatch):
+    _arrival_trip()
+    monkeypatch.setattr(s, "_amap", lambda: RecordingAirportAmap())
+    s.set_connection("departure", "flight", "北京", "上海", "2026-10-21 06:30", "2026-10-21 08:40", terminal_name="首都国际机场")
+    s.refine_routes()
+    from tripcore.mapview import build_map_data
+    last = build_map_data(s._load())["days"][-1]["timeline"]
+    types = [e["type"] for e in last]
+    assert "term" in types and "leg" in types and any(e["type"] == "hotel" for e in last)

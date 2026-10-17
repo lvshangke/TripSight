@@ -170,3 +170,10 @@ def test_prefer_subway_only_if_not_much_slower():
     slow = _transit(5400, ["地铁1号线(x--y)"])                     # 慢 80%，不选
     c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [bus, slow]}}})
     assert not c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", prefer_subway=True).uses_subway
+
+
+def test_transit_depart_time_is_sent_to_amap():
+    from datetime import datetime
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [_transit(3000, ["地铁1号线(x--y)"])]}}})
+    c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", depart=datetime(2026, 10, 30, 7, 5))
+    assert "date=2026-10-30" in c.calls[0] and "time=7%3A05" in c.calls[0] and "nightflag=1" in c.calls[0]

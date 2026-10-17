@@ -257,7 +257,8 @@ class AmapClient:
     # ---- 路线 ----
     def route(self, mode: str, from_lat: float, from_lon: float, to_lat: float, to_lon: float,
               city: Optional[str] = None, transit_strategy: str = "fastest",
-              max_transfers: Optional[int] = None, prefer_subway: bool = False) -> RouteResult:
+              max_transfers: Optional[int] = None, prefer_subway: bool = False,
+              depart: Optional[Any] = None) -> RouteResult:
         o_lat, o_lon = wgs84_to_gcj02(from_lat, from_lon)
         d_lat, d_lon = wgs84_to_gcj02(to_lat, to_lon)
         origin, dest = f"{o_lon:.6f},{o_lat:.6f}", f"{d_lon:.6f},{d_lat:.6f}"
@@ -273,10 +274,12 @@ class AmapClient:
             if transit_strategy not in TRANSIT_STRATEGIES:
                 raise AmapError(f"不支持的公交策略：{transit_strategy}")
             def query(strategy: str) -> list[RouteResult]:
-                data = self._get("/v3/direction/transit/integrated",
-                                 {"origin": origin, "destination": dest, "city": city, "cityd": city,
-                                  "strategy": TRANSIT_STRATEGIES[strategy]})
-                return self._transit_options(data)
+                params = {"origin": origin, "destination": dest, "city": city, "cityd": city,
+                          "strategy": TRANSIT_STRATEGIES[strategy]}
+                if depart is not None:       # 按出发时间查（含夜班车），避免拿白天的地铁方案套深夜
+                    params.update({"date": f"{depart.year}-{depart.month}-{depart.day}",
+                                   "time": f"{depart.hour}:{depart.minute:02d}", "nightflag": "1"})
+                return self._transit_options(self._get("/v3/direction/transit/integrated", params))
 
             options = query(transit_strategy)
             if max_transfers is None and not prefer_subway:
