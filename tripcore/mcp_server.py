@@ -32,7 +32,7 @@ from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
-from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
+from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -43,6 +43,7 @@ from .proposals import (
     describe_ops,
     make_proposal,
 )
+from .routeplace import entry, exit_
 from .scheduler import schedule
 from .state import NothingToUndo, commit
 from .state import undo as _undo
@@ -429,10 +430,10 @@ def refine_routes(day: Optional[int] = None) -> str:
         if day is not None and d.index != day - 1:
             continue
         stops = [trip.place(it.place_id) for it in d.items]
-        wanted += list(zip(stops, stops[1:]))
+        wanted += [(exit_(a), entry(b)) for a, b in zip(stops, stops[1:])]
         lod = trip.chosen_lodging
         if lod and stops:
-            wanted += [(lod, stops[0]), (stops[-1], lod)]
+            wanted += [(lod, entry(stops[0])), (exit_(stops[-1]), lod)]
     for which in ("arrival", "departure"):
         tp, tg = terminal_point(trip, which), transfer_target(trip, which)
         if tp is not None and tg is not None:
@@ -504,7 +505,7 @@ def fill_hours() -> str:
     missed: list[str] = []
     asked = 0
     for p in trip.places:
-        if p.opening_hours:
+        if p.opening_hours or p.waypoints:
             continue
         if asked >= MAX_HOURS_LOOKUPS:
             missed.append(f"{p.name}（本次查询已达上限，请再调用一次）")
@@ -1336,7 +1337,11 @@ def _render(trip: Trip) -> str:
         for i, p in enumerate(st.places):
             lock = " 🔒" if day.items[i].locked else ""
             out.append(f"  {i + 1}. {p.name}({p.id}) {p.duration_min}分钟{lock}")
-            out.append("     " + _hours_line(p, d))
+            if p.waypoints:
+                out.append("     路线：" + "→".join(w.name for w in p.waypoints)
+                           + f"（步行约 {sum(w.next_minutes for w in p.waypoints)} 分钟；各点营业时间请自行核实）")
+            else:
+                out.append("     " + _hours_line(p, d))
             for ml in trip.meals:
                 if ml.day == day.index and ml.after_place_id == p.id:
                     out.append("     🍜 " + _meal_text(ml))
@@ -1443,6 +1448,16 @@ def drop_candidates(ids: list[str]) -> str:
     return "已放弃：" + "、".join(c["name"] for c in hit)
 
 
+def _resolve_name(name: str) -> tuple[Optional[dict[str, Any]], str, list[dict[str, Any]]]:
+    """按名字在地图上确定一个位置：只自动采用高德结果（名字相符且无歧义）；OpenStreetMap 结果精度低，不自动采用。"""
+    res = lookup_coords(name)
+    hits = res.get("candidates") or ([{"name": res["name"], "lat": res["lat"], "lon": res["lon"]}] if res.get("found") else [])
+    if res.get("found") and res.get("source") != "amap":
+        return None, "高德没有找到（只有 OpenStreetMap 结果，精度低，不自动采用）", hits
+    pick, why = _pick_hit(name, hits)
+    return pick, why, hits
+
+
 MAX_ADOPT = 10
 
 
@@ -1468,9 +1483,7 @@ def adopt_candidates(ids: list[str]) -> str:
         if c["kind"] in ("food", "other"):
             lines.append(f"· {c['name']}：是{'餐饮' if c['kind'] == 'food' else '其他'}类，请用 find_food 搜店后 choose_food 安排，没有加入景点")
             continue
-        res = lookup_coords(c["name"])
-        hits = res.get("candidates") or ([{"name": res["name"], "lat": res["lat"], "lon": res["lon"]}] if res.get("found") else [])
-        pick, why = _pick_hit(c["name"], hits)
+        pick, why, hits = _resolve_name(c["name"])
         if pick is None:
             show = "；".join(f"{h['name']}({h['lat']:.4f},{h['lon']:.4f})" for h in hits[:3])
             lines.append(f"· {c['name']}：没有加入——{why}" + (f"。地图候选：{show}" if show else ""))
@@ -1489,6 +1502,75 @@ def adopt_candidates(ids: list[str]) -> str:
     _save_cands(items)
     return "\n".join(lines) + "\n请再调用 schedule_days 重新分天（门票、时长、营业时间仍待核实，可用 fill_hours 补营业时间）。"
 
+
+def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15, notes: str = "", source: str = "agent") -> str:
+    """添加一个“路线型景点”（如 citywalk）：按顺序给出途经点的名字（也可以直接用 submit_candidates 得到的候选 id，如 "c2"）。
+    每个途经点的坐标由地图查询，名字不符、有歧义或查不到的会报错并列出，不会创建；用户要先确认或换更准确的名字。
+    相邻途经点之间的步行路线和时间由高德查（没有 key 时按直线估算并标注）；总时长 = 步行时间 + 每站 stay_per_stop_min 分钟，
+    这是估算，可用 update_place 改。排程里它是一项：进入它的路段到第一个途经点，离开它的路段从最后一个途经点出发。
+    加入后请再调用 schedule_days，再 refine_routes。"""
+    if not (2 <= len(waypoints) <= 12):
+        raise ToolError("途经点需要 2~12 个。")
+    trip = _load()
+    cands = {c["id"]: c for c in _load_cands()}
+    resolved: list[tuple[str, dict[str, Any], Optional[dict[str, Any]]]] = []
+    problems: list[str] = []
+    for w in waypoints:
+        cand = cands.get(w)
+        wname = cand["name"] if cand else w
+        pick, why, hits = _resolve_name(wname)
+        if pick is None:
+            show = "；".join(f"{h['name']}({h['lat']:.4f},{h['lon']:.4f})" for h in hits[:3])
+            problems.append(f"{wname}：{why}" + (f"。地图候选：{show}" if show else ""))
+        else:
+            resolved.append((wname, pick, cand))
+    if problems:
+        raise ToolError("有途经点没能确定位置，没有创建：\n" + "\n".join(problems))
+    client = _amap()
+    wps: list[Waypoint] = []
+    for k, (wname, pick, _c) in enumerate(resolved):
+        wp = Waypoint(name=pick["name"], lat=round(pick["lat"], 6), lon=round(pick["lon"], 6), amap_id=pick.get("amap_id", "") or "")
+        if k > 0:
+            prev = wps[-1]
+            real = False
+            try:
+                if client is None:
+                    raise AmapError("no key")
+                r = client.route("walk", prev.lat, prev.lon, wp.lat, wp.lon, None)
+                prev.next_minutes, prev.next_km, prev.next_real = r.minutes, r.distance_km, True
+                prev.next_path = [list(pt) for pt in r.path]
+                real = True
+            except AmapError:
+                pass
+            if not real:
+                leg = estimate_leg("a", prev.lat, prev.lon, "b", wp.lat, wp.lon, "walk")
+                prev.next_minutes, prev.next_km, prev.next_real = leg.minutes, leg.distance_km, False
+        wps.append(wp)
+    walk = sum(w.next_minutes for w in wps)
+    duration = max(10, min(720, walk + stay_per_stop_min * len(wps)))
+    clat = sum(w.lat for w in wps) / len(wps)
+    clon = sum(w.lon for w in wps) / len(wps)
+    clue_txt = "；".join(c for _n, _p, cd in resolved if cd for c in cd["clues"])
+    note = (f"路线型景点：{'→'.join(w.name for w in wps)}。时长按步行约 {walk} 分钟 + 每站 {stay_per_stop_min} 分钟估算。"
+            + (f" [游记线索，待核实：{clue_txt}]" if clue_txt else "") + (" " + notes if notes else "") + " [门票/时长/闭馆日待核实]")
+    pid = _next_id("p", [p.id for p in trip.places])
+    try:
+        place = Place(id=pid, name=name, lat=clat, lon=clon, duration_min=duration, notes=note, source=source, waypoints=wps)
+    except ValidationError as e:
+        raise ToolError(f"参数不合法：{e}")
+    _save(commit(trip, lambda t: t.places.append(place)))
+    items = _load_cands()
+    used = {cd["id"] for _n, _p, cd in resolved if cd}
+    for c in items:
+        if c["id"] in used:
+            c["status"], c["place_id"] = "added", pid
+    if used:
+        _save_cands(items)
+    overlap = [p.name for p in trip.places if any(haversine_km(p.lat, p.lon, w.lat, w.lon) < 0.3 for w in wps)]
+    warn = f"\n注意：途经点离已有景点「{'、'.join(overlap)}」不到 300 米，可能重复，请和用户确认是否保留。" if overlap else ""
+    return (f"已添加路线型景点「{name}」(id={pid})：{len(wps)} 个途经点，步行约 {walk} 分钟，估算总时长 {duration} 分钟"
+            f"（{'步行路线来自高德' if all(w.next_real for w in wps[:-1]) else '部分路段为直线估算'}）。请再 schedule_days。{warn}")
+
 # ---------------------------------------------------------------------------
 # MCP 注册
 # ---------------------------------------------------------------------------
@@ -1497,7 +1579,7 @@ TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
-    submit_candidates, list_candidates, drop_candidates, adopt_candidates,
+    submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 
 

@@ -54,6 +54,19 @@ TravelMode = Literal["walk", "transit", "drive"]
 # 基础对象
 # ---------------------------------------------------------------------------
 
+class Waypoint(BaseModel):
+    """路线型景点上的一个途经点；next_* 是走到下一个途经点的步行信息（来自地图或直线估算）。"""
+
+    name: str
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    amap_id: str = ""
+    next_minutes: int = 0
+    next_km: float = 0
+    next_real: bool = False
+    next_path: list[list[float]] = Field(default_factory=list)
+
+
 class Place(BaseModel):
     """一个想去的地点（景点、餐厅都可以）。"""
 
@@ -63,6 +76,7 @@ class Place(BaseModel):
     lon: float = Field(ge=-180, le=180, description="经度")
     status: PlaceStatus = PlaceStatus.SHORTLIST
     duration_min: int = Field(default=90, ge=10, le=720, description="预计游览时长（分钟）")
+    waypoints: list[Waypoint] = Field(default_factory=list, description="路线型景点的有序途经点；为空表示普通景点")
     priority: int = Field(default=3, ge=1, le=5, description="重要程度 1~5，5 最重要")
     must_go: bool = Field(default=False, description="是否必去")
     ticket_price: float = Field(default=0, ge=0, description="门票（元）")

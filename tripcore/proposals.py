@@ -115,13 +115,13 @@ def _apply_one(t: Trip, op: Op) -> None:
             raise InvalidOperationError(f"没有第 {op.to_day + 1} 天（共 {len(plan.days)} 天）")
         existing = _get_item(plan, op.place_id)
         if existing is not None and existing.locked:
-            raise LockedItemError(f"「{t.place(op.place_id).name}」已锁定，不能移动")
+            raise LockedItemError(f"「{t.place(op.place_id).name}」已锁定（用户确认过的安排默认锁定），不能移动；要改的话在同一个提案里先加一条 lock 操作（locked=false）解锁，再移动")
         loc = _find(plan, op.place_id)
         if loc is not None:
             plan.days[loc[0]].items.pop(loc[1])
         target = plan.days[op.to_day].items
         pos = len(target) if op.to_position is None else min(op.to_position, len(target))
-        target.insert(pos, DayItem(place_id=op.place_id))
+        target.insert(pos, DayItem(place_id=op.place_id, locked=True))   # 用户确认过的安排默认锁定，之后的自动分天不会再改
         if t.place(op.place_id).status == PlaceStatus.SHORTLIST:
             t.place(op.place_id).status = PlaceStatus.PLANNED
         plan.unscheduled = [u for u in plan.unscheduled if u.place_id != op.place_id]

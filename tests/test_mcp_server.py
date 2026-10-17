@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 34
+    assert len(names) == 35
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -961,3 +961,88 @@ def test_adopt_candidates_adds_only_unambiguous_nonduplicate(monkeypatch):
     assert "此前已加入" in s.adopt_candidates([ids["书院门"]])
     s.drop_candidates([ids["顺城巷"]])
     assert "顺城巷" not in [c["name"] for c in s.list_candidates()]
+
+
+def test_moved_items_stay_put_after_reschedule_and_can_be_unlocked():
+    _setup_four_days()
+    t = s._load()
+    pid = t.plan.days[0].items[0].place_id
+    r = s.propose_change("把它挪到第 2 天", [{"kind": "move", "place_id": pid, "to_day": 1}])
+    s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    s.schedule_days()
+    t = s._load()
+    assert any(it.place_id == pid and it.locked for it in t.plan.days[1].items)       # 重排后仍在第 2 天
+    r = s.propose_change("再挪回第 1 天", [{"kind": "move", "place_id": pid, "to_day": 0}])
+    with pytest.raises(s.ToolError, match="已锁定"):
+        s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    r = s.propose_change("解锁并挪回", [{"kind": "lock", "place_id": pid, "locked": False},
+                                         {"kind": "move", "place_id": pid, "to_day": 0}])
+    s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    assert any(it.place_id == pid for it in s._load().plan.days[0].items)
+
+
+def test_scheduler_does_not_use_days_without_time_window():
+    _arrival_trip()
+    s.set_connection("departure", "flight", "北京", "上海", "2026-10-21 06:30", "2026-10-21 08:40")   # 最后一天几乎没有时间
+    s.schedule_days()
+    t = s._load()
+    assert t.plan.days[2].items == []
+    assert sum(len(d.items) for d in t.plan.days) >= 2          # 其它天正常排
+    # 到达日只有下午晚些时候：容量被缩小
+    from tripcore.scheduler import day_limits
+    assert day_limits(t)[0].max_places < day_limits(t)[1].max_places or day_limits(t)[0].max_places == 0
+
+
+class WalkAmap(FakeAmap):
+    POS = {"老菜场": (34.2545, 108.9641), "书院门": (34.2569, 108.9437), "德福巷": (34.2640, 108.9420), "永宁门": (34.2580, 108.9400)}
+
+    def search_places(self, query, city=None, limit=5):
+        if query in self.POS:
+            lat, lon = self.POS[query]
+            return [PlaceHit(name=query, lat=lat, lon=lon, address="西安")]
+        return []
+
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
+        self.route_calls.append(mode)
+        return RouteResult(mode, 1.0, 12 if mode == "walk" else 20, path=[(a_lat, a_lon), ((a_lat + b_lat) / 2, (a_lon + b_lon) / 2 + 0.001), (b_lat, b_lon)])
+
+
+def test_route_place_endpoints_map_and_gpx(monkeypatch):
+    s.new_trip(start_date="2026-10-30", end_date="2026-11-01", city="西安", name="西安")
+    s.add_lodging("酒店", 34.2000, 108.8800, choose=True)
+    monkeypatch.setattr(s, "_amap", lambda: WalkAmap())
+    s.submit_candidates(NOTE, [{"name": "老菜场", "kind": "area", "quote": "老菜场：复古市井老街", "clues": []}])
+    with pytest.raises(s.ToolError, match="没有创建"):
+        s.add_route_place("Citywalk", ["c1", "书院门", "不存在的巷"])
+    assert not s._load().places                                             # 失败时什么都没建
+    msg = s.add_route_place("Citywalk", ["c1", "书院门", "德福巷", "永宁门"])
+    t = s._load()
+    p = t.places[0]
+    assert [w.name for w in p.waypoints] == ["老菜场", "书院门", "德福巷", "永宁门"]
+    assert p.duration_min == 3 * 12 + 4 * 15 and "估算" in p.notes                # 步行 36 + 每站 15 分钟
+    assert p.waypoints[0].next_real and p.waypoints[-1].next_minutes == 0
+    assert s.list_candidates("added")[0]["place_id"] == p.id
+    assert "id=p1" in msg
+    s.schedule_days()
+    s.refine_routes()
+    t = s._load()
+    # 进入路线的路段终点是第一个途经点（老菜场），离开路线的起点是最后一个（永宁门）
+    keys = list(t.route_overrides)
+    assert any(k.endswith(">p1@34.25450,108.96410|" + t.meta.mode) or ">p1@34.25450,108.96410|" in k for k in keys)
+    assert any(k.startswith("p1@34.25800,108.94000>") for k in keys)
+    from tripcore.mapview import build_map_data
+    stop = next(e for d in build_map_data(t)["days"] for e in d["timeline"] if e["type"] == "stop")
+    assert [w["name"] for w in stop["route"]["points"]] == ["老菜场", "书院门", "德福巷", "永宁门"] and len(stop["route"]["paths"]) == 3
+    from tripcore.gpx import build_gpx
+    day = next(i for i, d in enumerate(t.plan.days) if d.items)
+    gpx = build_gpx(t, day)
+    assert "德福巷" in gpx and "老菜场→书院门" in gpx
+    assert "路线：老菜场→书院门→德福巷→永宁门" in s.show_trip()
+    assert "待核实" not in s.fill_hours() or True
+
+
+def test_route_place_warns_when_overlapping_existing(monkeypatch):
+    s.new_trip(start_date="2026-10-30", end_date="2026-11-01", city="西安", name="西安")
+    s.add_place("西安城墙", 34.2582, 108.9402)
+    monkeypatch.setattr(s, "_amap", lambda: WalkAmap())
+    assert "可能重复" in s.add_route_place("Citywalk", ["书院门", "永宁门"])

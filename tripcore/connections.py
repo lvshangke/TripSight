@@ -15,6 +15,7 @@ from typing import Optional
 from .geo import estimate_leg
 from .metrics import leg_key, leg_mode
 from .models import Connection, DateMode, Leg, Trip
+from .routeplace import entry, exit_
 
 DAY_START_MIN = 9 * 60
 DAY_END_MIN = 21 * 60
@@ -65,7 +66,8 @@ def transfer_target(trip: Trip, which: str):
     if trip.plan is None or idx is None or idx >= len(trip.plan.days) or not trip.plan.days[idx].items:
         return None
     items = trip.plan.days[idx].items
-    return trip.place(items[0].place_id if which == "arrival" else items[-1].place_id)
+    p = trip.place(items[0].place_id if which == "arrival" else items[-1].place_id)
+    return entry(p) if which == "arrival" else exit_(p)
 
 
 def terminal_leg(trip: Trip, which: str) -> Optional[Leg]:

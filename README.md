@@ -148,7 +148,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 34 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 35 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
@@ -221,6 +221,12 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 ## 游记/攻略 → 候选景点（`submit_candidates` / `adopt_candidates`）
 
 用户粘贴游记后，模型只负责读文字、列清单；代码核对：每个候选的原话 `quote` 必须逐字出现在原文里且包含地名，线索 `clues` 也必须是原文片段，对不上的拒收；候选按原文出现先后排序（顺路路线即游览顺序）并去重。候选存在 `~/.tripcore/candidates.json`，用户挑选后 `adopt_candidates` 才用地图查坐标：名字相符且无歧义、与已有景点相距 ≥ 300 米才加入，价格/时间只作“待核实线索”写进备注。餐饮类走 `find_food`。工具：`submit_candidates` `list_candidates` `drop_candidates` `adopt_candidates`。
+
+## 路线型景点（`add_route_place`）与排程改动
+
+- **路线型景点**：一个景点带有序途经点（如 citywalk 老菜场→…→永宁门）。排程里仍是一项，但进入它的路段终点是第一个途经点、离开它的路段起点是最后一个途经点；地图画出途经点和相邻点之间的步行路线（高德，没有 key 时是直线并标注），GPX 也包含这些点和路线。时长 = 步行时间 + 每站 15 分钟（估算，可 `update_place` 调整）。途经点位置只采用高德里名字相符且无歧义的结果。
+- **排程尊重可用时间窗口**：到达日/离开日按窗口缩小容量，窗口不足 2 小时的那天不排景点（例如凌晨 6:30 的航班那天）。
+- **提案里的“移动”自动锁定**：确认过的安排不会被之后的 `schedule_days` 打乱；要再移动，先在提案里加 `lock`（locked=false）解锁。
 
 ## 出行偏好会真正影响路线
 

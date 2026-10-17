@@ -17,6 +17,7 @@ from .coords import wgs84_to_gcj02
 from .connections import day_window, leave_by, terminal_leg, terminal_point, transfer_target, arrival_day, departure_day
 from .metrics import day_stats
 from .models import Trip
+from .routeplace import entry, exit_
 
 _ASSETS = Path(__file__).with_name("assets")
 _COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324"]
@@ -67,6 +68,17 @@ def _leg_entry(leg, a_name, a, b_name, b) -> dict[str, Any]:
             "link": amap_link(a_name, a.lat, a.lon, b_name, b.lat, b.lon, leg.mode)}
 
 
+def _route_data(p) -> dict[str, Any]:
+    """路线型景点：途经点和相邻途经点之间的步行路线（有真实形状用真实的，否则直线）。"""
+    pts = [{"name": w.name, "pos": _gcj(w.lat, w.lon)} for w in p.waypoints]
+    paths, mins = [], 0
+    for a, b in zip(p.waypoints, p.waypoints[1:]):
+        shape = [_gcj(lat, lon) for lat, lon in a.next_path] if a.next_real and a.next_path else [_gcj(a.lat, a.lon), _gcj(b.lat, b.lon)]
+        paths.append({"path": shape, "real": a.next_real, "minutes": a.next_minutes})
+        mins += a.next_minutes
+    return {"points": pts, "paths": paths, "walk_minutes": mins}
+
+
 def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
     icon = {"flight": "✈", "train": "🚄"}.get(c.kind, "🚌")
     return {"type": "term", "icon": icon, "role": role, "time": when.strftime("%H:%M"), "name": tp.name,
@@ -99,7 +111,8 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             if lodging and st.places:
                 timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
                 if st.lodging_out:
-                    timeline.append(_leg_entry(st.lodging_out, lodging.name, lodging, st.places[0].name, st.places[0]))
+                    e0 = entry(st.places[0])
+                    timeline.append(_leg_entry(st.lodging_out, lodging.name, lodging, e0.name, e0))
                     t += st.lodging_out.minutes
             for i, p in enumerate(st.places):
                 lines = []
@@ -109,8 +122,13 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     lines.append("需预约；备选：" + ("、".join(bk) if bk else "未设置"))
                 if p.ticket_price:
                     lines.append(f"门票：{p.ticket_price:g} 元")
-                timeline.append({"type": "stop", "n": i + 1, "name": p.name, "pos": _gcj(p.lat, p.lon), "arrive": _hm(t),
-                                 "leave": _hm(t + p.duration_min), "stay": p.duration_min, "lines": lines})
+                ent = entry(p)
+                stop = {"type": "stop", "n": i + 1, "name": p.name, "pos": _gcj(ent.lat, ent.lon), "arrive": _hm(t),
+                        "leave": _hm(t + p.duration_min), "stay": p.duration_min, "lines": lines}
+                if p.waypoints:
+                    stop["route"] = _route_data(p)
+                    stop["lines"] = [f"途经：{'→'.join(w.name for w in p.waypoints)}"] + lines
+                timeline.append(stop)
                 t += p.duration_min
                 for m in meals_by.get((day.index, p.id), []):
                     ml = []
@@ -120,11 +138,13 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     ml.append(f"营业时间：{m.opening_hours}（来源：{m.hours_source}）" if m.opening_hours else "营业时间待核实")
                     timeline.append({"type": "meal", "name": m.name, "pos": _gcj(m.lat, m.lon), "lines": ml})
                 if i < len(st.legs):
-                    timeline.append(_leg_entry(st.legs[i], p.name, p, st.places[i + 1].name, st.places[i + 1]))
+                    x, e = exit_(p), entry(st.places[i + 1])
+                    timeline.append(_leg_entry(st.legs[i], x.name, x, e.name, e))
                     t += st.legs[i].minutes
             if lodging and st.places:
                 if st.lodging_back:
-                    timeline.append(_leg_entry(st.lodging_back, st.places[-1].name, st.places[-1], lodging.name, lodging))
+                    xl = exit_(st.places[-1])
+                    timeline.append(_leg_entry(st.lodging_back, xl.name, xl, lodging.name, lodging))
                     t += st.lodging_back.minutes
                 timeline.append({"type": "hotel", "role": "返回", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
             if trip.departure and departure_day(trip) == day.index:
@@ -223,6 +243,10 @@ function show(di) {
       if (!isEnd) {
         const m = L.marker(pos, {icon}).bindPopup(popup(d.label+' · '+title, e.type==='hotel'?[]:e.lines)).addTo(layer);
         markers.push(m); row.onclick = () => { map.setView(m.getLatLng(), Math.max(map.getZoom(), 15)); m.openPopup(); };
+        if (e.route) {
+          e.route.paths.forEach(p => L.polyline(p.path, {color:d.color, weight:4, opacity:.9, dashArray: p.real?null:'4 6'}).bindTooltip('步行约'+p.minutes+'分钟'+(p.real?'':'（估算）'), {sticky:true}).addTo(layer));
+          e.route.points.forEach((w, k) => L.circleMarker(w.pos, {radius:6, color:d.color, fillColor:'#fff', fillOpacity:1, weight:3}).bindTooltip((k+1)+'. '+w.name, {permanent:false}).addTo(layer));
+        }
       } else { row.onclick = () => { map.setView(e.pos, Math.max(map.getZoom(), 15)); }; }
     }
     list.appendChild(row);

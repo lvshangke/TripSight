@@ -19,6 +19,7 @@ from datetime import date
 from typing import Optional
 
 from .geo import estimate_leg, haversine_km
+from .connections import DAY_END_MIN, DAY_START_MIN, day_window
 from .metrics import PACE_LIMITS, PaceLimits
 from .models import (
     SCHEDULABLE_STATUSES,
@@ -59,6 +60,29 @@ def _closed_on(place: Place, day_date: Optional[date]) -> bool:
     return day_date is not None and day_date.weekday() in place.closed_weekdays
 
 
+MIN_USABLE_MIN = 120      # 某天可用时间窗口不足这么多分钟，就不往里排景点
+
+
+def day_limits(trip: Trip) -> list[PaceLimits]:
+    """每天各自的容量：基准是节奏上限，再按当天可用时间窗口（到达/离开大交通）按比例缩小；
+    窗口不足 MIN_USABLE_MIN 的那天容量为 0（不排景点）。"""
+    base = PACE_LIMITS[trip.meta.pace]
+    full = DAY_END_MIN - DAY_START_MIN
+    out: list[PaceLimits] = []
+    for i in range(trip.meta.num_days):
+        ws, we, _ = day_window(trip, i)
+        w = we - ws
+        if w < MIN_USABLE_MIN:
+            out.append(PaceLimits(max_places=0, max_total_minutes=0))
+        elif w >= full:
+            out.append(base)
+        else:
+            r = w / full
+            out.append(PaceLimits(max_places=max(1, int(base.max_places * r + 0.5)),
+                                  max_total_minutes=max(60, int(base.max_total_minutes * r))))
+    return out
+
+
 def _fits(day_members: list[Place], new: Place, limits: PaceLimits) -> bool:
     """这一天还放得下这个景点吗？（数量和游览时长两个上限）"""
     if len(day_members) + 1 > limits.max_places:
@@ -75,8 +99,7 @@ def _fits(day_members: list[Place], new: Place, limits: PaceLimits) -> bool:
 
 def _core_set(
     candidates: list[Place],
-    n_days: int,
-    limits: PaceLimits,
+    limits: list[PaceLimits],
     used_count: int,
     used_visit: int,
 ) -> list[Place]:
@@ -85,8 +108,8 @@ def _core_set(
     为什么需要它？如果直接用所有景点（包括很远、很不重要的）去选“每天的中心点”，
     一个偏远的低优先级景点就会占掉一整天的中心位置。先挑出核心集合，再选中心，就不会这样。
     """
-    max_count = n_days * limits.max_places - used_count
-    max_visit = n_days * limits.max_visit_minutes - used_visit
+    max_count = sum(l.max_places for l in limits) - used_count
+    max_visit = sum(l.max_visit_minutes for l in limits) - used_visit
     core: list[Place] = []
     count, visit = 0, 0
     for p in sorted(candidates, key=lambda p: (not p.must_go, -p.priority, p.name, p.id)):
@@ -105,14 +128,15 @@ def _init_centers(
     candidates: list[Place],
     fixed: list[Optional[Point]],
     anchor: Optional[Point],
+    blocked: frozenset[int] = frozenset(),
 ) -> list[Optional[Point]]:
-    """给每一天挑一个中心点。fixed[i] 不为 None 的天（有锁定条目）中心点已确定。"""
+    """给每一天挑一个中心点（blocked 的天没有可用时间，不给中心点）。fixed[i] 不为 None 的天（有锁定条目）中心点已确定。"""
     centers: list[Optional[Point]] = list(fixed)
     chosen: list[Point] = [c for c in centers if c is not None]
     pool = [_pt(p) for p in candidates]
     generated: list[Point] = []
 
-    free_slots = [i for i, c in enumerate(centers) if c is None]
+    free_slots = [i for i, c in enumerate(centers) if c is None and i not in blocked]
     if pool and free_slots:
         if not chosen:
             centroid = _mean(pool)
@@ -154,7 +178,7 @@ def _assign(
     candidates: list[Place],
     locked_members: list[list[Place]],
     centers: list[Optional[Point]],
-    limits: PaceLimits,
+    limits: list[PaceLimits],
 ) -> tuple[list[list[Place]], list[Unscheduled]]:
     n_days = len(centers)
     members: list[list[Place]] = [list(m) for m in locked_members]
@@ -171,7 +195,7 @@ def _assign(
             unscheduled.append(Unscheduled(place_id=p.id, reason="安排期内每一天都闭馆"))
             continue
 
-        target = next((i for i in open_days if _fits(members[i], p, limits)), None)
+        target = next((i for i in open_days if _fits(members[i], p, limits[i])), None)
         if target is None:
             if p.must_go:
                 # 必去但放不下：放进当天游览时间最少的那天，让校验器提醒“太满”
@@ -270,7 +294,7 @@ def _improve(
     trip: Trip,
     members: list[list[Place]],
     locked_members: list[list[Place]],
-    limits: PaceLimits,
+    limits: list[PaceLimits],
     anchor: Optional[Point],
     mode: str,
     max_rounds: int = 6,
@@ -299,11 +323,13 @@ def _improve(
         d = trip.day_date(i)
         if any(_closed_on(p, d) for p in mem):
             return False
+        if mem and limits[i].max_places == 0:
+            return False
         if len(mem) <= 1:
             return True
-        if len(mem) > limits.max_places:
+        if len(mem) > limits[i].max_places:
             return False
-        return sum(p.duration_min for p in mem) <= limits.max_visit_minutes
+        return sum(p.duration_min for p in mem) <= limits[i].max_visit_minutes
 
     for _ in range(max_rounds):
         changed = False
@@ -355,7 +381,8 @@ def _improve(
 def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
     """根据当前景点池生成一份新行程（不修改 trip，只返回 Plan）。"""
     n_days = trip.meta.num_days
-    limits = PACE_LIMITS[trip.meta.pace]
+    limits = day_limits(trip)
+    blocked = frozenset(i for i, l in enumerate(limits) if l.max_places == 0)
     lodging = trip.chosen_lodging
     anchor: Optional[Point] = (lodging.lat, lodging.lon) if lodging else None
     mode = trip.meta.mode
@@ -382,8 +409,8 @@ def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
     ]
     used_count = sum(len(m) for m in locked_members)
     used_visit = sum(p.duration_min for m in locked_members for p in m)
-    core = _core_set(candidates, n_days, limits, used_count, used_visit)
-    centers = _init_centers(core, fixed, anchor)
+    core = _core_set(candidates, limits, used_count, used_visit)
+    centers = _init_centers(core, fixed, anchor, blocked)
 
     # 3~4. 分配 → 重算中心 → 重复，直到不再变化
     members: list[list[Place]] = locked_members

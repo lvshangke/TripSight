@@ -10,6 +10,7 @@ from typing import Optional
 
 from .geo import estimate_leg
 from .models import DayPlan, Leg, Pace, Place, Trip
+from .routeplace import entry, exit_
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,11 @@ def _leg(trip: Trip, a_id, a_lat, a_lon, b_id, b_lat, b_lon) -> Leg:
 
 def legs_between_stops(trip: Trip, places: list[Place]) -> list[Leg]:
     """相邻景点之间的交通（有真实路线用真实的，否则估算）。"""
-    return [_leg(trip, a.id, a.lat, a.lon, b.id, b.lat, b.lon) for a, b in zip(places, places[1:])]
+    out = []
+    for a, b in zip(places, places[1:]):
+        x, e = exit_(a), entry(b)
+        out.append(_leg(trip, x.id, x.lat, x.lon, e.id, e.lat, e.lon))
+    return out
 
 
 def lodging_legs(trip: Trip, places: list[Place]) -> tuple[Optional[Leg], Optional[Leg]]:
@@ -65,8 +70,9 @@ def lodging_legs(trip: Trip, places: list[Place]) -> tuple[Optional[Leg], Option
     if lodging is None or not places:
         return None, None
     first, last = places[0], places[-1]
-    out = _leg(trip, lodging.id, lodging.lat, lodging.lon, first.id, first.lat, first.lon)
-    back = _leg(trip, last.id, last.lat, last.lon, lodging.id, lodging.lat, lodging.lon)
+    e, x = entry(first), exit_(last)
+    out = _leg(trip, lodging.id, lodging.lat, lodging.lon, e.id, e.lat, e.lon)
+    back = _leg(trip, x.id, x.lat, x.lon, lodging.id, lodging.lat, lodging.lon)
     return out, back
 
 
