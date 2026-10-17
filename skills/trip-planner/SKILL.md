@@ -62,6 +62,8 @@ new_trip / add_place / update_place / remove_place / add_lodging / lookup_coords
 
 - 给用户看最终行程前，先调用 `show_trip`，把每个景点的营业时间、来源、预约与备选如实展示；标着“待核实”的要明确告诉用户，不要自己补。
 - 有具体出行日期时调用 `get_weather`：只有在预报范围内（约未来 4 天）才有天气；超出范围就说“暂无预报”，不要编造，也不要追问天气。
+- 添加景点时，把高德返回的类别文字原样填进 `category`（lookup_coords 结果里有）；只有明确知道室内/户外时才填 `outdoor`，不确定就不填，未知的不会触发天气提醒。
+- 查过天气后，show_trip / check_plan 会标出哪天的户外安排遇到雨雪或高温（并写明预报查询日期，预报之后可能变化）。
 - 天气不好（雨雪、高温）时只能建议，需要调整就用 propose_change，等用户确认。
 - 用户用 `set_leg_mode` 指定过的交通方式，`refine_routes` 会严格照办；展示时以 show_trip 的结果为准，不要用 compare_transport 的数字冒充行程里的数据。
 - 展示最终行程前，如果有景点营业时间是“待核实”，先调用 `fill_hours` 从高德补。仍补不上的，才联网搜索（必须附来源网址）或请用户确认。

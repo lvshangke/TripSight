@@ -84,6 +84,8 @@ class Place(BaseModel):
         default_factory=list, description="每周哪几天闭馆：0=周一 … 6=周日"
     )
     reservation_required: bool = False
+    category: str = Field(default="", description="地图服务给的类别文字（如 风景名胜;公园广场），用来判断室内外")
+    outdoor: Optional[bool] = Field(default=None, description="True 户外 / False 室内 / None 未知；明确指定的优先于类别推断")
     reserved: bool = Field(default=False, description="需要预约的话，是否已经约好")
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
@@ -254,6 +256,16 @@ class TripMeta(BaseModel):
         return self
 
 
+class WeatherSnap(BaseModel):
+    """某一天的天气预报快照（来自高德，抓取日期必须记录）。"""
+
+    day_weather: str = ""
+    night_weather: str = ""
+    day_temp: Optional[float] = None
+    night_temp: Optional[float] = None
+    fetched: str = Field(default="", description="抓取日期 YYYY-MM-DD")
+
+
 class Trip(BaseModel):
     meta: TripMeta = Field(default_factory=TripMeta)
     places: list[Place] = Field(default_factory=list)
@@ -272,6 +284,7 @@ class Trip(BaseModel):
         default_factory=dict,
         description="真实路线缓存（来自地图服务）。键见 metrics.leg_key；坐标变了键就变，旧缓存自动失效",
     )
+    weather: dict[str, WeatherSnap] = Field(default_factory=dict, description="日期→天气预报快照（高德，查到才有）")
     history: list[dict] = Field(default_factory=list, description="历史快照，用于撤销")
 
     @model_validator(mode="after")

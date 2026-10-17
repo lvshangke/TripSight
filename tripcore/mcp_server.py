@@ -32,7 +32,7 @@ from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
-from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint
+from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -197,13 +197,17 @@ def add_place(
     opening_hours: str = "",
     hours_source: str = "",
     backups: Optional[list[str]] = None,
+    category: str = "",
+    outdoor: Optional[bool] = None,
 ) -> str:
     """添加一个景点。lat/lon 必须来自 lookup_coords 或用户，绝不能自己编。
     ticket_price（元）、duration_min、closed_weekdays 如果没有可靠来源，请保持默认（门票填 0），
     不要凭印象编数字；verified=False 时会在备注里标“待核实”，用户确认过的数据才传 verified=True。
     closed_weekdays：闭馆的星期，0=周一 … 6=周日。
     opening_hours：营业时间原文，必须同时写 hours_source（amap，或网页网址，或 user），没有来源就留空。
-    backups：备选景点的 id 列表（需要预约、可能约不上时设置）。"""
+    backups：备选景点的 id 列表（需要预约、可能约不上时设置）。
+    category：高德返回的类别文字（如“风景名胜;公园广场”），用来判断室内外，没有就留空；
+    outdoor：明确知道室内(false)/户外(true)时才传，优先于类别推断；不确定就不传（未知的不会触发天气提醒）。"""
     trip = _load()
     for b in backups or []:
         if all(p.id != b for p in trip.places):
@@ -219,7 +223,7 @@ def add_place(
             priority=priority, must_go=must_go, ticket_price=ticket_price,
             closed_weekdays=closed_weekdays or [], reservation_required=reservation_required,
             notes=notes, source=source, opening_hours=opening_hours, hours_source=hours_source,
-            backups=backups or [],
+            backups=backups or [], category=category, outdoor=outdoor,
         )
     except ValidationError as e:
         raise ToolError(f"景点参数不合法：{e}")
@@ -323,6 +327,8 @@ def update_place(
     opening_hours: Optional[str] = None,
     hours_source: Optional[str] = None,
     backups: Optional[list[str]] = None,
+    category: Optional[str] = None,
+    outdoor: Optional[bool] = None,
 ) -> str:
     """修改景点的资料（只改传入的字段）。这不改变它在行程里的位置；改完后请再 schedule_days。
     坐标/价格必须来自工具或用户。"""
@@ -335,7 +341,7 @@ def update_place(
         name=name, lat=lat, lon=lon, duration_min=duration_min, priority=priority, must_go=must_go,
         ticket_price=ticket_price, closed_weekdays=closed_weekdays,
         reservation_required=reservation_required, notes=notes, opening_hours=opening_hours,
-        hours_source=hours_source, backups=backups).items() if v is not None}
+        hours_source=hours_source, backups=backups, category=category, outdoor=outdoor).items() if v is not None}
     if not changes:
         raise ToolError("没有传入要修改的字段。")
     for b in changes.get("backups", []):
@@ -1020,6 +1026,8 @@ def get_weather() -> str:
     except AmapError as e:
         raise ToolError(f"查询天气失败：{e}")
     lines, hit = [], 0
+    snaps: dict[str, WeatherSnap] = {}
+    today = date.today().isoformat()
     for d in trip.plan.days:
         dt = trip.day_date(d.index)
         if dt is None:
@@ -1029,6 +1037,8 @@ def get_weather() -> str:
             lines.append(f"第{d.index + 1}天 {dt.isoformat()}：暂无预报（超出高德预报范围）")
             continue
         hit += 1
+        snaps[dt.isoformat()] = WeatherSnap(day_weather=w.day_weather, night_weather=w.night_weather,
+                                            day_temp=w.day_temp, night_temp=w.night_temp, fetched=today)
         tips = []
         txt = w.day_weather + w.night_weather
         if "雨" in txt or "雪" in txt:
@@ -1039,9 +1049,11 @@ def get_weather() -> str:
             tips.append("低温，注意保暖")
         lines.append(f"第{d.index + 1}天 {dt.isoformat()}：白天{w.day_weather} {w.day_temp:.0f}°C，夜间{w.night_weather} {w.night_temp:.0f}°C"
                      + ("；" + "；".join(tips) if tips else ""))
+    if snaps:  # 天气只是缓存，不算一次修改：不进历史、不让提案失效
+        _save(trip.model_copy(update={"weather": {**trip.weather, **snaps}}))
     if hit == 0:
         return "出行日期不在高德天气预报范围内（仅约未来 4 天），暂不提供天气。\n" + "\n".join(lines)
-    return "\n".join(lines) + "\n（如要调整，请用 propose_change 提出，由用户确认。）"
+    return "\n".join(lines) + "\n（已记录，之后 show_trip / check_trip 会按这份预报提醒哪天的户外安排受影响；如要调整，请用 propose_change 提出，由用户确认。）"
 
 
 def _point(trip: Trip, pid: str):
@@ -1331,6 +1343,11 @@ def _render(trip: Trip) -> str:
         _ws, _we, _why = day_window(trip, day.index)
         if _why:
             out.append(f"  ⏱ {'；'.join(_why)}，可玩约 {_we - _ws} 分钟")
+        _w = trip.weather.get(d.isoformat()) if d else None
+        if _w:
+            out.append(f"  🌤 {_w.day_weather} {_w.day_temp:.0f}°C / 夜间{_w.night_weather} {_w.night_temp:.0f}°C（高德预报，{_w.fetched} 查询，之后可能变化）"
+                       if _w.day_temp is not None and _w.night_temp is not None else
+                       f"  🌤 {_w.day_weather} / 夜间{_w.night_weather}（高德预报，{_w.fetched} 查询）")
         if not st.places:
             out.append("  （空）")
             continue
@@ -1495,7 +1512,7 @@ def adopt_candidates(ids: list[str]) -> str:
             continue
         clue = f"[游记线索，待核实：{'；'.join(c['clues'])}] " if c["clues"] else ""
         msg = add_place(pick["name"], round(pick["lat"], 6), round(pick["lon"], 6), source=f"{c['source']}（{c['id']}）",
-                        notes=f"{clue}游记原话：{c['quote']}")
+                        notes=f"{clue}游记原话：{c['quote']}", category=pick.get("category") or "")
         pid = msg.split("id=")[1].split(")")[0]
         c["status"], c["place_id"] = "added", pid
         lines.append(f"· {c['name']}：已加入（地图点：{pick['name']}，{pick.get('address') or ''}；{pid}）")
