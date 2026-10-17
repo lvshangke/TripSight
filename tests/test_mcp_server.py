@@ -714,11 +714,11 @@ def test_create_amap_map_calls_mcp_directly_without_leaking_key(monkeypatch):
         return "amapuri://workInAmap/createWithToken?polymericId=mcp_x&from=MCP"
 
     monkeypatch.setattr(s, "_call_amap_mcp", fake)
-    r = s.create_amap_map()
+    r = s.create_amap_map(per_day=False)
     assert len(calls) == 1 and calls[0][0] == "maps_schema_personal_map" and calls[0][2] == "SECRETKEY123"
     assert len(calls[0][1]["lineList"]) == 2 and r["maps"][0]["link"].startswith("amapuri://")
     calls.clear()
-    r = s.create_amap_map(per_day=True)
+    r = s.create_amap_map()                                  # 默认每天一个链接
     assert len(calls) == 2 and all(len(c[1]["lineList"]) == 1 for c in calls) and len(r["maps"]) == 2
     log = (s.trip_path().with_name("amap_calls.log")).read_text(encoding="utf-8")
     assert "mcp.amap.com" in log and "SECRETKEY123" not in log

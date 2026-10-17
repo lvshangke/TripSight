@@ -796,10 +796,11 @@ def _audit_mcp(line: str) -> None:
         pass
 
 
-def create_amap_map(day: Optional[int] = None, per_day: bool = False) -> dict[str, Any]:
+def create_amap_map(day: Optional[int] = None, per_day: bool = True) -> dict[str, Any]:
     """生成高德 App 里的专属地图并返回链接（需要 AMAP_KEY）。参数由代码生成，直接请求高德官方 MCP，
-    不经过模型，所以不会丢坐标精度或漏掉某一天。day 从 1 开始，不填则所有天；
-    per_day=True 时每天单独生成一个链接（如果一张地图里只显示第一天，就用这个）。
+    不经过模型，所以不会丢坐标精度或漏掉某一天。day 从 1 开始，不填则所有天。
+    默认 per_day=True：每天单独生成一个链接，因为实测高德 App 的专属地图一次只显示第一条行程；
+    per_day=False 才把所有天放进同一张地图。
     链接是高德 App 的专用地址，要在装了高德的手机上打开。"""
     key = os.environ.get("AMAP_KEY", "").strip()
     if not key:
