@@ -24,6 +24,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from .amap import AmapClient, AmapError
 from .geo import estimate_leg, haversine_km
+from .hours import hours_for_weekday
 from .geocode import GeocodeError, geocode as _geocode
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
@@ -414,7 +415,10 @@ def refine_routes(day: Optional[int] = None) -> str:
         if requested >= MAX_ROUTE_REQUESTS:
             continue
         requested += 1
-        req_mode = estimate_leg(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode).mode   # 很近就按步行
+        if f"{a.id}>{b.id}" in trip.leg_modes:
+            req_mode = mode          # 用户明确指定的方式，严格照办，不因距离近而改成步行
+        else:
+            req_mode = estimate_leg(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode).mode   # 默认段：很近就按步行
         try:
             r = client.route(req_mode, a.lat, a.lon, b.lat, b.lon, city)
         except AmapError as e:
@@ -432,6 +436,52 @@ def refine_routes(day: Optional[int] = None) -> str:
     if todo > 0 and requested >= MAX_ROUTE_REQUESTS:
         msg += f"\n还有部分路段没查，请再调用一次 refine_routes。"
     return msg + "\n" + _render(_load())
+
+
+def get_weather() -> str:
+    """查行程各天的天气预报（高德，需要 AMAP_KEY）。只有设置了具体日期、且日期在高德预报范围内（约未来 4 天）
+    的那几天才有结果；其余天直接说明“暂无预报”，不要自行编造天气。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查天气。")
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    if not any(trip.day_date(d.index) for d in trip.plan.days):
+        return "还没有设置具体出行日期，无法查询天气。日期确定后再查。"
+    city = _load_context().get("city")
+    if not city:
+        raise ToolError("不知道目的地城市，new_trip 时请填写 city。")
+    try:
+        code = client.adcode(city)
+        if not code:
+            raise ToolError(f"高德找不到城市「{city}」。")
+        cast = {w.date: w for w in client.forecast(code)}
+    except AmapError as e:
+        raise ToolError(f"查询天气失败：{e}")
+    lines, hit = [], 0
+    for d in trip.plan.days:
+        dt = trip.day_date(d.index)
+        if dt is None:
+            continue
+        w = cast.get(dt.isoformat())
+        if w is None:
+            lines.append(f"第{d.index + 1}天 {dt.isoformat()}：暂无预报（超出高德预报范围）")
+            continue
+        hit += 1
+        tips = []
+        txt = w.day_weather + w.night_weather
+        if "雨" in txt or "雪" in txt:
+            tips.append("有雨雪，户外景点建议与室内景点调换或备好雨具")
+        if w.day_temp is not None and w.day_temp >= 35:
+            tips.append("高温，户外安排避开正午")
+        if w.night_temp is not None and w.night_temp <= 0:
+            tips.append("低温，注意保暖")
+        lines.append(f"第{d.index + 1}天 {dt.isoformat()}：白天{w.day_weather} {w.day_temp:.0f}°C，夜间{w.night_weather} {w.night_temp:.0f}°C"
+                     + ("；" + "；".join(tips) if tips else ""))
+    if hit == 0:
+        return "出行日期不在高德天气预报范围内（仅约未来 4 天），暂不提供天气。\n" + "\n".join(lines)
+    return "\n".join(lines) + "\n（如要调整，请用 propose_change 提出，由用户确认。）"
 
 
 def _point(trip: Trip, pid: str):
@@ -661,6 +711,21 @@ def show_trip() -> str:
 # 文字渲染
 # ---------------------------------------------------------------------------
 
+def _hours_line(p: Place, d: Optional[date]) -> str:
+    if not p.opening_hours:
+        return "营业时间：待核实（暂无来源）"
+    src = p.hours_source or "来源未注明"
+    base = f"营业时间：{p.opening_hours}（来源：{src}）"
+    if d is not None:
+        r = hours_for_weekday(p.opening_hours, d.weekday())
+        if r == "闭馆":
+            return base + f" ⚠ {_WEEKDAYS[d.weekday()]}可能闭馆"
+        if r:
+            return base + f" → {_WEEKDAYS[d.weekday()]}：{r}"
+        return base + "（当天时段无法自动判断，待核实）"
+    return base
+
+
 def _render(trip: Trip) -> str:
     m = trip.meta
     out = [f"【{m.name}】{m.num_days} 天，节奏 {m.pace.value}，交通偏好 {_MODE_NAMES[m.mode]}，版本 {trip.revision}"]
@@ -683,6 +748,10 @@ def _render(trip: Trip) -> str:
         for i, p in enumerate(st.places):
             lock = " 🔒" if day.items[i].locked else ""
             out.append(f"  {i + 1}. {p.name}({p.id}) {p.duration_min}分钟{lock}")
+            out.append("     " + _hours_line(p, d))
+            if p.reservation_required:
+                bk = [trip.place(b).name for b in p.backups if any(x.id == b for x in trip.places)]
+                out.append("     需预约；备选：" + ("、".join(bk) if bk else "未设置"))
             if i < len(st.legs):
                 leg = st.legs[i]
                 src = "高德路线" if leg.detail_level == "route" else "估算"
@@ -700,7 +769,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

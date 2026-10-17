@@ -59,6 +59,16 @@ class RouteResult:
     uses_subway: bool = False
 
 
+@dataclass
+class WeatherDay:
+    date: str            # YYYY-MM-DD
+    week: str
+    day_weather: str
+    night_weather: str
+    day_temp: Optional[float]
+    night_temp: Optional[float]
+
+
 # 公交策略（高德 transit 接口的 strategy 参数）
 TRANSIT_STRATEGIES = {"fastest": 0, "cheapest": 1, "fewest_transfers": 2, "least_walking": 3, "no_subway": 5}
 
@@ -177,6 +187,26 @@ class AmapClient:
         except ValueError:
             return None
         return gcj02_to_wgs84(lat_g, lon_g)
+
+    # ---- 天气 ----
+    def adcode(self, city: str) -> Optional[str]:
+        """城市名 → 行政区划代码 adcode（天气接口需要）。"""
+        data = self._get("/v3/geocode/geo", {"address": city})
+        codes = data.get("geocodes") or []
+        return _text(codes[0].get("adcode")) or None if codes else None
+
+    def forecast(self, adcode: str) -> list[WeatherDay]:
+        """未来几天（高德约 4 天）的天气预报。"""
+        data = self._get("/v3/weather/weatherInfo", {"city": adcode, "extensions": "all"})
+        out: list[WeatherDay] = []
+        for f in data.get("forecasts") or []:
+            for c in f.get("casts") or []:
+                out.append(WeatherDay(
+                    date=_text(c.get("date")), week=_text(c.get("week")),
+                    day_weather=_text(c.get("dayweather")), night_weather=_text(c.get("nightweather")),
+                    day_temp=_num(c.get("daytemp")), night_temp=_num(c.get("nighttemp")),
+                ))
+        return out
 
     # ---- 路线 ----
     def route(self, mode: str, from_lat: float, from_lon: float, to_lat: float, to_lon: float,

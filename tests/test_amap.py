@@ -122,3 +122,14 @@ def test_transit_without_segments_is_walk_only():
         {"duration": "700", "distance": "800", "segments": []}]}}})
     r = c.route("transit", 34.26, 108.94, 34.26, 108.95, "西安")
     assert r.transfers == 0 and r.lines == [] and not r.uses_subway
+
+
+def test_adcode_and_forecast_parsing():
+    c = client({
+        "/v3/geocode/geo": {"status": "1", "geocodes": [{"adcode": "610100", "location": "108.9,34.3"}]},
+        "/v3/weather/weatherInfo": {"status": "1", "forecasts": [{"casts": [
+            {"date": "2026-10-18", "week": "7", "dayweather": "小雨", "nightweather": "阴", "daytemp": "21", "nighttemp": "12"}]}]},
+    })
+    assert c.adcode("西安") == "610100"
+    w = c.forecast("610100")
+    assert w[0].date == "2026-10-18" and w[0].day_weather == "小雨" and w[0].day_temp == 21

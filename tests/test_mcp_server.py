@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 17
+    assert len(names) == 18
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -358,3 +358,64 @@ def test_leg_mode_changes_stats_and_refine_uses_it(monkeypatch):
         s.set_leg_mode(a, b, "bike")
     with pytest.raises(s.ToolError, match="找不到"):
         s.set_leg_mode(a, "zz", "walk")
+
+
+def test_explicit_leg_mode_is_not_downgraded_to_walk(monkeypatch):
+    s.new_trip(num_days=1, mode="transit")
+    s.add_place("甲", 39.9000, 116.4000)
+    s.add_place("乙", 39.9050, 116.4050)                  # 很近，默认会被当作步行
+    s.schedule_days()
+    t = s._load()
+    a, b = [it.place_id for it in t.plan.days[0].items]
+    s.set_leg_mode(a, b, "drive")
+    fake = ModeAmap()
+    monkeypatch.setattr(s, "_amap", lambda: fake)
+    out = s.refine_routes()
+    assert fake.route_calls == ["drive"] and "驾车" in out
+
+
+def test_show_trip_includes_hours_and_closed_warning():
+    s.new_trip(start_date="2026-10-19", end_date="2026-10-19", city="西安")   # 周一
+    s.add_place("博物馆", 39.9, 116.4, opening_hours="周二至周日 09:00-17:00 周一闭馆", hours_source="amap",
+                reservation_required=True)
+    s.add_place("无数据", 39.901, 116.401)
+    s.schedule_days()
+    out = s.show_trip()
+    assert "来源：amap" in out and "闭馆" in out and "待核实" in out and "需预约" in out
+
+
+def test_hours_parser():
+    from tripcore.hours import hours_for_weekday as h
+    assert h("周一至周日 08:30-17:00", 2) == "08:30-17:00"
+    assert h("周二至周日 09:00-17:00 周一闭馆", 0) == "闭馆"
+    assert h("周一至周五 09:00-17:00 周六至周日 09:00-18:00", 5) == "09:00-18:00"
+    assert h("全天", 3) == "全天开放" and h("", 1) is None and h("随缘开放", 1) is None
+
+
+class WeatherAmap(FakeAmap):
+    def __init__(self, dates):
+        super().__init__()
+        self.dates = dates
+
+    def adcode(self, city):
+        return "610100"
+
+    def forecast(self, adcode):
+        from tripcore.amap import WeatherDay
+        return [WeatherDay(d, "1", "小雨", "多云", 20, 12) for d in self.dates]
+
+
+def test_weather_only_within_forecast_range(monkeypatch):
+    s.new_trip(start_date="2026-10-18", end_date="2026-10-19", city="西安")
+    s.add_place("甲", 39.9, 116.4)
+    s.add_place("乙", 39.99, 116.3)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: WeatherAmap(["2026-10-18"]))
+    out = s.get_weather()
+    assert "小雨" in out and "暂无预报" in out
+    monkeypatch.setattr(s, "_amap", lambda: WeatherAmap(["2027-01-01"]))
+    assert "不在高德天气预报范围" in s.get_weather()
+    s.new_trip(num_days=2, city="西安")
+    s.add_place("甲", 39.9, 116.4)
+    s.schedule_days()
+    assert "没有设置具体出行日期" in s.get_weather()
