@@ -438,6 +438,56 @@ def refine_routes(day: Optional[int] = None) -> str:
     return msg + "\n" + _render(_load())
 
 
+MAX_HOURS_LOOKUPS = 20
+
+
+def fill_hours() -> str:
+    """给还没有营业时间的景点，从高德自动补上营业时间（来源记为 amap，需要 AMAP_KEY）。
+    只在高德结果的名字相符且位置很近（1.5 km 内）时才采用；匹配不上的保持“待核实”，已有营业时间的不覆盖。
+    补不上的，才去联网搜索（必须附来源网址）或请用户确认，不要凭记忆填写。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查询营业时间。")
+    trip = _load()
+    city = _load_context().get("city")
+    filled: dict[str, str] = {}
+    missed: list[str] = []
+    asked = 0
+    for p in trip.places:
+        if p.opening_hours:
+            continue
+        if asked >= MAX_HOURS_LOOKUPS:
+            missed.append(f"{p.name}（本次查询已达上限，请再调用一次）")
+            continue
+        asked += 1
+        try:
+            hits = client.search_places(p.name, city, limit=5)
+        except AmapError as e:
+            missed.append(f"{p.name}（查询失败：{e}）")
+            continue
+        best = None
+        for h in hits:
+            if (p.name in h.name or h.name in p.name) and haversine_km(p.lat, p.lon, h.lat, h.lon) <= 1.5 \
+                    and (h.opentime_week or h.opentime_today):
+                best = h
+                break
+        if best is None:
+            missed.append(f"{p.name}（高德没有匹配的营业时间）")
+            continue
+        filled[p.id] = best.opentime_week or best.opentime_today
+    if filled:
+        def mutate(t: Trip) -> None:
+            for pid, text in filled.items():
+                old = t.place(pid)
+                t.places[t.places.index(old)] = Place.model_validate(
+                    {**old.model_dump(), "opening_hours": text, "hours_source": "amap"})
+        _save(commit(trip, mutate))
+    msg = f"已补充 {len(filled)} 个景点的营业时间（来源 amap）。"
+    if missed:
+        msg += "\n仍待核实：" + "；".join(missed)
+    return msg + ("\n" + _render(_load()) if trip.plan else "")
+
+
 def get_weather() -> str:
     """查行程各天的天气预报（高德，需要 AMAP_KEY）。只有设置了具体日期、且日期在高德预报范围内（约未来 4 天）
     的那几天才有结果；其余天直接说明“暂无预报”，不要自行编造天气。"""
@@ -769,7 +819,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

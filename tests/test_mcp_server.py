@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 18
+    assert len(names) == 19
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -419,3 +419,33 @@ def test_weather_only_within_forecast_range(monkeypatch):
     s.add_place("甲", 39.9, 116.4)
     s.schedule_days()
     assert "没有设置具体出行日期" in s.get_weather()
+
+
+class HoursAmap(FakeAmap):
+    def search_places(self, query, city=None, limit=5):
+        if query == "故宫":
+            return [PlaceHit("故宫博物院", 39.9165, 116.3975, opentime_week="周二至周日 08:30-17:00"),
+                    PlaceHit("别处", 39.0, 116.0, opentime_week="周一至周日 00:00-24:00")]
+        if query == "天坛":
+            return [PlaceHit("天坛公园", 31.0, 121.0, opentime_week="周一至周日 06:00-22:00")]   # 名字像但太远
+        return []
+
+
+def test_fill_hours_matches_by_name_and_distance(monkeypatch):
+    _setup_trip()
+    s.update_place("p4", opening_hours="用户给的 9-17", hours_source="user")
+    monkeypatch.setattr(s, "_amap", lambda: HoursAmap())
+    out = s.fill_hours()
+    t = s._load()
+    assert t.place("p1").opening_hours.startswith("周二至周日") and t.place("p1").hours_source == "amap"
+    assert t.place("p2").opening_hours == "" and "天坛" in out and "仍待核实" in out    # 太远，不采用
+    assert t.place("p4").opening_hours == "用户给的 9-17"                                # 不覆盖
+    s.undo()
+    assert s._load().place("p1").opening_hours == ""
+
+
+def test_fill_hours_needs_key(monkeypatch):
+    _setup_trip()
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    with pytest.raises(s.ToolError, match="AMAP_KEY"):
+        s.fill_hours()
