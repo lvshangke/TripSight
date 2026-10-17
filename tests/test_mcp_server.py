@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 19
+    assert len(names) == 22
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -449,3 +449,65 @@ def test_fill_hours_needs_key(monkeypatch):
     monkeypatch.setattr(s, "_amap", lambda: None)
     with pytest.raises(s.ToolError, match="AMAP_KEY"):
         s.fill_hours()
+
+
+class FoodAmap(FakeAmap):
+    def __init__(self):
+        super().__init__()
+        self.around = []
+
+    def search_around(self, lat, lon, radius_m=800, types="050000", keywords="", limit=20):
+        self.around.append((radius_m, types, keywords))
+        return [PlaceHit("面馆A", lat + 0.001, lon, rating=4.2, cost=30, opentime_week="周一至周日 07:00-21:00"),
+                PlaceHit("饭店B", lat, lon + 0.002, rating=4.8, cost=88),
+                PlaceHit("太远的店", lat + 0.05, lon, rating=5.0, cost=10)]
+
+
+def test_food_suggest_choose_remove_and_show(monkeypatch):
+    _setup_trip()
+    s.schedule_days()
+    fake = FoodAmap()
+    monkeypatch.setattr(s, "_amap", lambda: fake)
+    r = s.suggest_food(1, "p1", keyword="面食")
+    names = [c["name"] for c in r["candidates"]]
+    assert names == ["饭店B", "面馆A"]                  # 按评分排序，太远的被剔除
+    assert fake.around[0] == (800, "050000", "面食")
+    rev = s._load().revision
+    assert s._load().meals == []                       # 只是候选，不改行程
+    assert s._load().revision == rev
+    s.choose_food(r["candidates"][1]["candidate_id"])
+    t = s._load()
+    assert t.meals[0].name == "面馆A" and t.meals[0].cost_per_person == 30 and t.meals[0].hours_source == "amap"
+    out = s.show_trip()
+    assert "🍜" in out and "面馆A" in out and "餐饮" in out
+    with pytest.raises(s.ToolError, match="已经"):
+        s.choose_food(r["candidates"][1]["candidate_id"])
+    s.remove_food("m1")
+    assert s._load().meals == []
+    s.undo()
+    assert s._load().meals[0].id == "m1"
+    with pytest.raises(s.ToolError, match="没有这个候选"):
+        s.choose_food("f99")
+    with pytest.raises(s.ToolError):
+        s.suggest_food(9, "p1")
+
+
+def test_food_needs_key(monkeypatch):
+    _setup_trip()
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    with pytest.raises(s.ToolError, match="AMAP_KEY"):
+        s.suggest_food(1, "p1")
+
+
+def test_seasonal_hours():
+    from datetime import date
+    from tripcore.hours import hours_for_date as h
+    t = "3~10月 08:00-18:30;11月15日起周一闭馆"
+    assert h(t, date(2026, 10, 19)) == "08:00-18:30"          # 周一，但闭馆条件 11/15 才开始
+    assert h("周一至周日 08:30-19:00;11月15日起周一闭馆", date(2026, 11, 16)) == "闭馆"
+    assert h("周一至周日 08:30-19:00;11月15日起周一闭馆", date(2026, 10, 19)) == "08:30-19:00"
+    assert h("周一至周日 08:30-18:00;10月11日起 08:30-17:30", date(2026, 10, 20)) == "08:30-17:30"
+    assert h("周一至周日 08:30-18:00;10月11日起 08:30-17:30", date(2026, 10, 5)) == "08:30-18:00"
+    assert h("4~10月 08:00-18:00", date(2026, 12, 1)) is None   # 条件不适用且没有别的信息
+    assert h("1月 08:00 3月 09:00", date(2026, 1, 5)) is None    # 条件过于复杂，不猜

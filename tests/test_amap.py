@@ -133,3 +133,12 @@ def test_adcode_and_forecast_parsing():
     assert c.adcode("西安") == "610100"
     w = c.forecast("610100")
     assert w[0].date == "2026-10-18" and w[0].day_weather == "小雨" and w[0].day_temp == 21
+
+
+def test_search_around_converts_and_parses():
+    c = client({"/v5/place/around": {"status": "1", "pois": [
+        {"name": "面馆", "id": "B2", "location": _gcj_loc(34.26, 108.95), "address": "钟楼旁",
+         "business": {"rating": "4.5", "cost": "28", "opentime_week": "周一至周日 07:00-21:00"}}]}})
+    hits = c.search_around(34.26, 108.95, 800)
+    assert hits[0].name == "面馆" and abs(hits[0].lat - 34.26) < 1e-4 and hits[0].cost == 28
+    assert "radius=800" in c.calls[0] and "types=050000" in c.calls[0]

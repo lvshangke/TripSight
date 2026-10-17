@@ -24,11 +24,11 @@ from pydantic import TypeAdapter, ValidationError
 
 from .amap import AmapClient, AmapError
 from .geo import estimate_leg, haversine_km
-from .hours import hours_for_weekday
+from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
-from .models import DateMode, Leg, Lodging, Pace, Place, Trip, TripMeta
+from .models import DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -168,6 +168,10 @@ def new_trip(
     _save(trip)
     _save_proposals({})
     _save_context({"city": city} if city else {})
+    try:
+        _food_path().write_text("{}", encoding="utf-8")      # 旧行程的候选餐厅作废
+    except OSError:
+        pass
     return f"已创建行程「{meta.name}」，共 {meta.num_days} 天，节奏 {meta.pace.value}，交通偏好 {_MODE_NAMES[meta.mode]}。"
 
 
@@ -488,6 +492,91 @@ def fill_hours() -> str:
     return msg + ("\n" + _render(_load()) if trip.plan else "")
 
 
+def _food_path() -> Path:
+    return trip_path().with_name("food_candidates.json")
+
+
+def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: str = "") -> dict[str, Any]:
+    """在某天某个景点附近搜候选餐厅（高德，需要 AMAP_KEY），返回名称、评分、人均参考、营业时间、距离。
+    day 是第几天（从 1 开始）；radius_m 搜索半径（米，默认 800）；keyword 可选，如“面食”“清真”。
+    这只是候选，不会改行程。请把候选展示给用户，由用户选定后再调用 choose_food(candidate_id)。
+    评分和人均是高德的参考值，不是实时价格，不要说成准确价格。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法搜索餐厅。")
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    if not (1 <= day <= len(trip.plan.days)):
+        raise ToolError(f"没有第 {day} 天（共 {len(trip.plan.days)} 天）")
+    try:
+        pl = trip.place(after_place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+    try:
+        hits = client.search_around(pl.lat, pl.lon, radius_m=radius_m, keywords=keyword, limit=25)
+    except AmapError as e:
+        raise ToolError(f"搜索餐厅失败：{e}")
+    cands = []
+    for h in hits:
+        dist = int(haversine_km(pl.lat, pl.lon, h.lat, h.lon) * 1000)
+        if dist > radius_m * 1.2:
+            continue
+        cands.append({"name": h.name, "address": h.address, "lat": h.lat, "lon": h.lon, "rating": h.rating,
+                      "cost_per_person": h.cost, "opening_hours": h.opentime_week or h.opentime_today,
+                      "distance_m": dist, "amap_id": h.amap_id})
+    cands.sort(key=lambda c: (-(c["rating"] or 0), c["distance_m"]))
+    cands = cands[:8]
+    stored = {}
+    for i, c in enumerate(cands, 1):
+        c["candidate_id"] = f"f{i}"
+        stored[c["candidate_id"]] = {**c, "day": day - 1, "after_place_id": after_place_id}
+    fp = _food_path()
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8")
+    shown = [{k: c[k] for k in ("candidate_id", "name", "address", "rating", "cost_per_person", "opening_hours", "distance_m")}
+             for c in cands]
+    return {"place": pl.name, "day": day, "radius_m": radius_m, "candidates": shown,
+            "note": "评分/人均为高德参考值；营业时间为空表示高德无数据，需核实。请用户选择后调用 choose_food。"}
+
+
+def choose_food(candidate_id: str) -> str:
+    """把用户选定的候选餐厅记为这一天的用餐点（候选来自最近一次 suggest_food）。
+    只能在用户明确选定后调用；用餐点不占景点容量，可用 undo 撤销。"""
+    fp = _food_path()
+    try:
+        stored = json.loads(fp.read_text(encoding="utf-8")) if fp.exists() else {}
+    except (OSError, ValueError):
+        stored = {}
+    c = stored.get(candidate_id)
+    if c is None:
+        raise ToolError("没有这个候选，请先调用 suggest_food，并使用它返回的 candidate_id。")
+    trip = _load()
+    try:
+        trip.place(c["after_place_id"])
+    except KeyError as e:
+        raise ToolError(str(e))
+    if any(m.name == c["name"] and m.day == c["day"] for m in trip.meals):
+        raise ToolError(f"「{c['name']}」已经在第 {c['day'] + 1} 天的用餐点里了。")
+    mid = _next_id("m", [m.id for m in trip.meals])
+    meal = Meal(id=mid, day=c["day"], after_place_id=c["after_place_id"], name=c["name"], lat=c["lat"], lon=c["lon"],
+                address=c.get("address") or "", cost_per_person=c.get("cost_per_person"), rating=c.get("rating"),
+                opening_hours=c.get("opening_hours") or "", hours_source="amap" if c.get("opening_hours") else "",
+                distance_m=c.get("distance_m"))
+    _save(commit(trip, lambda t: t.meals.append(meal)))
+    return f"已把「{meal.name}」记为第 {meal.day + 1} 天的用餐点（{meal.id}）。人均和评分是高德参考值。"
+
+
+def remove_food(meal_id: str) -> str:
+    """取消一个已选的用餐点（可用 undo 撤销）。"""
+    trip = _load()
+    m = next((x for x in trip.meals if x.id == meal_id), None)
+    if m is None:
+        raise ToolError(f"找不到用餐点：{meal_id}")
+    _save(commit(trip, lambda t: t.meals.remove(next(x for x in t.meals if x.id == meal_id))))
+    return f"已取消用餐点「{m.name}」。"
+
+
 def get_weather() -> str:
     """查行程各天的天气预报（高德，需要 AMAP_KEY）。只有设置了具体日期、且日期在高德预报范围内（约未来 4 天）
     的那几天才有结果；其余天直接说明“暂无预报”，不要自行编造天气。"""
@@ -761,13 +850,24 @@ def show_trip() -> str:
 # 文字渲染
 # ---------------------------------------------------------------------------
 
+def _meal_text(ml: Meal) -> str:
+    bits = [ml.name]
+    if ml.rating is not None:
+        bits.append(f"评分{ml.rating:g}")
+    bits.append(f"人均约{ml.cost_per_person:.0f}元（参考）" if ml.cost_per_person is not None else "人均待核实")
+    if ml.distance_m is not None:
+        bits.append(f"距景点约{ml.distance_m}米")
+    bits.append(f"营业：{ml.opening_hours}（来源：{ml.hours_source}）" if ml.opening_hours else "营业时间待核实")
+    return f"{ml.id} " + "，".join(bits)
+
+
 def _hours_line(p: Place, d: Optional[date]) -> str:
     if not p.opening_hours:
         return "营业时间：待核实（暂无来源）"
     src = p.hours_source or "来源未注明"
     base = f"营业时间：{p.opening_hours}（来源：{src}）"
     if d is not None:
-        r = hours_for_weekday(p.opening_hours, d.weekday())
+        r = hours_for_date(p.opening_hours, d)
         if r == "闭馆":
             return base + f" ⚠ {_WEEKDAYS[d.weekday()]}可能闭馆"
         if r:
@@ -799,6 +899,9 @@ def _render(trip: Trip) -> str:
             lock = " 🔒" if day.items[i].locked else ""
             out.append(f"  {i + 1}. {p.name}({p.id}) {p.duration_min}分钟{lock}")
             out.append("     " + _hours_line(p, d))
+            for ml in trip.meals:
+                if ml.day == day.index and ml.after_place_id == p.id:
+                    out.append("     🍜 " + _meal_text(ml))
             if p.reservation_required:
                 bk = [trip.place(b).name for b in p.backups if any(x.id == b for x in trip.places)]
                 out.append("     需预约；备选：" + ("、".join(bk) if bk else "未设置"))
@@ -806,9 +909,16 @@ def _render(trip: Trip) -> str:
                 leg = st.legs[i]
                 src = "高德路线" if leg.detail_level == "route" else "估算"
                 out.append(f"     ↓ 约 {leg.minutes} 分钟（{_MODE_NAMES[leg.mode]}，{leg.distance_km} km，{src}）")
+    orphan = [ml for ml in trip.meals if not any(ml.day == dd.index and any(it.place_id == ml.after_place_id for it in dd.items)
+                                                   for dd in trip.plan.days)]
+    for ml in orphan:
+        out.append(f"🍜 第{ml.day + 1}天用餐点（⚠ 挂靠的景点已不在这一天）：{_meal_text(ml)}")
     if trip.plan.unscheduled:
         out.append("未安排：" + "；".join(f"{trip.place(u.place_id).name}：{u.reason}" for u in trip.plan.unscheduled))
     c = estimate_cost(trip)
+    costs = [ml.cost_per_person for ml in trip.meals if ml.cost_per_person is not None]
+    if costs:
+        out.append(f"餐饮（已选 {len(trip.meals)} 处，人均参考合计 {sum(costs):.0f} 元/人，未乘人数、不计入下面的粗略费用）")
     out.append(f"粗略费用（仅门票+住宿）：{c.total:.0f} {m.currency}")
     return "\n".join(out)
 
@@ -819,7 +929,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, choose_food, remove_food, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

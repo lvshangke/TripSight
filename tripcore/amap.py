@@ -153,6 +153,23 @@ class AmapClient:
         if city:
             params.update({"region": city, "city_limit": "true"})
         data = self._get("/v5/place/text", params)
+        return self._parse_pois(data)
+
+    def search_around(self, lat: float, lon: float, radius_m: int = 800, types: str = "050000",
+                      keywords: str = "", limit: int = 20) -> list[PlaceHit]:
+        """以某点为中心搜周边（默认餐饮类 050000）。lat/lon 是 WGS84。"""
+        g_lat, g_lon = wgs84_to_gcj02(lat, lon)
+        params: dict[str, Any] = {
+            "location": f"{g_lon:.6f},{g_lat:.6f}", "radius": max(100, min(int(radius_m), 5000)),
+            "types": types, "page_size": max(1, min(limit, 25)), "show_fields": "business",
+            "sortrule": "distance",
+        }
+        if keywords:
+            params["keywords"] = keywords
+        return self._parse_pois(self._get("/v5/place/around", params))
+
+    @staticmethod
+    def _parse_pois(data: dict) -> list[PlaceHit]:
         hits: list[PlaceHit] = []
         for poi in data.get("pois", []) or []:
             loc = _text(poi.get("location"))

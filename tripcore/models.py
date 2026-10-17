@@ -86,6 +86,24 @@ class Place(BaseModel):
         return self
 
 
+class Meal(BaseModel):
+    """用户选定的用餐点：挂在某天某个景点之后。不占景点容量，不参与排程，信息来自地图服务。"""
+
+    id: str
+    day: int = Field(ge=0, description="第几天，从 0 开始")
+    after_place_id: str = Field(description="挂在哪个景点之后（该景点附近）")
+    name: str
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    address: str = ""
+    cost_per_person: Optional[float] = Field(default=None, ge=0, description="人均消费参考（元），不是实时价")
+    rating: Optional[float] = None
+    opening_hours: str = ""
+    hours_source: str = ""
+    distance_m: Optional[int] = Field(default=None, description="离挂靠景点的直线距离（米）")
+    source: str = "amap"
+
+
 class Lodging(BaseModel):
     """候选住宿。"""
 
@@ -195,6 +213,7 @@ class Trip(BaseModel):
     chosen_lodging_id: Optional[str] = None
     plan: Optional[Plan] = None
     revision: int = Field(default=0, description="版本号：每次改动 +1，用来防止过期的提案被误用")
+    meals: list[Meal] = Field(default_factory=list, description="用户选定的用餐点")
     leg_modes: dict[str, TravelMode] = Field(
         default_factory=dict,
         description="单段出行方式：键是“起点id>终点id”，没有的段用 meta.mode",
