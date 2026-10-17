@@ -14,6 +14,8 @@
 
 ---
 
+> **接入聊天 Agent（nanobot）**：见 [docs/SETUP.md](docs/SETUP.md)。仓库里的 `skills/` 是给 nanobot 用的说明书，`scripts/install_skills.py` 负责安装，`nanobot/config.example.json` 是配置样例（不含密钥）。
+
 ## 一、第一次运行（约 5 分钟）
 
 需要 Python 3.10 或更新版本（本项目在 Python 3.12 上测试通过）。
