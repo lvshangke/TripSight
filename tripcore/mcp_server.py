@@ -631,7 +631,7 @@ def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Op
     meal = Meal(id=mid, day=day0, after_place_id=pid, name=c["name"], lat=c["lat"], lon=c["lon"],
                 address=c.get("address") or "", cost_per_person=c.get("cost_per_person"), rating=c.get("rating"),
                 opening_hours=c.get("opening_hours") or "", hours_source="amap" if c.get("opening_hours") else "",
-                distance_m=dist)
+                distance_m=dist, amap_id=c.get("amap_id") or "")
     _save(commit(trip, lambda t: t.meals.append(meal)))
     extra = "（离该景点较远，注意交通）" if dist > 3000 else ""
     return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是高德参考值。"
@@ -649,6 +649,114 @@ def export_map() -> str:
         raise ToolError(f"写入地图文件失败：{e}")
     note = "" if trip.plan else "（还没有分天，地图上只有空白底图）"
     return f"地图已生成：{path}{note}\n在浏览器里打开即可（macOS 可用 open 命令）；底图需要联网。"
+
+
+MAX_POI_LOOKUPS = 25
+
+
+def _match_poi(client: Any, name: str, lat: float, lon: float, city: Optional[str], max_km: float = 1.5) -> Optional[str]:
+    """按名称+距离在高德里找对应的 POI ID；名字不相符或太远就返回 None（宁缺毋滥）。"""
+    for h in client.search_places(name, city, limit=5):
+        if h.amap_id and (name in h.name or h.name in name) and haversine_km(lat, lon, h.lat, h.lon) <= max_km:
+            return h.amap_id
+    return None
+
+
+def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
+    """生成高德“专属地图”（maps_schema_personal_map）所需的参数：每天一条行程，从酒店出发经各景点回到酒店，
+    用餐点挂在对应景点之后。景点名称、坐标（已转成高德坐标系）、POI ID 都由代码生成，需要 AMAP_KEY。
+    POI ID 缺的会先按名称+距离到高德匹配，匹配不上的点会被跳过并列在 skipped 里。
+    把返回的 arguments 原样（不要改动任何字段）传给 amap-maps 的 maps_schema_personal_map，
+    再把它返回的链接给用户。day 从 1 开始，不填则所有天。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法匹配高德 POI。")
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    n = len(trip.plan.days)
+    if day is not None and not (1 <= day <= n):
+        raise ToolError(f"没有第 {day} 天（共 {n} 天）")
+    city = _load_context().get("city")
+    days = [d for d in trip.plan.days if (day is None or d.index == day - 1) and d.items]
+    if not days:
+        raise ToolError("没有可生成的行程。")
+    lod = trip.chosen_lodging
+    # 1) 补 POI ID
+    need: list[tuple[str, str, Any]] = []     # (种类, id, 对象)
+    seen: set[tuple[str, str]] = set()
+    for d in days:
+        for it in d.items:
+            pl = trip.place(it.place_id)
+            if not pl.amap_id and ("p", pl.id) not in seen:
+                seen.add(("p", pl.id)); need.append(("p", pl.id, pl))
+        for m in trip.meals:
+            if m.day == d.index and not m.amap_id and ("m", m.id) not in seen:
+                seen.add(("m", m.id)); need.append(("m", m.id, m))
+    if lod and not lod.amap_id:
+        need.append(("l", lod.id, lod))
+    found: dict[tuple[str, str], str] = {}
+    for kind, oid, obj in need[:MAX_POI_LOOKUPS]:
+        try:
+            pid = _match_poi(client, obj.name, obj.lat, obj.lon, city, 1.0 if kind == "l" else 1.5)
+        except AmapError:
+            pid = None
+        if pid:
+            found[(kind, oid)] = pid
+    if found:
+        def mutate(t: Trip) -> None:
+            for (kind, oid), pid in found.items():
+                if kind == "p":
+                    t.places[t.places.index(t.place(oid))] = t.place(oid).model_copy(update={"amap_id": pid})
+                elif kind == "m":
+                    m0 = next(x for x in t.meals if x.id == oid)
+                    t.meals[t.meals.index(m0)] = m0.model_copy(update={"amap_id": pid})
+                else:
+                    l0 = next(x for x in t.lodgings if x.id == oid)
+                    t.lodgings[t.lodgings.index(l0)] = l0.model_copy(update={"amap_id": pid})
+        trip = commit(trip, mutate)
+        _save(trip)
+    # 2) 组装
+    from .coords import wgs84_to_gcj02
+
+    def point(obj: Any) -> Optional[dict[str, Any]]:
+        if not obj.amap_id:
+            return None
+        g_lat, g_lon = wgs84_to_gcj02(obj.lat, obj.lon)
+        return {"name": obj.name, "lon": round(g_lon, 6), "lat": round(g_lat, 6), "poiId": obj.amap_id}
+
+    skipped: list[str] = []
+    lines = []
+    lod = trip.chosen_lodging
+
+    def add(pts: list, obj: Any, label: str) -> None:
+        pt = point(obj)
+        if pt:
+            pts.append(pt)
+        else:
+            skipped.append(f"{label}：{obj.name}（高德里没有匹配到 POI，已跳过）")
+
+    for d in days:
+        pts: list[dict[str, Any]] = []
+        if lod:
+            add(pts, lod, f"第{d.index + 1}天 酒店")
+        for it in d.items:
+            pl = trip.place(it.place_id)
+            add(pts, pl, f"第{d.index + 1}天 景点")
+            for m in trip.meals:
+                if m.day == d.index and m.after_place_id == pl.id:
+                    add(pts, m, f"第{d.index + 1}天 用餐")
+        if lod:
+            add(pts, lod, f"第{d.index + 1}天 酒店")
+        dt = trip.day_date(d.index)
+        lines.append({"title": f"第{d.index + 1}天" + (f" {dt.isoformat()}" if dt else ""), "pointInfoList": pts})
+    return {
+        "tool": "maps_schema_personal_map",
+        "arguments": {"orgName": trip.meta.name, "lineList": lines},
+        "skipped": skipped,
+        "note": "arguments 请原样传给 amap-maps 的 maps_schema_personal_map，不要改动或补充任何字段；返回的链接给用户，"
+                "在手机（装了高德 App）或浏览器里打开。坐标已转成高德坐标系。",
+    }
 
 
 def export_gpx(day: Optional[int] = None) -> str:
@@ -1054,7 +1162,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, personal_map_payload, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

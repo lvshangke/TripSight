@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 26
+    assert len(names) == 27
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -644,3 +644,43 @@ def test_spread_overlapping_markers():
     from tripcore.mapview import _spread
     out = _spread([[34.26, 108.94], [34.26, 108.94], [34.30, 108.99]])
     assert out[0] == [34.26, 108.94] and out[1] != out[0] and out[2] == [34.30, 108.99]
+
+
+class PoiAmap(FakeAmap):
+    def search_places(self, query, city=None, limit=5):
+        table = {"故宫": PlaceHit("故宫博物院", 39.9165, 116.3975, amap_id="B000A8UIN8"),
+                 "酒店A": PlaceHit("酒店A(王府井店)", 39.9101, 116.4001, amap_id="B0HOTEL1"),
+                 "老店": PlaceHit("老店", 39.9170, 116.3980, amap_id="B0FOOD1", rating=4.6, cost=60),
+                 "天坛": PlaceHit("天坛公园", 31.0, 121.0, amap_id="B0FAR")}     # 名字像但太远
+        return [table[query]] if query in table else []
+
+
+def test_personal_map_payload_closed_loop_and_poi_matching(monkeypatch):
+    s.new_trip(num_days=1, city="北京", name="北京行")
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.add_place("天坛", 39.8822, 116.4066)
+    s.add_lodging("酒店A", 39.9100, 116.4000, choose=True)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: PoiAmap())
+    s.find_food("老店")
+    s.choose_food("f1")
+    r = s.personal_map_payload()
+    a = r["arguments"]
+    assert a["orgName"] == "北京行" and len(a["lineList"]) == 1
+    pts = a["lineList"][0]["pointInfoList"]
+    names = [p["name"] for p in pts]
+    assert names[0] == names[-1] == "酒店A" and "故宫" in names and "老店" in names     # 闭环、用餐挂在景点后
+    assert "天坛" not in names and any("天坛" in x for x in r["skipped"])                # 太远不采用，宁缺毋滥
+    assert all(set(p) == {"name", "lon", "lat", "poiId"} and p["poiId"] for p in pts)
+    from tripcore.coords import wgs84_to_gcj02
+    g = wgs84_to_gcj02(39.9163, 116.3972)
+    gu = [p for p in pts if p["name"] == "故宫"][0]
+    assert abs(gu["lat"] - g[0]) < 1e-5 and abs(gu["lon"] - g[1]) < 1e-5               # 高德坐标系
+    assert s._load().place("p1").amap_id == "B000A8UIN8"                                # 已存下，下次不再查
+    f = PoiAmap(); calls = []
+    f.search_places = lambda q, c=None, limit=5: calls.append(q) or PoiAmap.search_places(f, q, c, limit)
+    monkeypatch.setattr(s, "_amap", lambda: f)
+    s.personal_map_payload()
+    assert "故宫" not in calls and "酒店A" not in calls
+    with pytest.raises(s.ToolError):
+        s.personal_map_payload(day=5)

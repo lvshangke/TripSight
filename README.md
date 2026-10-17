@@ -208,3 +208,8 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - 页面数据由代码生成，文字在浏览器端转义。
 
 `export_gpx(day)` 把每天的闭环路线写成 `~/.tripcore/gpx/day-N.gpx`（WGS84；途经点 + 轨迹，估算段在注释里标明）。
+
+## 高德专属地图（`personal_map_payload`）
+
+在 nanobot 里额外接入高德官方 MCP（`https://mcp.amap.com/mcp?key=…`，key 只放自己的配置里）。`personal_map_payload` 生成 `maps_schema_personal_map` 的参数（`orgName`、`lineList[{title, pointInfoList[{name, lon, lat, poiId}]}]`）：每天一条行程，酒店→景点（用餐点挂在景点后）→酒店；`poiId` 由代码按名称+距离（景点 1.5 km、酒店 1 km 内）在高德里匹配并存下来，匹配不上的点跳过并列出；坐标转成高德坐标系。Agent 把 `arguments` 原样交给 `maps_schema_personal_map`，返回的链接可在高德 App 打开。
+

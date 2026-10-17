@@ -76,6 +76,7 @@ class Place(BaseModel):
     source: str = Field(default="user", description="来源：user / agent / 某个网址等")
     opening_hours: str = Field(default="", description="营业时间原文（如高德返回的本周营业时间）")
     hours_source: str = Field(default="", description="营业时间的来源：amap / 官网网址 / user；空表示未核实")
+    amap_id: str = Field(default="", description="高德 POI ID（生成高德专属地图时需要；由代码按名称+距离匹配，不由模型填写）")
     backups: list[str] = Field(default_factory=list, description="备选景点的 id：这个景点去不成（如没约上）时换成它们")
 
     @model_validator(mode="after")
@@ -101,6 +102,7 @@ class Meal(BaseModel):
     opening_hours: str = ""
     hours_source: str = ""
     distance_m: Optional[int] = Field(default=None, description="离挂靠景点的直线距离（米）")
+    amap_id: str = ""
     source: str = "amap"
 
 
@@ -113,6 +115,7 @@ class Lodging(BaseModel):
     lon: float = Field(ge=-180, le=180)
     price_min: float = Field(default=0, ge=0, description="每晚最低价（元）")
     price_max: float = Field(default=0, ge=0, description="每晚最高价（元）")
+    amap_id: str = Field(default="", description="高德 POI ID（代码按名称+距离匹配）")
     status: Literal["candidate", "booked"] = "candidate"
     notes: str = ""
 
