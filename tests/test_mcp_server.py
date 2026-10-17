@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 27
+    assert len(names) == 28
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -684,3 +684,57 @@ def test_personal_map_payload_closed_loop_and_poi_matching(monkeypatch):
     assert "故宫" not in calls and "酒店A" not in calls
     with pytest.raises(s.ToolError):
         s.personal_map_payload(day=5)
+
+
+def _setup_four_days():
+    s.new_trip(num_days=2, city="北京", name="北京行")
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.add_place("天坛", 39.8822, 116.4066)
+    s.add_place("颐和园", 39.9999, 116.2755)
+    s.add_lodging("酒店A", 39.9100, 116.4000, choose=True)
+    s.schedule_days()
+
+
+class PoiAll(FakeAmap):
+    def search_places(self, query, city=None, limit=5):
+        from tripcore.geocode import geocode  # noqa: F401  (not used)
+        t = s._load()
+        objs = [*t.places, *t.lodgings]
+        return [PlaceHit(o.name, o.lat, o.lon, amap_id=f"ID-{o.name}") for o in objs if o.name == query]
+
+
+def test_create_amap_map_calls_mcp_directly_without_leaking_key(monkeypatch):
+    _setup_four_days()
+    monkeypatch.setenv("AMAP_KEY", "SECRETKEY123")
+    monkeypatch.setattr(s, "_amap", lambda: PoiAll())
+    calls = []
+
+    def fake(tool, arguments, key):
+        calls.append((tool, arguments, key))
+        return "amapuri://workInAmap/createWithToken?polymericId=mcp_x&from=MCP"
+
+    monkeypatch.setattr(s, "_call_amap_mcp", fake)
+    r = s.create_amap_map()
+    assert len(calls) == 1 and calls[0][0] == "maps_schema_personal_map" and calls[0][2] == "SECRETKEY123"
+    assert len(calls[0][1]["lineList"]) == 2 and r["maps"][0]["link"].startswith("amapuri://")
+    calls.clear()
+    r = s.create_amap_map(per_day=True)
+    assert len(calls) == 2 and all(len(c[1]["lineList"]) == 1 for c in calls) and len(r["maps"]) == 2
+    log = (s.trip_path().with_name("amap_calls.log")).read_text(encoding="utf-8")
+    assert "mcp.amap.com" in log and "SECRETKEY123" not in log
+
+    def boom(tool, arguments, key):
+        raise RuntimeError("https://mcp.amap.com/mcp?key=SECRETKEY123 failed")
+
+    monkeypatch.setattr(s, "_call_amap_mcp", boom)
+    with pytest.raises(s.ToolError) as e:
+        s.create_amap_map()
+    assert "SECRETKEY123" not in str(e.value)
+    assert "SECRETKEY123" not in (s.trip_path().with_name("amap_calls.log")).read_text(encoding="utf-8")
+
+
+def test_create_amap_map_needs_key(monkeypatch):
+    _setup_four_days()
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    with pytest.raises(s.ToolError, match="AMAP_KEY"):
+        s.create_amap_map()

@@ -759,6 +759,82 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
     }
 
 
+AMAP_MCP_URL = "https://mcp.amap.com/mcp"
+
+
+def _call_amap_mcp(tool: str, arguments: dict[str, Any], key: str) -> str:
+    """直接请求高德官方 MCP（streamable HTTP）并返回文字结果。放在单独线程里跑，避免和服务自己的事件循环冲突。"""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    url = os.environ.get("AMAP_MCP_URL", AMAP_MCP_URL)
+
+    async def run() -> str:
+        async with streamablehttp_client(f"{url}?key={key}") as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                res = await session.call_tool(tool, arguments)
+                text = "\n".join(getattr(c, "text", "") for c in res.content).strip()
+                if res.isError:
+                    raise RuntimeError(text or "高德 MCP 返回错误")
+                return text
+
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(lambda: asyncio.run(asyncio.wait_for(run(), timeout=60))).result()
+
+
+def _audit_mcp(line: str) -> None:
+    try:
+        p = trip_path().with_name("amap_calls.log")
+        with p.open("a", encoding="utf-8") as f:
+            from datetime import datetime
+            f.write(f"{datetime.now().isoformat(timespec='seconds')} | mcp.amap.com | {line}\n")
+    except OSError:
+        pass
+
+
+def create_amap_map(day: Optional[int] = None, per_day: bool = False) -> dict[str, Any]:
+    """生成高德 App 里的专属地图并返回链接（需要 AMAP_KEY）。参数由代码生成，直接请求高德官方 MCP，
+    不经过模型，所以不会丢坐标精度或漏掉某一天。day 从 1 开始，不填则所有天；
+    per_day=True 时每天单独生成一个链接（如果一张地图里只显示第一天，就用这个）。
+    链接是高德 App 的专用地址，要在装了高德的手机上打开。"""
+    key = os.environ.get("AMAP_KEY", "").strip()
+    if not key:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY）。")
+    if day is not None or not per_day:
+        jobs = [(day, personal_map_payload(day))]
+    else:
+        n = len(_load().plan.days) if _load().plan else 0
+        jobs = []
+        for d in range(1, n + 1):
+            try:
+                jobs.append((d, personal_map_payload(d)))
+            except ToolError:
+                continue                       # 空的一天跳过
+        if not jobs:
+            raise ToolError("没有可生成的行程。")
+    out, skipped = [], []
+    for d, payload in jobs:
+        args = payload["arguments"]
+        pts = sum(len(x["pointInfoList"]) for x in args["lineList"])
+        try:
+            text = _call_amap_mcp("maps_schema_personal_map", args, key)
+        except Exception as e:                  # 不回显异常原文，避免带出含 key 的网址
+            _audit_mcp(f"maps_schema_personal_map | 行程{len(args['lineList'])}条 点{pts}个 | 失败 {type(e).__name__}")
+            raise ToolError(f"调用高德专属地图失败：{type(e).__name__}。请检查网络和 key 是否有效。")
+        _audit_mcp(f"maps_schema_personal_map | 行程{len(args['lineList'])}条 点{pts}个 | OK")
+        import re
+        m = re.search(r"[a-zA-Z][a-zA-Z0-9+.-]*://\S+", text)
+        out.append({"day": d if d is not None else "全部", "link": m.group(0) if m else text,
+                    "lines": len(args["lineList"]), "points": pts})
+        skipped += payload["skipped"]
+    return {"maps": out, "skipped": skipped,
+            "note": "把链接发到装了高德 App 的手机上打开（电脑浏览器打不开）。链接可能有有效期，尽快打开。"}
+
+
 def export_gpx(day: Optional[int] = None) -> str:
     """把某一天（day 从 1 开始，不填则每一天）的闭环路线导出成 GPX 文件，可导入其他地图或运动类 App。
     有高德真实路线形状的段用真实形状，没有的用直线（文件里会标“估算”）；建议先 refine_routes。"""
@@ -1162,7 +1238,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, personal_map_payload, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 
