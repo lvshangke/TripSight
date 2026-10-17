@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 25
+    assert len(names) == 26
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -579,6 +579,68 @@ def test_map_coordinates_are_gcj02():
     s.new_trip(num_days=1)
     s.add_place("故宫", 39.9163, 116.3972)
     s.schedule_days()
-    pos = build_map_data(s._load())["days"][0]["stops"][0]["pos"]
+    pos = [e for e in build_map_data(s._load())["days"][0]["timeline"] if e["type"] == "stop"][0]["pos"]
     g = wgs84_to_gcj02(39.9163, 116.3972)
     assert abs(pos[0] - g[0]) < 1e-5 and abs(pos[1] - g[1]) < 1e-5
+
+
+class PathAmap(FakeAmap):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+        self.route_calls.append(mode)
+        mid = ((a_lat + b_lat) / 2 + 0.002, (a_lon + b_lon) / 2)
+        r = RouteResult(mode, 3.0, 20, path=[(a_lat, a_lon), mid, (b_lat, b_lon)])
+        if mode == "transit":
+            r.lines, r.transfers, r.walking_km, r.cost_yuan = ["地铁2号线", "21路"], 1, 0.4, 3
+        return r
+
+
+def test_closed_loop_timeline_paths_links_and_gpx(monkeypatch):
+    s.new_trip(num_days=1, mode="transit", city="北京")
+    s.add_place("故宫", 39.9163, 116.3972, duration_min=120)
+    s.add_place("天坛", 39.8822, 116.4066, duration_min=60)
+    s.add_lodging("酒店A", 39.9100, 116.4000, choose=True)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: PathAmap())
+    s.refine_routes()
+    t = s._load()
+    assert all(l.path_checked and len(l.path) == 3 for l in t.route_overrides.values())
+    from tripcore.mapview import build_map_data
+    tl = build_map_data(t)["days"][0]["timeline"]
+    kinds = [e["type"] for e in tl]
+    assert kinds == ["hotel", "leg", "stop", "leg", "stop", "leg", "hotel"]           # 酒店出发→…→回酒店，闭环
+    assert tl[0]["role"] == "出发" and tl[-1]["role"] == "返回" and tl[0]["time"] == "09:00"
+    assert tl[2]["arrive"] > tl[0]["time"] and tl[4]["arrive"] > tl[2]["leave"]        # 时间递增
+    legs = [e for e in tl if e["type"] == "leg"]
+    assert all(l["real"] and len(l["path"]) == 3 for l in legs)
+    assert all(l["link"].startswith("https://uri.amap.com/navigation?from=") for l in legs)
+    assert all(("mode=walk" if l["mode"] == "步行" else "mode=bus") in l["link"] for l in legs)
+    assert any("地铁2号线" in l["note"] for l in legs)
+    out = s.export_gpx(1)
+    gpx = (s.trip_path().with_name("gpx") / "day-1.gpx").read_text(encoding="utf-8")
+    assert "day-1.gpx" in out and gpx.count("<wpt") == 4 and gpx.count("<trkseg>") == 3 and "估算" not in gpx
+    import xml.dom.minidom as md
+    md.parseString(gpx)                                                                 # 合法 XML
+    with pytest.raises(s.ToolError):
+        s.export_gpx(5)
+
+
+def test_old_cache_without_path_is_refetched(monkeypatch):
+    s.new_trip(num_days=1, city="北京")
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.add_place("天坛", 39.8822, 116.4066)
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: FakeAmap())          # 没有 path
+    s.refine_routes()
+    t = s._load()
+    for k, l in t.route_overrides.items():
+        assert l.path_checked and l.path == []
+    f2 = PathAmap()
+    monkeypatch.setattr(s, "_amap", lambda: f2)
+    s.refine_routes()
+    assert f2.route_calls == []                                  # 已问过但没有形状的，不会反复请求
+
+
+def test_spread_overlapping_markers():
+    from tripcore.mapview import _spread
+    out = _spread([[34.26, 108.94], [34.26, 108.94], [34.30, 108.99]])
+    assert out[0] == [34.26, 108.94] and out[1] != out[0] and out[2] == [34.30, 108.99]

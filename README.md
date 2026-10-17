@@ -199,7 +199,12 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - `find_food(店名)`：用户自己想吃的店。高德按店名搜索，并用代码算出离已排行程里哪一天、哪个景点最近，作为建议位置（超过 3 km 会警告）；`choose_food` 可指定 `day` / `after_place_id` 改位置。
 - `Trip.meta.travelers`（人数，默认 1，`new_trip(travelers=…)` / `set_travelers`）：`show_trip` 按人数估算门票和已选餐厅，住宿按整间价不乘人数。
 
-## 地图页（`export_map`）
+## 地图页（`export_map`）与 GPX（`export_gpx`）
 
-生成 `~/.tripcore/map.html`（与 `trip.json` 同目录），浏览器直接打开：按天分色的编号标记、同一天按顺序连线（直线，标注交通方式、分钟数、是“高德路线”还是“估算”）、住宿 🏨、用餐点 🍜；点标记看营业时间及来源、预约与备选、人均参考；顶部按钮可按天显示/隐藏。
-底图是高德通用瓦片（`webrd0{s}.is.autonavi.com`，仅供个人使用，不是官方 JS API），坐标由 WGS84 自动转成 GCJ-02。Leaflet 1.9.4（BSD-2，见 `tripcore/assets/LEAFLET-LICENSE`）内嵌在页面里，只有瓦片需要联网。页面里的数据由代码生成，文字在浏览器端转义。
+`export_map` 生成 `~/.tripcore/map.html`（与 `trip.json` 同目录），浏览器直接打开：
+- 左侧时间线：每天 9:00 从酒店出发 → 各景点（到达/离开时间、营业时间及来源、预约与备选）→ 回酒店，闭环；🍜 用餐点挂在对应景点后面；每段显示交通方式、时长、公交线路与换乘，并带“在高德打开”链接（`uri.amap.com/navigation`，手机可调起 App）。
+- 右侧地图：一次显示一天；实线是高德返回的真实路线形状（`refine_routes` 缓存在 `Leg.path`），虚线是估算直线；靠得太近的标记会错开显示。
+- 底图是高德通用瓦片（`webrd0{s}.is.autonavi.com`，仅供个人使用，不是官方 JS API），坐标由 WGS84 自动转成 GCJ-02。Leaflet 1.9.4（BSD-2，见 `tripcore/assets/LEAFLET-LICENSE`）内嵌在页面里，只有瓦片需要联网。
+- 页面数据由代码生成，文字在浏览器端转义。
+
+`export_gpx(day)` 把每天的闭环路线写成 `~/.tripcore/gpx/day-N.gpx`（WGS84；途经点 + 轨迹，估算段在注释里标明）。

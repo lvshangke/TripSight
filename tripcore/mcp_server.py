@@ -26,6 +26,7 @@ from .amap import AmapClient, AmapError
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
+from .gpx import build_gpx
 from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
@@ -383,6 +384,18 @@ def remove_place(place_id: str) -> str:
 MAX_ROUTE_REQUESTS = 25   # 单次最多请求次数，避免超过工具超时；没做完的下次再调用
 
 
+def _route_note(r: Any) -> str:
+    """路线说明：公交写线路、换乘、步行距离、票价；其余为空。"""
+    if r.mode != "transit" or not getattr(r, "lines", None):
+        return ""
+    bits = ["→".join(r.lines), f"换乘{r.transfers}次" if r.transfers is not None else ""]
+    if r.walking_km is not None:
+        bits.append(f"步行{r.walking_km:g}km")
+    if r.cost_yuan is not None:
+        bits.append(f"票价{r.cost_yuan:g}元")
+    return "，".join(b for b in bits if b)
+
+
 def refine_routes(day: Optional[int] = None) -> str:
     """把已排好的行程里“估算”的交通时间升级为高德的真实路线时间（需要 AMAP_KEY）。
     day 是第几天（从 1 开始），不填则处理所有天。结果会缓存，重复调用只补没查过的路段。
@@ -415,7 +428,8 @@ def refine_routes(day: Optional[int] = None) -> str:
         mode = leg_mode(trip, a.id, b.id)
         key = leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode)
         all_keys.add(key)
-        if key in trip.route_overrides or key in new_legs:
+        cached = trip.route_overrides.get(key)
+        if (cached is not None and cached.path_checked) or key in new_legs:
             skipped += 1
             continue
         if requested >= MAX_ROUTE_REQUESTS:
@@ -431,11 +445,12 @@ def refine_routes(day: Optional[int] = None) -> str:
             failures.append(f"{a.name} → {b.name}：{e}")
             continue
         new_legs[key] = Leg(from_id=a.id, to_id=b.id, mode=r.mode, distance_km=r.distance_km,  # type: ignore[arg-type]
-                            minutes=r.minutes, detail_level="route")
+                            minutes=r.minutes, detail_level="route", path=[list(pt) for pt in r.path],
+                            path_checked=True, note=_route_note(r))
 
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
-    todo = len(all_keys - set(trip.route_overrides) - set(new_legs)) - len(failures)
+    todo = len([k for k in all_keys if k not in new_legs and not (k in trip.route_overrides and trip.route_overrides[k].path_checked)]) - len(failures)
     msg = f"已更新 {len(new_legs)} 段为高德真实路线，{skipped} 段此前已查过。"
     if failures:
         msg += "\n失败：" + "；".join(failures[:5]) + "（这些路段仍用估算值）"
@@ -634,6 +649,32 @@ def export_map() -> str:
         raise ToolError(f"写入地图文件失败：{e}")
     note = "" if trip.plan else "（还没有分天，地图上只有空白底图）"
     return f"地图已生成：{path}{note}\n在浏览器里打开即可（macOS 可用 open 命令）；底图需要联网。"
+
+
+def export_gpx(day: Optional[int] = None) -> str:
+    """把某一天（day 从 1 开始，不填则每一天）的闭环路线导出成 GPX 文件，可导入其他地图或运动类 App。
+    有高德真实路线形状的段用真实形状，没有的用直线（文件里会标“估算”）；建议先 refine_routes。"""
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    n = len(trip.plan.days)
+    if day is not None and not (1 <= day <= n):
+        raise ToolError(f"没有第 {day} 天（共 {n} 天）")
+    folder = trip_path().with_name("gpx")
+    written = []
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        for i in ([day - 1] if day else range(n)):
+            if not trip.plan.days[i].items:
+                continue
+            f = folder / f"day-{i + 1}.gpx"
+            f.write_text(build_gpx(trip, i), encoding="utf-8")
+            written.append(str(f))
+    except OSError as e:
+        raise ToolError(f"写入 GPX 失败：{e}")
+    if not written:
+        raise ToolError("这一天没有景点，没有可导出的路线。")
+    return "已导出 GPX（坐标为标准 WGS84）：\n" + "\n".join(written)
 
 
 def set_travelers(n: int) -> str:
@@ -1013,7 +1054,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

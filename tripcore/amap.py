@@ -57,6 +57,7 @@ class RouteResult:
     cost_yuan: Optional[float] = None
     lines: list[str] = field(default_factory=list)
     uses_subway: bool = False
+    path: list[tuple[float, float]] = field(default_factory=list)   # 路线形状 (lat, lon)，WGS84，已抽稀
 
 
 @dataclass
@@ -71,6 +72,33 @@ class WeatherDay:
 
 # 公交策略（高德 transit 接口的 strategy 参数）
 TRANSIT_STRATEGIES = {"fastest": 0, "cheapest": 1, "fewest_transfers": 2, "least_walking": 3, "no_subway": 5}
+
+
+_MAX_PATH_POINTS = 250
+
+
+def _parse_polyline(text: Any) -> list[tuple[float, float]]:
+    """高德 polyline "lon,lat;lon,lat;…"（GCJ-02）→ [(lat, lon)]（WGS84）。坏点直接跳过。"""
+    out: list[tuple[float, float]] = []
+    if not isinstance(text, str):
+        return out
+    for pair in text.split(";"):
+        try:
+            lon_g, lat_g = (float(x) for x in pair.split(","))
+        except ValueError:
+            continue
+        lat, lon = gcj02_to_wgs84(lat_g, lon_g)
+        out.append((round(lat, 5), round(lon, 5)))
+    return out
+
+
+def _thin(points: list[tuple[float, float]], limit: int = _MAX_PATH_POINTS) -> list[tuple[float, float]]:
+    """等间隔抽稀，保留首尾，避免缓存过大。"""
+    if len(points) <= limit:
+        return points
+    step = (len(points) - 1) / (limit - 1)
+    idx = sorted({round(i * step) for i in range(limit)} | {len(points) - 1})
+    return [points[i] for i in idx]
 
 
 def _num(v: Any) -> Optional[float]:
@@ -254,10 +282,14 @@ class AmapClient:
             if dur is None or dist is None:
                 raise AmapError("公交结果缺少时间或距离")
             lines: list[tuple[str, str]] = []
+            path: list[tuple[float, float]] = []
             for seg in t.get("segments") or []:
+                for st in ((seg.get("walking") or {}).get("steps")) or []:
+                    path += _parse_polyline(st.get("polyline"))
                 buslines = ((seg.get("bus") or {}).get("buslines")) or []
                 if buslines:
                     lines.append((_text(buslines[0].get("name")).split("(")[0], _text(buslines[0].get("type"))))
+                    path += _parse_polyline(buslines[0].get("polyline"))
             walk_m = _num(t.get("walking_distance"))
             return RouteResult(
                 "transit", round(dist / 1000, 2), max(1, round(dur / 60)),
@@ -266,6 +298,7 @@ class AmapClient:
                 cost_yuan=_num(t.get("cost")),
                 lines=[n for n, _ in lines],
                 uses_subway=any("地铁" in n or "地铁" in ty for n, ty in lines),
+                path=_thin(path),
             )
         raise AmapError(f"不支持的出行方式：{mode}")
 
@@ -277,4 +310,7 @@ class AmapClient:
         dur, dist = _num(paths[0].get("duration")), _num(paths[0].get("distance"))
         if dur is None or dist is None:
             raise AmapError("路线结果缺少时间或距离")
-        return RouteResult(mode, round(dist / 1000, 2), max(1, round(dur / 60)))
+        path: list[tuple[float, float]] = []
+        for st in paths[0].get("steps") or []:
+            path += _parse_polyline(st.get("polyline"))
+        return RouteResult(mode, round(dist / 1000, 2), max(1, round(dur / 60)), path=_thin(path))

@@ -136,6 +136,9 @@ class Leg(BaseModel):
     distance_km: float
     minutes: int
     detail_level: Literal["estimate", "route", "steps"] = "estimate"
+    path: list[list[float]] = Field(default_factory=list, description="真实路线形状 [[纬度,经度],…]，WGS84，已抽稀；估算没有")
+    path_checked: bool = Field(default=False, description="是否已向地图服务请求过路线形状（旧缓存没有，会重新查一次）")
+    note: str = Field(default="", description="路线说明，如公交的线路、换乘次数、步行距离、票价")
 
 
 # ---------------------------------------------------------------------------
