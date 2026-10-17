@@ -288,7 +288,7 @@ def test_unbooked_issue_lists_backups_and_removal_cleans_them():
 class ModeAmap(FakeAmap):
     """按出行方式返回不同结果：走路 25 分钟，公交 14 分钟（1 次换乘，含地铁），驾车 10 分钟。"""
 
-    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
         self.route_calls.append(mode)
         if mode == "walk":
             return RouteResult("walk", 1.9, 25)

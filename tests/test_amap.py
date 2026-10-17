@@ -142,3 +142,31 @@ def test_search_around_converts_and_parses():
     hits = c.search_around(34.26, 108.95, 800)
     assert hits[0].name == "面馆" and abs(hits[0].lat - 34.26) < 1e-4 and hits[0].cost == 28
     assert "radius=800" in c.calls[0] and "types=050000" in c.calls[0]
+
+
+def _transit(duration, names):
+    segs = [{"bus": {"buslines": [{"name": n, "type": "地铁线路" if "地铁" in n else "普通公交线路"}]}} for n in names]
+    return {"duration": str(duration), "distance": "9000", "walking_distance": "500", "cost": "4", "segments": segs}
+
+
+def test_transit_respects_max_transfers_and_warns_when_impossible():
+    fast3 = _transit(3000, ["A路(x--y)", "B路(x--y)", "C路(x--y)", "D路(x--y)"])     # 3 次换乘，50 分钟
+    slow1 = _transit(4200, ["地铁2号线(x--y)", "E路(x--y)"])                          # 1 次换乘，70 分钟
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [fast3, slow1]}}})
+    assert c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安").minutes == 50          # 不设偏好：沿用第一个
+    r = c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", max_transfers=1)
+    assert (r.minutes, r.transfers, r.warning) == (70, 1, "")
+    only3 = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [fast3]}}})
+    r = only3.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", max_transfers=1)
+    assert r.transfers == 3 and "超过你的上限 1 次" in r.warning
+    assert any("strategy=2" in u for u in only3.calls)            # 默认方案不满足时，会再查「少换乘」
+
+
+def test_prefer_subway_only_if_not_much_slower():
+    bus = _transit(3000, ["A路(x--y)"])
+    sub = _transit(3600, ["地铁1号线(x--y)"])                      # 慢 20%，选地铁
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [bus, sub]}}})
+    assert c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", prefer_subway=True).uses_subway
+    slow = _transit(5400, ["地铁1号线(x--y)"])                     # 慢 80%，不选
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [bus, slow]}}})
+    assert not c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", prefer_subway=True).uses_subway

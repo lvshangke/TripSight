@@ -385,6 +385,16 @@ def remove_place(place_id: str) -> str:
 MAX_ROUTE_REQUESTS = 25   # 单次最多请求次数，避免超过工具超时；没做完的下次再调用
 
 
+def _transit_kwargs(prefs: Any) -> dict[str, Any]:
+    """把用户的换乘/地铁偏好传给高德路线查询；没设置偏好时不传，沿用高德默认方案。"""
+    kw: dict[str, Any] = {}
+    if prefs.max_transfers is not None:
+        kw["max_transfers"] = prefs.max_transfers
+    if prefs.prefer_subway:
+        kw["prefer_subway"] = True
+    return kw
+
+
 def _route_note(r: Any) -> str:
     """路线说明：公交写线路、换乘、步行距离、票价；其余为空。"""
     if r.mode != "transit" or not getattr(r, "lines", None):
@@ -394,6 +404,8 @@ def _route_note(r: Any) -> str:
         bits.append(f"步行{r.walking_km:g}km")
     if r.cost_yuan is not None:
         bits.append(f"票价{r.cost_yuan:g}元")
+    if getattr(r, "warning", ""):
+        bits.append("⚠ " + r.warning)
     return "，".join(b for b in bits if b)
 
 
@@ -445,7 +457,9 @@ def refine_routes(day: Optional[int] = None) -> str:
         else:
             req_mode = estimate_leg(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode).mode   # 默认段：很近就按步行
         try:
-            r = client.route(req_mode, a.lat, a.lon, b.lat, b.lon, city)
+            pr = trip.meta.transport_prefs
+            kw = _transit_kwargs(pr) if req_mode == "transit" else {}
+            r = client.route(req_mode, a.lat, a.lon, b.lat, b.lon, city, **kw)
         except AmapError as e:
             failures.append(f"{a.name} → {b.name}：{e}")
             continue
@@ -1048,13 +1062,18 @@ def set_transport_prefs(
 
     def mutate(t: Trip) -> None:
         t.meta.transport_prefs = t.meta.transport_prefs.model_validate({**t.meta.transport_prefs.model_dump(), **changes})
+        if "max_transfers" in changes or "prefer_subway" in changes:      # 换乘/地铁偏好变了，旧的公交路线缓存作废
+            for k in [k for k, v in t.route_overrides.items() if v.mode == "transit"]:
+                del t.route_overrides[k]
 
     try:
         new = commit(trip, mutate)
     except ValidationError as e:
         raise ToolError(f"参数不合法：{e}")
     _save(new)
-    return f"已更新出行偏好：{new.meta.transport_prefs.model_dump()}"
+    hint = "（换乘/地铁偏好已变，之前查过的公交路线已清除，请再调用 refine_routes 按新偏好重查）" if (
+        "max_transfers" in changes or "prefer_subway" in changes) else ""
+    return f"已更新出行偏好：{new.meta.transport_prefs.model_dump()}{hint}"
 
 
 def set_leg_mode(from_id: str, to_id: str, mode: str) -> str:
@@ -1093,7 +1112,8 @@ def compare_transport(from_id: str, to_id: str, transit_strategy: str = "fastest
     errors: dict[str, str] = {}
     for m in ("walk", "transit", "drive"):
         try:
-            options[m] = client.route(m, a.lat, a.lon, b.lat, b.lon, city, transit_strategy=transit_strategy) \
+            options[m] = client.route(m, a.lat, a.lon, b.lat, b.lon, city, transit_strategy=transit_strategy,
+                                      **_transit_kwargs(trip.meta.transport_prefs)) \
                 if m == "transit" else client.route(m, a.lat, a.lon, b.lat, b.lon, city)
         except AmapError as e:
             errors[m] = str(e)
