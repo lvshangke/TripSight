@@ -22,11 +22,12 @@ from typing import Any, Optional
 
 from pydantic import TypeAdapter, ValidationError
 
-from .geo import haversine_km
+from .amap import AmapClient, AmapError
+from .geo import estimate_leg, haversine_km
 from .geocode import GeocodeError, geocode as _geocode
 from .lodging import rank_lodgings, suggest_stay_area
-from .metrics import day_stats, estimate_cost
-from .models import DateMode, Lodging, Pace, Place, Trip, TripMeta
+from .metrics import day_stats, estimate_cost, leg_key
+from .models import DateMode, Leg, Lodging, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -105,6 +106,11 @@ def _save_context(data: dict) -> None:
     p = _context_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _amap() -> Optional[AmapClient]:
+    """有 AMAP_KEY 才启用高德；测试里会替换这个函数。"""
+    return AmapClient.from_env()
 
 
 def _next_id(prefix: str, existing: list[str]) -> str:
@@ -208,8 +214,15 @@ def add_lodging(
     price_max: float = 0,
     choose: bool = False,
     notes: str = "",
+    price_source: str = "manual",
+    price_date: Optional[str] = None,
 ) -> str:
-    """添加候选住宿（价格为每晚，元）。choose=True 则同时设为本次选定的住宿。"""
+    """添加候选住宿（价格为每晚，元）。choose=True 则同时设为本次选定的住宿。
+    price_source 说明价格从哪来：manual（用户手填）/ rollinggo（参考价）/ amap（高德人均参考）；
+    price_date 是查询日期或对应的入住日期。价格没有来源时不要填，留 0。"""
+    if price_min or price_max:
+        tag = f"[价格来源:{price_source}" + (f" {price_date}" if price_date else "") + "]"
+        notes = (notes + " " if notes else "") + tag
     trip = _load()
     lid = _next_id("l", [l.id for l in trip.lodgings])
     try:
@@ -227,16 +240,39 @@ def add_lodging(
 
 
 def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
-    """查询地点坐标（目前用 OpenStreetMap，第 2 步会换成高德）。city 不填则用行程的目的地城市。
-    会检查结果离城市中心有多远：超过 60 km 时 warning 非空，说明很可能查到了别处同名地点，
-    请换更具体的关键词重查（如加区名），不要自己改坐标。找不到时 found=false。"""
+    """查询地点坐标，返回候选列表 candidates（第一条也展开在顶层字段里）。
+    有高德 key 时用高德（限定在行程城市内，附带地址、评分、人均/参考价格 cost、今日营业时间）；
+    没有 key、不在国内或高德查不到时退回 OpenStreetMap。city 不填则用行程的目的地城市。
+    候选不止一个且名称相近时，请把候选展示给用户确认，不要自己挑。坐标不能自己改。
+    OSM 结果会检查离城市中心的距离：超过 60 km 时 warning 非空，说明可能查到了别处的同名地点。"""
     city = city or _load_context().get("city")
+    amap_note = ""
+    client = _amap()
+    if client is not None:
+        try:
+            hits = client.search_places(query, city, limit=5)
+        except AmapError as e:
+            hits, amap_note = [], f"高德不可用（{e}），已退回 OpenStreetMap"
+        else:
+            if not hits:
+                amap_note = "高德没有找到，已退回 OpenStreetMap"
+        if hits:
+            cands = [{
+                "name": h.name, "lat": round(h.lat, 6), "lon": round(h.lon, 6), "address": h.address,
+                "district": h.district, "category": h.category, "rating": h.rating,
+                "cost_reference": h.cost, "opentime_today": h.opentime_today,
+            } for h in hits]
+            top = cands[0]
+            return {"found": True, "source": "amap", "name": top["name"], "lat": top["lat"], "lon": top["lon"],
+                    "display_name": f"{top['name']} {top['address']}".strip(), "warning": "",
+                    "candidates": cands,
+                    "note": "cost_reference 是高德的人均/参考价，不是实时价格，也不一定是门票。"}
     try:
         r = _geocode(query, city)
     except GeocodeError as e:
-        return {"found": False, "error": str(e)}
-    out: dict[str, Any] = {"found": True, "name": r["name"], "lat": r["lat"], "lon": r["lon"],
-                           "display_name": r["display_name"], "warning": ""}
+        return {"found": False, "source": "osm", "error": str(e), "note": amap_note}
+    out: dict[str, Any] = {"found": True, "source": "osm", "name": r["name"], "lat": r["lat"], "lon": r["lon"],
+                           "display_name": r["display_name"], "warning": "", "note": amap_note}
     if city:
         try:
             c = _geocode(city)
@@ -312,6 +348,66 @@ def remove_place(place_id: str) -> str:
 
     _save(commit(trip, mutate))
     return f"已删除景点「{place.name}」({place_id})。"
+
+
+MAX_ROUTE_REQUESTS = 25   # 单次最多请求次数，避免超过工具超时；没做完的下次再调用
+
+
+def refine_routes(day: Optional[int] = None) -> str:
+    """把已排好的行程里“估算”的交通时间升级为高德的真实路线时间（需要 AMAP_KEY）。
+    day 是第几天（从 1 开始），不填则处理所有天。结果会缓存，重复调用只补没查过的路段。
+    出行方式沿用行程设置；两点很近时自动按步行。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查询真实路线。")
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    if day is not None and not (1 <= day <= len(trip.plan.days)):
+        raise ToolError(f"没有第 {day} 天（共 {len(trip.plan.days)} 天）")
+    city = _load_context().get("city")
+    mode = trip.meta.mode
+
+    wanted: list[tuple[Any, Any]] = []   # (起点对象, 终点对象)，对象有 id/lat/lon
+    for d in trip.plan.days:
+        if day is not None and d.index != day - 1:
+            continue
+        stops = [trip.place(it.place_id) for it in d.items]
+        wanted += list(zip(stops, stops[1:]))
+        lod = trip.chosen_lodging
+        if lod and stops:
+            wanted += [(lod, stops[0]), (stops[-1], lod)]
+
+    new_legs: dict[str, Leg] = {}
+    failures: list[str] = []
+    requested = skipped = 0
+    for a, b in wanted:
+        key = leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode)
+        if key in trip.route_overrides or key in new_legs:
+            skipped += 1
+            continue
+        if requested >= MAX_ROUTE_REQUESTS:
+            continue
+        requested += 1
+        req_mode = estimate_leg(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode).mode   # 很近就按步行
+        try:
+            r = client.route(req_mode, a.lat, a.lon, b.lat, b.lon, city)
+        except AmapError as e:
+            failures.append(f"{a.name} → {b.name}：{e}")
+            continue
+        new_legs[key] = Leg(from_id=a.id, to_id=b.id, mode=r.mode, distance_km=r.distance_km,  # type: ignore[arg-type]
+                            minutes=r.minutes, detail_level="route")
+
+    if new_legs:
+        _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
+    todo = max(0, len({leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode) for a, b in wanted})
+               - len(trip.route_overrides) - len(new_legs) - len(failures))
+    msg = f"已更新 {len(new_legs)} 段为高德真实路线，{skipped} 段此前已查过。"
+    if failures:
+        msg += "\n失败：" + "；".join(failures[:5]) + "（这些路段仍用估算值）"
+    if todo > 0 and requested >= MAX_ROUTE_REQUESTS:
+        msg += f"\n还有部分路段没查，请再调用一次 refine_routes。"
+    return msg + "\n" + _render(_load())
 
 
 def schedule_days(keep_locked: bool = True) -> str:
@@ -453,7 +549,8 @@ def _render(trip: Trip) -> str:
             out.append(f"  {i + 1}. {p.name}({p.id}) {p.duration_min}分钟{lock}")
             if i < len(st.legs):
                 leg = st.legs[i]
-                out.append(f"     ↓ 约 {leg.minutes} 分钟（{_MODE_NAMES[leg.mode]}，{leg.distance_km} km，估算）")
+                src = "高德路线" if leg.detail_level == "route" else "估算"
+                out.append(f"     ↓ 约 {leg.minutes} 分钟（{_MODE_NAMES[leg.mode]}，{leg.distance_km} km，{src}）")
     if trip.plan.unscheduled:
         out.append("未安排：" + "；".join(f"{trip.place(u.place_id).name}：{u.reason}" for u in trip.plan.unscheduled))
     c = estimate_cost(trip)
@@ -466,7 +563,7 @@ def _render(trip: Trip) -> str:
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, schedule_days, check_plan,
+    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

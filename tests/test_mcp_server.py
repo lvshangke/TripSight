@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 13
+    assert len(names) == 14
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -160,3 +160,97 @@ def test_lookup_warns_when_far_from_city(monkeypatch):
     monkeypatch.setattr(s, "_geocode", fake)
     r = s.lookup_coords("中央大街")
     assert r["found"] and r["warning"] and r["distance_from_city_km"] > 60
+
+
+# ---------------- 高德相关（全部用假客户端，不联网） ----------------
+from tripcore.amap import AmapError, PlaceHit, RouteResult  # noqa: E402
+
+
+class FakeAmap:
+    def __init__(self, hits=None, fail_routes=False):
+        self.hits, self.fail_routes, self.route_calls = hits or [], fail_routes, []
+
+    def search_places(self, query, city=None, limit=5):
+        return self.hits
+
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None):
+        self.route_calls.append(mode)
+        if self.fail_routes:
+            raise AmapError("没有找到路线")
+        return RouteResult(mode, 7.5, 33)
+
+
+def test_lookup_uses_amap_candidates(monkeypatch):
+    s.new_trip(city="西安")
+    hit = PlaceHit(name="秦始皇帝陵博物院", lat=34.38, lon=109.27, address="临潼区", rating=4.8, cost=120)
+    monkeypatch.setattr(s, "_amap", lambda: FakeAmap([hit]))
+    r = s.lookup_coords("兵马俑")
+    assert r["source"] == "amap" and r["candidates"][0]["cost_reference"] == 120 and r["lat"] == 34.38
+
+
+def test_lookup_falls_back_to_osm_when_amap_fails(monkeypatch):
+    s.new_trip(city="西安")
+
+    class Broken:
+        def search_places(self, *a, **k):
+            raise AmapError("INVALID_USER_KEY")
+
+    monkeypatch.setattr(s, "_amap", lambda: Broken())
+    monkeypatch.setattr(s, "_geocode", lambda q, city=None, **k: {"name": q, "lat": 34.34, "lon": 108.94, "display_name": "x"})
+    r = s.lookup_coords("大雁塔")
+    assert r["found"] and r["source"] == "osm" and "高德不可用" in r["note"]
+
+
+def test_refine_routes_needs_key(monkeypatch):
+    _setup_trip()
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    with pytest.raises(s.ToolError, match="AMAP_KEY"):
+        s.refine_routes()
+
+
+def test_refine_routes_caches_and_is_undoable(monkeypatch):
+    _setup_trip()
+    s.add_lodging("酒店A", 39.91, 116.40, choose=True)
+    s.schedule_days()
+    fake = FakeAmap()
+    monkeypatch.setattr(s, "_amap", lambda: fake)
+    out = s.refine_routes()
+    assert "高德真实路线" in out and "高德路线" in out
+    t = s._load()
+    assert t.route_overrides and all(l.detail_level == "route" for l in t.route_overrides.values())
+    first_calls = len(fake.route_calls)
+    s.refine_routes()                      # 第二次：全部命中缓存，不再请求
+    assert len(fake.route_calls) == first_calls
+    s.undo()
+    assert s._load().route_overrides == {}
+
+
+def test_cache_invalidated_when_coordinates_change(monkeypatch):
+    _setup_trip()
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: FakeAmap())
+    s.refine_routes()
+    n = len(s._load().route_overrides)
+    assert n > 0
+    s.update_place("p1", lat=39.95)        # 坐标变了，含 p1 的路段缓存键随之失效
+    f2 = FakeAmap()
+    monkeypatch.setattr(s, "_amap", lambda: f2)
+    s.refine_routes()
+    assert f2.route_calls                  # 受影响的路段被重新查询
+
+
+def test_refine_failures_are_reported_and_keep_estimates(monkeypatch):
+    _setup_trip()
+    s.schedule_days()
+    monkeypatch.setattr(s, "_amap", lambda: FakeAmap(fail_routes=True))
+    out = s.refine_routes()
+    assert "失败" in out and s._load().route_overrides == {}
+
+
+def test_lodging_price_source_tag():
+    s.new_trip()
+    s.add_lodging("甲", 39.9, 116.4, price_min=300, price_max=400, price_source="rollinggo", price_date="2026-10-25")
+    s.add_lodging("乙", 39.9, 116.4)
+    t = s._load()
+    assert "价格来源:rollinggo 2026-10-25" in t.lodgings[0].notes and "价格来源" not in t.lodgings[1].notes

@@ -181,6 +181,10 @@ class Trip(BaseModel):
     chosen_lodging_id: Optional[str] = None
     plan: Optional[Plan] = None
     revision: int = Field(default=0, description="版本号：每次改动 +1，用来防止过期的提案被误用")
+    route_overrides: dict[str, Leg] = Field(
+        default_factory=dict,
+        description="真实路线缓存（来自地图服务）。键见 metrics.leg_key；坐标变了键就变，旧缓存自动失效",
+    )
     history: list[dict] = Field(default_factory=list, description="历史快照，用于撤销")
 
     @model_validator(mode="after")

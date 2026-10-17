@@ -35,13 +35,23 @@ def day_places(trip: Trip, day: DayPlan) -> list[Place]:
     return [trip.place(it.place_id) for it in day.items]
 
 
-def legs_between_stops(trip: Trip, places: list[Place]) -> list[Leg]:
-    """相邻景点之间的交通估算。"""
+def leg_key(a_id: str, a_lat: float, a_lon: float, b_id: str, b_lat: float, b_lon: float, mode: str) -> str:
+    """路线缓存的键：包含两端坐标，所以景点坐标一改，旧缓存自然不再命中。"""
+    return f"{a_id}@{a_lat:.5f},{a_lon:.5f}>{b_id}@{b_lat:.5f},{b_lon:.5f}|{mode}"
+
+
+def _leg(trip: Trip, a_id, a_lat, a_lon, b_id, b_lat, b_lon) -> Leg:
+    """优先用缓存的真实路线，没有就估算。"""
     mode = trip.meta.mode
-    return [
-        estimate_leg(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode)
-        for a, b in zip(places, places[1:])
-    ]
+    cached = trip.route_overrides.get(leg_key(a_id, a_lat, a_lon, b_id, b_lat, b_lon, mode))
+    if cached is not None:
+        return cached
+    return estimate_leg(a_id, a_lat, a_lon, b_id, b_lat, b_lon, mode)
+
+
+def legs_between_stops(trip: Trip, places: list[Place]) -> list[Leg]:
+    """相邻景点之间的交通（有真实路线用真实的，否则估算）。"""
+    return [_leg(trip, a.id, a.lat, a.lon, b.id, b.lat, b.lon) for a, b in zip(places, places[1:])]
 
 
 def lodging_legs(trip: Trip, places: list[Place]) -> tuple[Optional[Leg], Optional[Leg]]:
@@ -49,10 +59,9 @@ def lodging_legs(trip: Trip, places: list[Place]) -> tuple[Optional[Leg], Option
     lodging = trip.chosen_lodging
     if lodging is None or not places:
         return None, None
-    mode = trip.meta.mode
     first, last = places[0], places[-1]
-    out = estimate_leg(lodging.id, lodging.lat, lodging.lon, first.id, first.lat, first.lon, mode)
-    back = estimate_leg(last.id, last.lat, last.lon, lodging.id, lodging.lat, lodging.lon, mode)
+    out = _leg(trip, lodging.id, lodging.lat, lodging.lon, first.id, first.lat, first.lon)
+    back = _leg(trip, last.id, last.lat, last.lon, lodging.id, lodging.lat, lodging.lon)
     return out, back
 
 
