@@ -31,7 +31,14 @@ always: true
 
 ## 工具一览
 
-new_trip / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
+new_trip / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
+
+## 长期偏好（跨行程、跨会话）
+- 用户**明确**说出长期偏好时（“我不爱走路”“我一般喜欢地铁”“以后住宿别超过400”“我不吃辣”），调用 `remember_preference`，并用一句话告诉用户记了什么、可以随时让你忘掉。value 只能用工具说明里列出的键，不确定就只写 text。
+- 不记：一次性要求（“这次想住近点”）、你自己的推断、健康/证件/账号等隐私信息。
+- 对话开头可以 `list_preferences` 看已记下什么；`new_trip` 会自动套用节奏、步行、地铁、换乘、打车偏好并在返回里说明，转告用户“按你之前的偏好设成了……”。用户这次明说的永远优先。
+- 用户说“忘掉/不用记这个” → `forget_preference`。
+- 饮食偏好会出现在 suggest_food 的 user_food_preferences 里，只是提示，你要对照候选向用户说明，不要自己过滤或替用户决定。
 
 ## 查酒店价格（仅当本机已安装 rgh 命令、且已登录时）
 

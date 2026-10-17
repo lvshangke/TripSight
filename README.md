@@ -151,7 +151,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 37 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 40 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
@@ -190,6 +190,10 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 景点新增 `opening_hours` / `hours_source`（营业时间及来源）和 `backups`（备选景点；预约没约上时 `check_plan` 会提示）。高德每次调用会记到 `~/.tripcore/amap_calls.log`（不含 key）。
 
 出行方式：`set_transport_prefs`（步行上限、偏好地铁、最大换乘、是否打车）、`set_leg_mode`（单段指定方式）、`compare_transport`（高德比较步行/公交/驾车并按偏好给建议）。公交结果含换乘次数、步行距离、票价、线路、是否含地铁（字段按高德文档解析，待真实 key 联调确认）。
+
+## 长期偏好
+
+`~/.tripcore/preferences.json` 保存用户明确说过的长期偏好，跨行程、跨会话（`remember_preference` / `list_preferences` / `forget_preference`）。每条有类别、原话、日期，以及可选的结构化值（pace、walk_max_min、prefer_subway、max_transfers、taxi_ok、avoid_food、like_food、lodging_budget_max）；同一个结构化键只保留最新一条。`new_trip` 会自动套用节奏和出行偏好，住宿预算只在 `add_lodging` 超出时提醒，饮食偏好只在 `suggest_food` 里作为提示，不自动过滤。只记用户说过的话，不推断；用户本次明说的永远优先。
 
 ## 营业时间展示与天气
 

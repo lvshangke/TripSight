@@ -32,6 +32,7 @@ from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
+from . import prefs as _prefs
 from .stays import hint_text as _stay_hint
 from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
@@ -104,6 +105,10 @@ def _context_path() -> Path:
     return trip_path().with_name("context.json")
 
 
+def _prefs_path() -> Path:
+    return trip_path().with_name("preferences.json")
+
+
 def _load_context() -> dict:
     p = _context_path()
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
@@ -143,7 +148,7 @@ def _parse_date(s: Optional[str], field: str) -> Optional[date]:
 def new_trip(
     name: str = "我的旅行",
     num_days: int = 3,
-    pace: str = "normal",
+    pace: Optional[str] = None,
     mode: str = "transit",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -154,7 +159,15 @@ def new_trip(
     travelers: int = 1,
 ) -> str:
     """创建一个新行程（会覆盖当前行程）。travelers 是出行人数（用户没说就先问）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
-    日期可不填；填 start_date+end_date 为确定日期，填 earliest_start+latest_end 为大致范围。"""
+    日期可不填；填 start_date+end_date 为确定日期，填 earliest_start+latest_end 为大致范围。
+    pace 不填时，用用户之前说过的长期偏好（没有就是 normal）；用户长期偏好里的步行/地铁/换乘/打车设置也会自动套用到新行程，
+    返回文字里会列出套用了什么。用户这次明确说的永远优先。"""
+    saved = _prefs.merged_values(_prefs.load(_prefs_path()))
+    applied: list[str] = []
+    if pace is None:
+        pace = saved.get("pace", "normal")
+        if "pace" in saved:
+            applied.append(f"节奏 {pace}")
     sd, ed = _parse_date(start_date, "start_date"), _parse_date(end_date, "end_date")
     es, le = _parse_date(earliest_start, "earliest_start"), _parse_date(latest_end, "latest_end")
     if sd or ed:
@@ -171,6 +184,10 @@ def new_trip(
         )
     except (ValidationError, ValueError) as e:
         raise ToolError(f"参数不合法：{e}")
+    tp = {k: saved[k] for k in _prefs.TRANSPORT_KEYS if k in saved}
+    if tp:
+        meta.transport_prefs = meta.transport_prefs.model_validate({**meta.transport_prefs.model_dump(), **tp})
+        applied += [f"{k}={v}" for k, v in tp.items()]
     trip = Trip(meta=meta)
     _save(trip)
     _save_proposals({})
@@ -179,7 +196,13 @@ def new_trip(
         _food_path().write_text("{}", encoding="utf-8")      # 旧行程的候选餐厅作废
     except OSError:
         pass
-    return f"已创建行程「{meta.name}」，共 {meta.num_days} 天，节奏 {meta.pace.value}，交通偏好 {_MODE_NAMES[meta.mode]}。"
+    msg = f"已创建行程「{meta.name}」，共 {meta.num_days} 天，节奏 {meta.pace.value}，交通偏好 {_MODE_NAMES[meta.mode]}。"
+    allp = _prefs.load(_prefs_path())
+    if applied:
+        msg += "\n按你之前的长期偏好套用了：" + "、".join(applied) + "（可随时改）。"
+    if allp:
+        msg += "\n已记住的长期偏好：" + _prefs.describe(allp)
+    return msg
 
 
 def add_place(
@@ -263,7 +286,11 @@ def add_lodging(
             t.chosen_lodging_id = lid
 
     _save(commit(trip, mutate))
-    return f"已添加住宿「{name}」(id={lid})" + ("，并设为选定住宿。" if choose else "。")
+    over = ""
+    cap = _prefs.merged_values(_prefs.load(_prefs_path())).get("lodging_budget_max")
+    if cap and price_max and price_max > cap:
+        over = f" ⚠ 价格上限 {price_max:g} 超过你记下的住宿预算 {cap:g} 元/晚。"
+    return f"已添加住宿「{name}」(id={lid})" + ("，并设为选定住宿。" if choose else "。") + over
 
 
 def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
@@ -590,8 +617,12 @@ def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: st
     fp.write_text(json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8")
     shown = [{k: c[k] for k in ("candidate_id", "name", "address", "rating", "cost_per_person", "opening_hours", "distance_m")}
              for c in cands]
-    return {"place": pl.name, "day": day, "radius_m": radius_m, "candidates": shown,
-            "note": "评分/人均为高德参考值；营业时间为空表示高德无数据，需核实。请用户选择后调用 choose_food。"}
+    res = {"place": pl.name, "day": day, "radius_m": radius_m, "candidates": shown,
+           "note": "评分/人均为高德参考值；营业时间为空表示高德无数据，需核实。请用户选择后调用 choose_food。"}
+    fp_ = [x for x in _prefs.load(_prefs_path()) if x["category"] == "food"]
+    if fp_:
+        res["user_food_preferences"] = _prefs.describe(fp_)      # 只是提示，不自动过滤；请对照候选向用户说明
+    return res
 
 
 def find_food(name: str) -> dict[str, Any]:
@@ -1243,6 +1274,43 @@ def clear_stays() -> str:
     return "已清除分段住宿。"
 
 
+def remember_preference(category: str, text: str, value: Optional[dict[str, Any]] = None) -> str:
+    """记下用户明确表达的长期偏好（跨行程保存，换会话/重启也在）。只在用户明确说“我不喜欢/我总是/以后都/我一般”这类
+    长期偏好时调用；一次性的要求（“这次想住近点”）、你自己的推断、健康/证件/账号等隐私信息都不要记。记完要用一句话告诉用户记了什么。
+    category：transport / pace / lodging / food / interest / other；text：用户的原话或简短概括。
+    value 可选，用来让代码直接使用，只允许这些键：pace(relaxed/normal/packed)、walk_max_min(整数分钟)、prefer_subway(bool)、
+    max_transfers(0-5)、taxi_ok(bool)、avoid_food(忌口列表)、like_food(爱吃列表)、lodging_budget_max(元/晚)。
+    同一个结构化键只保留最新的一条。"""
+    items = _prefs.load(_prefs_path())
+    try:
+        new, entry, replaced = _prefs.add(items, category, text, value)
+    except ValueError as e:
+        raise ToolError(f"没有记下：{e}")
+    _prefs.save(_prefs_path(), new)
+    return f"已记住 [{entry['id']}] {entry['text']}" + (f"（取代了：{'；'.join(replaced)}）" if replaced else "") \
+        + "。新建行程时会自动套用；用 forget_preference 可以删除。"
+
+
+def list_preferences() -> str:
+    """列出已记下的长期偏好。"""
+    items = _prefs.load(_prefs_path())
+    if not items:
+        return "还没有记下任何长期偏好。"
+    return "\n".join(f"[{x['id']}] ({x['category']}) {x['text']}  — {x['date']}"
+                     + (f"  值：{x['value']}" if x.get("value") else "") for x in items)
+
+
+def forget_preference(pref_id: str) -> str:
+    """删除一条长期偏好（用户说“忘掉/不用记这个”时）。"""
+    items = _prefs.load(_prefs_path())
+    try:
+        new = _prefs.forget(items, pref_id)
+    except KeyError:
+        raise ToolError(f"没有这条偏好：{pref_id}")
+    _prefs.save(_prefs_path(), new)
+    return f"已删除偏好 {pref_id}。"
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
     trip = _load()
@@ -1645,7 +1713,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

@@ -25,3 +25,9 @@ def make_trip(places, num_days=2, lodgings=None, **meta_kw) -> Trip:
 @pytest.fixture
 def beijing() -> Trip:
     return load_trip(EXAMPLE)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_state(tmp_path, monkeypatch):
+    """所有测试都用临时目录保存行程/偏好，绝不碰真实的 ~/.tripcore。"""
+    monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "trip.json"))
