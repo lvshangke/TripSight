@@ -30,7 +30,7 @@ from .gpx import build_gpx
 from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
-from .connections import day_window, leave_by, ready_time
+from .connections import day_window, leave_by, ready_time, terminal_point, transfer_minutes, transfer_target
 from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
@@ -420,6 +420,10 @@ def refine_routes(day: Optional[int] = None) -> str:
         lod = trip.chosen_lodging
         if lod and stops:
             wanted += [(lod, stops[0]), (stops[-1], lod)]
+    for which in ("arrival", "departure"):
+        tp, tg = terminal_point(trip, which), transfer_target(trip, which)
+        if tp is not None and tg is not None:
+            wanted.append((tp, tg) if which == "arrival" else (tg, tp))
 
     new_legs: dict[str, Leg] = {}
     failures: list[str] = []
@@ -884,12 +888,15 @@ def set_connection(
     price_date: str = "",
     booked: bool = False,
     note: str = "",
+    terminal_name: str = "",
 ) -> str:
     """记录到达或离开目的地的大交通（航班/火车）。which：arrival（到达）/ departure（离开）；
     kind：flight / train / other；时间写成 2026-10-19 14:30（当地时间）。
     所有字段必须来自用户选定的方案或查询工具的原始结果，逐字照抄，不要估算或编造；
     价格（每人）必须同时写来源 price_source（如 flyai / user）和日期 price_date，否则不要填。
-    booked 只有用户明确说已经订好才能填 True。工具会据此缩短第一天/最后一天可玩的时间，并在 check_plan 里提醒。"""
+    booked 只有用户明确说已经订好才能填 True。
+terminal_name：目的地这一侧的机场/车站名（到达填到达的机场/站，离开填出发的机场/站，如“咸阳国际机场”“西安北站”），
+工具会用高德查出位置，并用 refine_routes 查它与酒店之间的真实路程时间；查不到位置时，该时间用经验值兜底。工具会据此缩短第一天/最后一天可玩的时间，并在 check_plan 里提醒。"""
     if which not in ("arrival", "departure"):
         raise ToolError("which 只能是 arrival 或 departure")
     if price_per_person is not None and not (price_source and price_date):
@@ -902,12 +909,38 @@ def set_connection(
                           booked=booked, note=note)
     except (ValidationError, ValueError) as e:
         raise ToolError(f"参数不合法：{e}")
-    _save(commit(trip, lambda t: setattr(t, which, conn)))
+    term_msg = ""
+    if terminal_name:
+        conn.terminal_name = terminal_name
+        client = _amap()
+        if client is None:
+            term_msg = "没有高德 key，查不到机场/车站位置，路程时间先用经验值。"
+        else:
+            want = "机场" if kind == "flight" else ("火车站" if kind == "train" else "")
+            try:
+                hits = client.search_places(terminal_name, None, limit=8)
+            except AmapError as e:
+                hits, term_msg = [], f"高德查机场/车站位置失败（{e}），路程时间先用经验值。"
+            pick = next((h for h in hits if want and want in h.category and terminal_name[:2] in h.name), None) \
+                or next((h for h in hits if want and want in h.category), None) \
+                or (hits[0] if hits and not want else None)
+            if pick is not None:
+                conn.terminal_name, conn.terminal_lat, conn.terminal_lon = pick.name, pick.lat, pick.lon
+                term_msg = f"位置：{pick.name}（高德，{pick.address or pick.district}）。"
+            elif not term_msg:
+                term_msg = f"高德没有找到「{terminal_name}」这个{want or '地点'}，路程时间先用经验值，请核对名称。"
+    new = commit(trip, lambda t: setattr(t, which, conn))
+    _save(new)
+    mins, src = transfer_minutes(new, which)
     if which == "arrival":
-        r = ready_time(conn)
-        return f"已记录到达：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.arr_time:%m-%d %H:%M} 到，约 {r:%H:%M} 后才能开始游玩。"
-    lv = leave_by(conn)
-    return f"已记录离开：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.dep_time:%m-%d %H:%M} 出发，最晚 {lv:%H:%M} 就要动身。"
+        r = ready_time(new)
+        return (f"已记录到达：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.arr_time:%m-%d %H:%M} 到，"
+                f"约 {r:%H:%M} 后才能开始游玩（含机场/车站到酒店约 {mins} 分钟，{src}）。{term_msg}"
+                + (" 请 refine_routes 查真实路程。" if conn.terminal_lat is not None else ""))
+    lv = leave_by(new)
+    return (f"已记录离开：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.dep_time:%m-%d %H:%M} 出发，"
+            f"最晚 {lv:%H:%M} 就要从酒店动身（含去机场/车站约 {mins} 分钟，{src}）。{term_msg}"
+            + (" 请 refine_routes 查真实路程。" if conn.terminal_lat is not None else ""))
 
 
 def clear_connection(which: str) -> str:
@@ -987,6 +1020,10 @@ def get_weather() -> str:
 
 
 def _point(trip: Trip, pid: str):
+    if pid in ("arrival", "departure"):
+        tp = terminal_point(trip, pid)
+        if tp is not None:
+            return tp
     for x in [*trip.places, *trip.lodgings]:
         if x.id == pid:
             return x

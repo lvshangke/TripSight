@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .coords import wgs84_to_gcj02
-from .connections import day_window, leave_by
+from .connections import day_window, leave_by, terminal_leg, terminal_point, transfer_target, arrival_day, departure_day
 from .metrics import day_stats
 from .models import Trip
 
@@ -82,6 +82,10 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             t = float(w_start)
             if w_why:
                 timeline.append({"type": "conn", "text": "；".join(w_why)})
+            if trip.arrival and arrival_day(trip) == day.index:
+                tp, tg, tl = terminal_point(trip, "arrival"), transfer_target(trip, "arrival"), terminal_leg(trip, "arrival")
+                if tp and tg and tl:
+                    timeline.append(_leg_entry(tl, tp.name, tp, tg.name, tg))
             if lodging and st.places:
                 timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
                 if st.lodging_out:
@@ -113,6 +117,10 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     timeline.append(_leg_entry(st.lodging_back, st.places[-1].name, st.places[-1], lodging.name, lodging))
                     t += st.lodging_back.minutes
                 timeline.append({"type": "hotel", "role": "返回", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
+            if trip.departure and departure_day(trip) == day.index:
+                tp, tg, tl = terminal_point(trip, "departure"), transfer_target(trip, "departure"), terminal_leg(trip, "departure")
+                if tp and tg and tl:
+                    timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp))
             if w_why and t > w_end:
                 timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）

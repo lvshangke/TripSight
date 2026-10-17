@@ -121,6 +121,9 @@ class Connection(BaseModel):
     price_date: str = ""
     booked: bool = Field(default=False, description="用户是否已经订好（只能由用户告知）")
     note: str = ""
+    terminal_name: str = Field(default="", description="目的地这一侧的机场/车站名（到达=到达站，离开=出发站），位置由代码用地图服务查")
+    terminal_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    terminal_lon: Optional[float] = Field(default=None, ge=-180, le=180)
 
     @model_validator(mode="after")
     def _check_times(self) -> "Connection":

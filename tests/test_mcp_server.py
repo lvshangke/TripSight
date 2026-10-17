@@ -756,7 +756,7 @@ def test_connections_shrink_first_and_last_day_and_warn():
     _arrival_trip()
     from tripcore.connections import day_window
     t = s._load()
-    assert day_window(t, 0)[0] == 15 * 60 + 30            # 14:00 到 + 90 分钟 = 15:30 才能开始
+    assert day_window(t, 0)[0] == 15 * 60 + 30            # 14:00 到 + 45 取行李 + 45 兜底路程 = 15:30 才能开始
     assert day_window(t, 2)[1] == 15 * 60                 # 18:00 飞，提前 180 分钟 = 15:00 就要走
     out = s.check_plan()
     codes = [i["code"] for i in out["issues"]]
@@ -795,3 +795,47 @@ def test_map_timeline_starts_after_arrival_and_flags_overrun():
     hotel = [e for e in first if e["type"] == "hotel"][0]
     assert hotel["time"] >= "15:30"
     assert any(e["type"] == "conn" and "⚠" in e["text"] for e in d[2]["timeline"] + first)
+
+
+class AirportAmap:
+    def search_places(self, query, city=None, limit=5):
+        from tripcore.amap import PlaceHit
+        return [PlaceHit(name="首都机场南路", lat=40.07, lon=116.60, category="道路附属设施"),
+                PlaceHit(name="北京首都国际机场T3航站楼", lat=40.0799, lon=116.6031, address="顺义区",
+                         category="交通设施服务;机场相关;机场出发/到达")]
+
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+        from tripcore.amap import RouteResult
+        return RouteResult(mode=mode, distance_km=30.0, minutes=60, path=[(a_lat, a_lon), (b_lat, b_lon)])
+
+
+def test_terminal_lookup_and_real_transfer_time(monkeypatch):
+    _arrival_trip()
+    monkeypatch.setattr(s, "_amap", lambda: AirportAmap())
+    msg = s.set_connection("arrival", "flight", "上海", "北京", "2026-10-19 10:30", "2026-10-19 14:00",
+                           number="CA1883", terminal_name="首都国际机场")
+    assert "北京首都国际机场T3航站楼" in msg and "距离估算" in msg
+    t = s._load()
+    assert t.arrival.terminal_lat == 40.0799
+    s.refine_routes()
+    from tripcore.connections import day_window, transfer_minutes
+    t = s._load()
+    assert transfer_minutes(t, "arrival") == (60, "高德路线")
+    assert day_window(t, 0)[0] == 14 * 60 + 45 + 60       # 14:00 + 45 取行李 + 60 路程
+    assert "高德路线" in s.show_trip()
+    from tripcore.mapview import build_map_data
+    assert any(e["type"] == "leg" and e["real"] for e in build_map_data(t)["days"][0]["timeline"][:3])
+
+
+def test_terminal_not_found_falls_back(monkeypatch):
+    _arrival_trip()
+
+    class Empty:
+        def search_places(self, *a, **k):
+            return []
+    monkeypatch.setattr(s, "_amap", lambda: Empty())
+    msg = s.set_connection("departure", "flight", "北京", "上海", "2026-10-21 18:00", "2026-10-21 20:10",
+                           terminal_name="不存在机场")
+    assert "没有找到" in msg and "经验值" in msg
+    from tripcore.connections import day_window
+    assert day_window(s._load(), 2)[1] == 15 * 60

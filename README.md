@@ -216,7 +216,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 ## 到达与离开（`set_connection` / `clear_connection`）
 
-`Trip.arrival` / `Trip.departure`：到达、离开目的地的航班/火车（班次、出发和到达时间、每人参考价及来源日期、是否已订）。确定性规则：到达后飞机 90 分钟、火车 45 分钟才能开始玩；离开前飞机提前 180 分钟、火车提前 60 分钟出发；每天默认 9:00–21:00。第一天/最后一天的可玩时间据此缩短：`check_plan` 报 `CONNECTION_WINDOW_TOO_SMALL`（装不下）和 `CONNECTION_DATE_MISMATCH`（日期不在行程内）；`show_trip` 和地图时间线显示可玩时段，地图第一天从到达后的时间开始；大交通价格 × 人数计入“按 N 人估算”。排程算法本身不变，调整由提案走确认。
+`Trip.arrival` / `Trip.departure`：到达、离开目的地的航班/火车（班次、出发和到达时间、每人参考价及来源日期、是否已订）。确定性规则：到达日可开始游玩 = 到达时间 + 出站时间（飞机 45 / 火车 15 分钟）+ 机场/车站→酒店（没选酒店则第一个景点）的路程时间；离开日最晚出发 = 起飞/发车时间 − 提前量（飞机 120 / 火车 40 分钟）− 酒店→机场/车站的路程时间；每天默认 9:00–21:00。`set_connection(..., terminal_name="咸阳国际机场")` 会用高德查出机场/车站位置，`refine_routes` 查真实路程（`show_trip`/地图标明“高德路线”或“距离估算”）；没填名称或查不到时，路程用经验值兜底（到达 飞机 45/火车 30，离开 飞机 60/火车 20 分钟）。第一天/最后一天的可玩时间据此缩短：`check_plan` 报 `CONNECTION_WINDOW_TOO_SMALL`（装不下）和 `CONNECTION_DATE_MISMATCH`（日期不在行程内）；`show_trip` 和地图时间线显示可玩时段，地图第一天从到达后的时间开始；大交通价格 × 人数计入“按 N 人估算”。排程算法本身不变，调整由提案走确认。
 
 查询机票/火车票/酒店价格使用飞猪 `flyai` 命令行，技能 `flyai-search` 限制为只读（只用 `search-flight`/`search-train`/`search-hotel`，不预订，不安装，不配置 key，价格标来源和日期；酒店坐标一律由高德查，不用 FlyAI 的）。
 
