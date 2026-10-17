@@ -33,6 +33,9 @@ def _print_plan(trip: Trip) -> None:
     lodging = trip.chosen_lodging
     if lodging:
         print(f"住宿：{lodging.name}")
+    if trip.stays:
+        names = {l.id: l.name for l in trip.lodgings}
+        print("分段住宿：" + "；".join(f"第{a.from_day + 1}–{a.to_day + 1}晚 {names[a.lodging_id]}" for a in trip.stays))
 
     for day in trip.plan.days:
         st = day_stats(trip, day)

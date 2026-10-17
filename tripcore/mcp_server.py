@@ -32,7 +32,8 @@ from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
-from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
+from .stays import hint_text as _stay_hint
+from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -437,9 +438,9 @@ def refine_routes(day: Optional[int] = None) -> str:
             continue
         stops = [trip.place(it.place_id) for it in d.items]
         wanted += [(exit_(a), entry(b)) for a, b in zip(stops, stops[1:])]
-        lod = trip.chosen_lodging
-        if lod and stops:
-            wanted += [(lod, entry(stops[0])), (exit_(stops[-1]), lod)]
+        lod_m, lod_n = trip.morning_lodging(d.index), trip.lodging_for_day(d.index)
+        if lod_m and lod_n and stops:
+            wanted += [(lod_m, entry(stops[0])), (exit_(stops[-1]), lod_n)]
     for which in ("arrival", "departure"):
         tp, tg = terminal_point(trip, which), transfer_target(trip, which)
         if tp is not None and tg is not None:
@@ -717,7 +718,6 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
     days = [d for d in trip.plan.days if (day is None or d.index == day - 1) and d.items]
     if not days:
         raise ToolError("没有可生成的行程。")
-    lod = trip.chosen_lodging
     # 1) 补 POI ID
     need: list[tuple[str, str, Any]] = []     # (种类, id, 对象)
     seen: set[tuple[str, str]] = set()
@@ -729,8 +729,10 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
         for m in trip.meals:
             if m.day == d.index and not m.amap_id and ("m", m.id) not in seen:
                 seen.add(("m", m.id)); need.append(("m", m.id, m))
-    if lod and not lod.amap_id:
-        need.append(("l", lod.id, lod))
+    for lod in {x.id: x for x in (trip.chosen_lodging, *(trip.lodging_for_day(d.index) for d in days),
+                                   *(trip.morning_lodging(d.index) for d in days)) if x}.values():
+        if not lod.amap_id:
+            need.append(("l", lod.id, lod))
     found: dict[tuple[str, str], str] = {}
     for kind, oid, obj in need[:MAX_POI_LOOKUPS]:
         try:
@@ -763,7 +765,6 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
 
     skipped: list[str] = []
     lines = []
-    lod = trip.chosen_lodging
 
     def add(pts: list, obj: Any, label: str) -> None:
         pt = point(obj)
@@ -774,16 +775,17 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
 
     for d in days:
         pts: list[dict[str, Any]] = []
-        if lod:
-            add(pts, lod, f"第{d.index + 1}天 酒店")
+        lod_m, lod_n = trip.morning_lodging(d.index), trip.lodging_for_day(d.index)
+        if lod_m:
+            add(pts, lod_m, f"第{d.index + 1}天 酒店")
         for it in d.items:
             pl = trip.place(it.place_id)
             add(pts, pl, f"第{d.index + 1}天 景点")
             for m in trip.meals:
                 if m.day == d.index and m.after_place_id == pl.id:
                     add(pts, m, f"第{d.index + 1}天 用餐")
-        if lod:
-            add(pts, lod, f"第{d.index + 1}天 酒店")
+        if lod_n:
+            add(pts, lod_n, f"第{d.index + 1}天 酒店")
         dt = trip.day_date(d.index)
         lines.append({"title": f"第{d.index + 1}天" + (f" {dt.isoformat()}" if dt else ""), "pointInfoList": pts})
     return {
@@ -1203,6 +1205,44 @@ def check_plan() -> dict[str, Any]:
     return {"ok": not any(i["severity"] in ("error", "warning") for i in issues), "issues": issues}
 
 
+def set_stays(stays: list[dict[str, Any]]) -> str:
+    """设置分段住宿（长途旅行换酒店）。stays 每项形如 {"lodging_id":"l1","from_day":1,"to_day":3}，
+    天数从 1 起、含两端，表示第 from_day 晚到第 to_day 晚住这家（最后一天没有“今晚”，跟随覆盖它的那段）。
+    各段不能重叠；没覆盖到的天沿用已选住宿（add_lodging choose=true）。住宿必须先用 add_lodging 添加（坐标来自工具或用户）。
+    换酒店当天早上仍从旧酒店出发、晚上回新酒店；到达日去第一家，离开日从前一晚那家出发。
+    这会改变行程，只能在用户确认之后调用。设置后建议 schedule_days 与 refine_routes 重新算一遍。"""
+    trip = _load()
+    n = trip.meta.num_days
+    items: list[Stay] = []
+    for x in stays:
+        try:
+            fd, td = int(x["from_day"]), int(x["to_day"])
+            st = Stay(lodging_id=str(x["lodging_id"]), from_day=fd - 1, to_day=td - 1)
+        except (KeyError, ValueError, ValidationError) as e:
+            raise ToolError(f"住宿段格式不对（需要 lodging_id、from_day、to_day，天数从 1 起）：{e}")
+        if not (1 <= fd <= td <= n):
+            raise ToolError(f"天数超出范围：第 {fd}–{td} 天（行程共 {n} 天）。")
+        items.append(st)
+    try:
+        new = commit(trip, lambda t: setattr(t, "stays", items))
+        Trip.model_validate(new.model_dump())     # 校验：住宿存在、各段不重叠
+    except (ValidationError, ValueError) as e:
+        raise ToolError(f"住宿设置不合法：{e}")
+    _save(new)
+    names = {l.id: l.name for l in new.lodgings}
+    return "已设置分段住宿：" + "；".join(f"第{a.from_day + 1}–{a.to_day + 1}晚 {names[a.lodging_id]}" for a in sorted(items, key=lambda z: z.from_day)) \
+        + "。请重新 schedule_days 和 refine_routes，往返路线才会按各天的酒店重算。"
+
+
+def clear_stays() -> str:
+    """清除分段住宿，恢复成全程住已选住宿。需用户确认。"""
+    trip = _load()
+    if not trip.stays:
+        return "当前没有分段住宿。"
+    _save(commit(trip, lambda t: setattr(t, "stays", [])))
+    return "已清除分段住宿。"
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
     trip = _load()
@@ -1322,7 +1362,12 @@ def _hours_line(p: Place, d: Optional[date]) -> str:
 def _render(trip: Trip) -> str:
     m = trip.meta
     out = [f"【{m.name}】{m.num_days} 天，节奏 {m.pace.value}，交通偏好 {_MODE_NAMES[m.mode]}，版本 {trip.revision}"]
-    if trip.chosen_lodging:
+    if trip.stays:
+        names = {l.id: l.name for l in trip.lodgings}
+        out.append("住宿（分段）：" + "；".join(f"第{a.from_day + 1}–{a.to_day + 1}晚 {names.get(a.lodging_id, a.lodging_id)}"
+                                              for a in sorted(trip.stays, key=lambda z: z.from_day))
+                   + (f"；其余晚 {trip.chosen_lodging.name}" if trip.chosen_lodging else ""))
+    elif trip.chosen_lodging:
         out.append(f"住宿：{trip.chosen_lodging.name}")
     for label, c in (("到达", trip.arrival), ("离开", trip.departure)):
         if c is not None:
@@ -1387,6 +1432,9 @@ def _render(trip: Trip) -> str:
         total = c.tickets * n + food + c.lodging + fare
         out.append(f"按 {n} 人估算：门票 {c.tickets * n:.0f} + 已选餐厅 {food:.0f} + 大交通 {fare:.0f} + 住宿 {c.lodging:.0f}（按整间/整晚价，未乘人数）"
                    f" = 约 {total:.0f} {m.currency}（未含交通和未选的餐食，均为参考值）")
+    hint = _stay_hint(trip)
+    if hint:
+        out.append("💡 " + hint)
     return "\n".join(out)
 
 
@@ -1597,7 +1645,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    suggest_lodging, propose_change, apply_proposal, undo, show_trip,
+    suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

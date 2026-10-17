@@ -129,6 +129,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 - **闭馆只按“星期几”判断**，没有具体营业时间，也不知道法定节假日。
 - **只支持整个行程住同一个酒店**。
 - `date_mode` 为 `range` / `unknown` 时，不做闭馆日检查（因为不知道具体星期几）。
+- 长途旅行可分段住宿：`set_stays`（第几晚到第几晚住哪家，各段不重叠）/`clear_stays`。早上从前一晚的酒店出发，晚上回今晚的酒店，到达日去第一家、离开日从前一晚那家出发；费用按每晚所住酒店的价格相加。景点分布在相距较远的几片、而酒店离某片太远时（行程≥4天），`show_trip`/`check_plan` 会自动给一行“住宿建议”，**只是提示，不改行程**。多酒店时分天不再以单一酒店为锚点。
 - 费用只含“门票 + 住宿”，不含餐饮和交通。
 - 地理编码的结果有时不准（尤其是重名或中文别名），请人工核对。国内地图服务使用另一套坐标系（GCJ-02），以后接入时需要转换。
 - 目前只在 Python 3.12 上运行过测试。
@@ -150,7 +151,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 35 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 37 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 

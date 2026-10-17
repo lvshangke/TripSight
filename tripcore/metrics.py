@@ -64,15 +64,19 @@ def legs_between_stops(trip: Trip, places: list[Place]) -> list[Leg]:
     return out
 
 
-def lodging_legs(trip: Trip, places: list[Place]) -> tuple[Optional[Leg], Optional[Leg]]:
-    """住宿 → 当天第一个景点、当天最后一个景点 → 住宿。没选住宿或当天没景点则为 None。"""
-    lodging = trip.chosen_lodging
-    if lodging is None or not places:
+def lodging_legs(trip: Trip, places: list[Place], day_index: Optional[int] = None) -> tuple[Optional[Leg], Optional[Leg]]:
+    """住宿 → 当天第一个景点、当天最后一个景点 → 住宿。没选住宿或当天没景点则为 None。
+    给了 day_index 且设置了分段住宿时：早上从前一晚的酒店出发，晚上回今晚的酒店。"""
+    if day_index is None:
+        morning = night = trip.chosen_lodging
+    else:
+        morning, night = trip.morning_lodging(day_index), trip.lodging_for_day(day_index)
+    if morning is None or night is None or not places:
         return None, None
     first, last = places[0], places[-1]
     e, x = entry(first), exit_(last)
-    out = _leg(trip, lodging.id, lodging.lat, lodging.lon, e.id, e.lat, e.lon)
-    back = _leg(trip, x.id, x.lat, x.lon, lodging.id, lodging.lat, lodging.lon)
+    out = _leg(trip, morning.id, morning.lat, morning.lon, e.id, e.lat, e.lon)
+    back = _leg(trip, x.id, x.lat, x.lon, night.id, night.lat, night.lon)
     return out, back
 
 
@@ -93,7 +97,7 @@ class DayStats:
 def day_stats(trip: Trip, day: DayPlan) -> DayStats:
     places = day_places(trip, day)
     legs = legs_between_stops(trip, places)
-    out, back = lodging_legs(trip, places)
+    out, back = lodging_legs(trip, places, day.index)
     all_legs = legs + [x for x in (out, back) if x is not None]
     visit = sum(p.duration_min for p in places)
     travel = sum(l.minutes for l in all_legs)
@@ -122,13 +126,16 @@ class CostEstimate:
 
 
 def estimate_cost(trip: Trip) -> CostEstimate:
-    """粗略费用：只含“已排入行程的景点门票 + 已选住宿 × 晚数”，不含餐饮和交通。"""
+    """粗略费用：只含“已排入行程的景点门票 + 每晚所住酒店的价格之和”，不含餐饮和交通。"""
     tickets = 0.0
     if trip.plan:
         for day in trip.plan.days:
             for it in day.items:
                 tickets += trip.place(it.place_id).ticket_price
-    lodging = trip.chosen_lodging
-    nights = max(trip.meta.num_days - 1, 0) if lodging else 0
-    lodging_cost = lodging.price_mid * nights if lodging else 0.0
+    nights, lodging_cost = 0, 0.0
+    for n in range(max(trip.meta.num_days - 1, 0)):     # 第 n 晚住 lodging_for_day(n)
+        lod = trip.lodging_for_day(n)
+        if lod is not None:
+            nights += 1
+            lodging_cost += lod.price_mid
     return CostEstimate(tickets=tickets, lodging=lodging_cost, nights=nights)

@@ -88,7 +88,6 @@ def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
 
 def build_map_data(trip: Trip) -> dict[str, Any]:
     days: list[dict[str, Any]] = []
-    lodging = trip.chosen_lodging
     meals_by = {}
     for m in trip.meals:
         meals_by.setdefault((m.day, m.after_place_id), []).append(m)
@@ -96,6 +95,8 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
         for day in trip.plan.days:
             st = day_stats(trip, day)
             d = trip.day_date(day.index)
+            lodging = trip.lodging_for_day(day.index)         # 今晚住的（返回、到达日去的）
+            lod_m = trip.morning_lodging(day.index)           # 早上出发的（换酒店当天是旧的）
             timeline: list[dict[str, Any]] = []
             w_start, w_end, w_why = day_window(trip, day.index)
             t = float(w_start)
@@ -108,11 +109,11 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     timeline.append(_leg_entry(tl, tp.name, tp, tg.name, tg))
                     if lodging and not st.places:
                         timeline.append({"type": "hotel", "role": "到达", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
-            if lodging and st.places:
-                timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
+            if lod_m and st.places:
+                timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lod_m.name, "pos": _gcj(lod_m.lat, lod_m.lon)})
                 if st.lodging_out:
                     e0 = entry(st.places[0])
-                    timeline.append(_leg_entry(st.lodging_out, lodging.name, lodging, e0.name, e0))
+                    timeline.append(_leg_entry(st.lodging_out, lod_m.name, lod_m, e0.name, e0))
                     t += st.lodging_out.minutes
             for i, p in enumerate(st.places):
                 lines = []
@@ -150,23 +151,23 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             if trip.departure and departure_day(trip) == day.index:
                 tp, tg, tl = terminal_point(trip, "departure"), transfer_target(trip, "departure"), terminal_leg(trip, "departure")
                 if tp and tg and tl:
-                    if lodging and not st.places:
+                    if lod_m and not st.places:
                         timeline.append({"type": "hotel", "role": "出发", "time": _hm(leave_by(trip).hour * 60 + leave_by(trip).minute),
-                                         "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
+                                         "name": lod_m.name, "pos": _gcj(lod_m.lat, lod_m.lon)})
                     timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp))
                     timeline.append(_term_entry(trip.departure, "离开", trip.departure.dep_time, tp))
             if w_why and t > w_end:
                 timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）
             marks = [e for e in timeline if e["type"] in ("stop", "meal")]
-            hotel_pos = [_gcj(lodging.lat, lodging.lon)] if lodging and st.places else []
+            hotel_pos = [_gcj(lod_m.lat, lod_m.lon)] if lod_m and st.places else []
             shown = _spread(hotel_pos + [e["pos"] for e in marks])[len(hotel_pos):]   # 酒店先占位，景点围绕它错开
             for e, pos in zip(marks, shown):
                 e["show"] = pos
             days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {d.isoformat()}" if d else ""),
                          "color": _COLORS[day.index % len(_COLORS)], "timeline": timeline,
-                         "closed_loop": bool(lodging and st.places)})
-    return {"title": trip.meta.name, "days": days, "has_lodging": lodging is not None,
+                         "closed_loop": bool(lod_m and lodging and lod_m.id == lodging.id and st.places)})
+    return {"title": trip.meta.name, "days": days, "has_lodging": trip.has_lodging,
             "start": _hm(DAY_START_MIN)}
 
 

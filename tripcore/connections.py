@@ -60,9 +60,13 @@ def departure_day(trip: Trip) -> Optional[int]:
 
 def transfer_target(trip: Trip, which: str):
     """机场/车站要往返的那一头：选了酒店就是酒店；否则到达日第一个景点 / 离开日最后一个景点。"""
+    idx = arrival_day(trip) if which == "arrival" else departure_day(trip)
+    if idx is not None and trip.has_lodging:
+        lod = trip.lodging_for_day(idx) if which == "arrival" else trip.morning_lodging(idx)
+        if lod is not None:
+            return lod
     if trip.chosen_lodging:
         return trip.chosen_lodging
-    idx = arrival_day(trip) if which == "arrival" else departure_day(trip)
     if trip.plan is None or idx is None or idx >= len(trip.plan.days) or not trip.plan.days[idx].items:
         return None
     items = trip.plan.days[idx].items

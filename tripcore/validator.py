@@ -11,6 +11,7 @@ from typing import Literal, Optional
 from .connections import arrival_day, day_window, departure_day
 from .metrics import PACE_LIMITS, day_stats, estimate_cost
 from .models import Trip
+from .stays import hint_text
 from .weather import bad_weather, is_outdoor
 
 Severity = Literal["error", "warning", "info"]
@@ -95,7 +96,7 @@ def validate(trip: Trip) -> list[Issue]:
 
         for leg in (st.lodging_out, st.lodging_back):
             if leg is not None and leg.minutes > LODGING_FAR_MIN:
-                lodging = trip.chosen_lodging
+                lodging = trip.lodging_for_day(day.index)
                 issues.append(
                     Issue(
                         "LODGING_FAR",
@@ -170,6 +171,10 @@ def validate(trip: Trip) -> list[Issue]:
                     f"= {cost.total:.0f} {trip.meta.currency}，已超过预算 {budget:.0f}（尚未计入餐饮和交通）。",
                 )
             )
+
+    hint = hint_text(trip)
+    if hint:
+        issues.append(Issue("STAY_SUGGESTION", "info", hint))
 
     issues.sort(key=lambda i: (_SEVERITY_ORDER[i.severity], i.day_index if i.day_index is not None else 99))
     return issues

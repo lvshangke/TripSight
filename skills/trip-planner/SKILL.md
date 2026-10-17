@@ -15,6 +15,7 @@ always: true
 2. `new_trip`（务必填 city）→ 用 `lookup_coords` 查坐标 → `add_place`。
 3. `schedule_days` 分天 → `check_plan` 看问题，把 error / warning 用大白话告诉用户。
 4. 景点基本定了，再谈**住宿**：先 `suggest_lodging` 说推荐住哪一带；有具体酒店候选时用 `add_lodging`。住宿价格只用用户提供的，不要自己报价。
+   长途旅行（≥4天）若 show_trip / check_plan 出现“💡 住宿建议”，把这条提示转述给用户并问是否分段住；用户同意并给出各段酒店后，先 `add_lodging` 添加，再用 `set_stays`（天数从 1 起），随后 `schedule_days`、`refine_routes`。不要自己改动行程或擅自换酒店，也不要在用户没确认前调用 set_stays。
 5. 任何调整都走**提案**（见下）。
 
 ## 铁律

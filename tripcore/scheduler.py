@@ -383,8 +383,10 @@ def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
     n_days = trip.meta.num_days
     limits = day_limits(trip)
     blocked = frozenset(i for i, l in enumerate(limits) if l.max_places == 0)
-    lodging = trip.chosen_lodging
+    lodging = trip.lodging_for_day(0)
     anchor: Optional[Point] = (lodging.lat, lodging.lon) if lodging else None
+    if len({s.lodging_id for s in trip.stays}) > 1:
+        anchor = None     # 多家酒店时没有单一的锚点，分天只看景点本身的远近
     mode = trip.meta.mode
 
     # 1. 保留锁定条目

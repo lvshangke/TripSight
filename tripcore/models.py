@@ -266,11 +266,26 @@ class WeatherSnap(BaseModel):
     fetched: str = Field(default="", description="抓取日期 YYYY-MM-DD")
 
 
+class Stay(BaseModel):
+    """一段住宿：from_day..to_day（含，0 起）每晚住 lodging_id。用于长途旅行换酒店。"""
+
+    lodging_id: str
+    from_day: int = Field(ge=0)
+    to_day: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _order(self) -> "Stay":
+        if self.to_day < self.from_day:
+            raise ValueError("to_day 不能早于 from_day")
+        return self
+
+
 class Trip(BaseModel):
     meta: TripMeta = Field(default_factory=TripMeta)
     places: list[Place] = Field(default_factory=list)
     lodgings: list[Lodging] = Field(default_factory=list)
     chosen_lodging_id: Optional[str] = None
+    stays: list[Stay] = Field(default_factory=list, description="分段住宿（长途换酒店）；没设置的天用 chosen_lodging_id")
     plan: Optional[Plan] = None
     revision: int = Field(default=0, description="版本号：每次改动 +1，用来防止过期的提案被误用")
     meals: list[Meal] = Field(default_factory=list, description="用户选定的用餐点")
@@ -297,6 +312,13 @@ class Trip(BaseModel):
             raise ValueError("住宿 id 不能重复")
         if self.chosen_lodging_id and self.chosen_lodging_id not in lodging_ids:
             raise ValueError(f"chosen_lodging_id 找不到对应的住宿：{self.chosen_lodging_id}")
+        for s in self.stays:
+            if s.lodging_id not in lodging_ids:
+                raise ValueError(f"stays 里的住宿找不到：{s.lodging_id}")
+        ordered = sorted(self.stays, key=lambda s: s.from_day)
+        for a, b in zip(ordered, ordered[1:]):
+            if b.from_day <= a.to_day:
+                raise ValueError(f"住宿时间段重叠：第{a.from_day + 1}-{a.to_day + 1}天 与 第{b.from_day + 1}-{b.to_day + 1}天")
         return self
 
     # ---- 一些方便的查询方法 ----
@@ -321,3 +343,20 @@ class Trip(BaseModel):
             if l.id == self.chosen_lodging_id:
                 return l
         return None
+
+    def lodging_for_day(self, index: int) -> Optional[Lodging]:
+        """第 index 天晚上住的酒店（没有分段设置就是 chosen_lodging）。最后一天没有“今晚”，取覆盖它的那段。"""
+        for st in self.stays:
+            if st.from_day <= index <= st.to_day:
+                for l in self.lodgings:
+                    if l.id == st.lodging_id:
+                        return l
+        return self.chosen_lodging
+
+    def morning_lodging(self, index: int) -> Optional[Lodging]:
+        """第 index 天早上从哪家酒店出发＝前一晚住的那家（换酒店当天早上还在旧酒店）。"""
+        return self.lodging_for_day(index - 1) if index > 0 else self.lodging_for_day(0)
+
+    @property
+    def has_lodging(self) -> bool:
+        return self.chosen_lodging is not None or bool(self.stays)

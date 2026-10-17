@@ -17,7 +17,8 @@ def build_gpx(trip: Trip, day_index: int) -> str:
         raise ValueError("没有这一天的行程")
     day = trip.plan.days[day_index]
     st = day_stats(trip, day)
-    lod = trip.chosen_lodging
+    lod = trip.morning_lodging(day_index)       # 早上出发的酒店
+    lod_end = trip.lodging_for_day(day_index)   # 晚上回的酒店
     wpts: list[tuple[str, float, float, str]] = []
     segs: list[tuple[str, list[tuple[float, float]]]] = []
 
@@ -34,8 +35,8 @@ def build_gpx(trip: Trip, day_index: int) -> str:
                 wpts.append((f"{i + 1}.{k + 1} {w.name}", w.lat, w.lon, f"{p.name} 途经点"))
         else:
             wpts.append((f"{i + 1}. {p.name}", p.lat, p.lon, f"停留 {p.duration_min} 分钟"))
-    if lod and st.places:
-        wpts.append((f"返回：{lod.name}", lod.lat, lod.lon, "酒店"))
+    if lod_end and st.places:
+        wpts.append((f"返回：{lod_end.name}", lod_end.lat, lod_end.lon, "酒店"))
     for m in trip.meals:
         if m.day == day_index:
             wpts.append((f"用餐：{m.name}", m.lat, m.lon, "用餐点"))
@@ -47,10 +48,10 @@ def build_gpx(trip: Trip, day_index: int) -> str:
     for i, leg in enumerate(st.legs):
         a, b = exit_(st.places[i]), entry(st.places[i + 1])
         segs.append((f"{a.name}→{b.name}" + ("" if leg.detail_level == "route" else "（估算）"), leg_pts(leg, a, b)))
-    if lod and st.places and st.lodging_back:
+    if lod_end and st.places and st.lodging_back:
         xl = exit_(st.places[-1])
-        segs.append((f"{xl.name}→{lod.name}" + ("" if st.lodging_back.detail_level == "route" else "（估算）"),
-                     leg_pts(st.lodging_back, xl, lod)))
+        segs.append((f"{xl.name}→{lod_end.name}" + ("" if st.lodging_back.detail_level == "route" else "（估算）"),
+                     leg_pts(st.lodging_back, xl, lod_end)))
     for p in st.places:                                   # 路线型景点内部的步行路线
         for a, b in zip(p.waypoints, p.waypoints[1:]):
             pts = [(q[0], q[1]) for q in a.next_path] if a.next_real and a.next_path else [(a.lat, a.lon), (b.lat, b.lon)]
