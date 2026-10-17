@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 30
+    assert len(names) == 34
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -888,3 +888,76 @@ def test_map_shows_terminal_markers_even_on_empty_departure_day(monkeypatch):
     last = build_map_data(s._load())["days"][-1]["timeline"]
     types = [e["type"] for e in last]
     assert "term" in types and "leg" in types and any(e["type"] == "hotel" for e in last)
+
+
+# ---------------- 游记 → 候选 ----------------
+NOTE = """完整citywalk顺路路线：老菜场→东仓门早市→书院门→顺城巷→湘子庙→德福巷→永宁门（夜景）
+【沿途必打卡点位】
+✔️老菜场：复古市井老街，楼宇搭配远处城墙远景，原生老城风貌。
+✔️东仓门早市：本地人私藏晨间市集！热气腾腾的甑糕、油糕等特色小吃超多。
+✔️书院门：闹中取静的青石板街巷，满街字画碑帖、文房小店。
+✔️顺城巷：整条路线封神路段！沿千年城墙慢行。
+✔️湘子庙+德福巷：清幽古寺静谧治愈，终点老街超多咖啡馆、小店。
+✔️永宁门：西安经典地标，傍晚光影绝美，夜景灯火璀璨。
+【游玩小Tips】
+- 想感受烟火气建议上午出发，打卡早市氛围最好"""
+
+
+class NoteAmap(FakeAmap):
+    POS = {"书院门": (34.2569, 108.9437), "永宁门": (34.2580, 108.9400), "德福巷": (34.2640, 108.9420),
+           "东仓门早市": (34.2650, 108.9480), "湘子庙": (34.2610, 108.9400)}
+
+    def search_places(self, query, city=None, limit=5):
+        if query == "顺城巷":                                  # 两个同名地点相距很远 → 有歧义
+            return [PlaceHit(name="顺城巷", lat=34.25, lon=108.94), PlaceHit(name="顺城巷", lat=34.30, lon=109.05)]
+        if query in self.POS:
+            lat, lon = self.POS[query]
+            return [PlaceHit(name=query, lat=lat, lon=lon, address="西安")]
+        return []
+
+
+def test_candidates_validated_against_note_text(monkeypatch):
+    s.new_trip(start_date="2026-10-30", end_date="2026-11-02", city="西安", name="西安")
+    items = [
+        {"name": "书院门", "kind": "area", "quote": "书院门：闹中取静的青石板街巷"},
+        {"name": "东仓门早市", "kind": "area", "quote": "东仓门早市：本地人私藏晨间市集", "clues": ["建议上午出发", "门票30元"]},
+        {"name": "老菜场", "kind": "area", "quote": "老菜场：复古市井老街"},
+        {"name": "大雁塔", "kind": "attraction", "quote": "大雁塔：必去地标"},           # 原文没有 → 拒收
+        {"name": "湘子庙", "kind": "attraction", "quote": "德福巷：终点老街"},           # 名字不在 quote 里 → 拒收
+    ]
+    out = s.submit_candidates(NOTE, items, source="citywalk")
+    assert [c["name"] for c in out["added"]] == ["老菜场", "书院门", "东仓门早市"] or \
+        [c["name"] for c in out["added"]] == ["老菜场", "东仓门早市", "书院门"]
+    names = [c["name"] for c in out["added"]]
+    assert names.index("老菜场") < names.index("东仓门早市") < names.index("书院门")   # 按原文先后排序
+    assert {r["name"] for r in out["rejected"]} == {"大雁塔", "湘子庙"}
+    east = next(c for c in out["added"] if c["name"] == "东仓门早市")
+    assert east["clues"] == ["建议上午出发"] and east["dropped_clues"] == ["门票30元"]
+    again = s.submit_candidates(NOTE, items[:1])
+    assert again["skipped_duplicates"] == ["书院门"] and not again["added"]
+    assert len(s.list_candidates()) == 3
+
+
+def test_adopt_candidates_adds_only_unambiguous_nonduplicate(monkeypatch):
+    s.new_trip(start_date="2026-10-30", end_date="2026-11-02", city="西安", name="西安")
+    s.add_place("西安城墙", 34.2582, 108.9402, duration_min=120)             # 离永宁门不到 300 米
+    monkeypatch.setattr(s, "_amap", lambda: NoteAmap())
+    s.submit_candidates(NOTE, [
+        {"name": "书院门", "kind": "area", "quote": "书院门：闹中取静的青石板街巷", "clues": ["满街字画碑帖"]},
+        {"name": "永宁门", "kind": "attraction", "quote": "永宁门：西安经典地标"},
+        {"name": "顺城巷", "kind": "area", "quote": "顺城巷：整条路线封神路段"},
+        {"name": "东仓门早市", "kind": "food", "quote": "东仓门早市：本地人私藏晨间市集"},
+    ])
+    ids = {c["name"]: c["id"] for c in s.list_candidates()}
+    out = s.adopt_candidates(list(ids.values()))
+    assert "书院门：已加入" in out
+    assert "永宁门：没有加入——和已有景点「西安城墙」" in out
+    assert "顺城巷：没有加入——有多个同名地点" in out
+    assert "东仓门早市：是餐饮类" in out and "find_food" in out
+    t = s._load()
+    sy = next(p for p in t.places if p.name == "书院门")
+    assert "待核实" in sy.notes and "满街字画碑帖" in sy.notes and "游记原话" in sy.notes and sy.source.startswith("游记")
+    assert {c["name"] for c in s.list_candidates("added")} == {"书院门"}
+    assert "此前已加入" in s.adopt_candidates([ids["书院门"]])
+    s.drop_candidates([ids["顺城巷"]])
+    assert "顺城巷" not in [c["name"] for c in s.list_candidates()]

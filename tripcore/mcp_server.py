@@ -23,6 +23,7 @@ from typing import Any, Optional
 from pydantic import TypeAdapter, ValidationError
 
 from .amap import AmapClient, AmapError
+from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
@@ -1367,6 +1368,127 @@ def _render(trip: Trip) -> str:
     return "\n".join(out)
 
 
+
+# ---------------------------------------------------------------------------
+# 游记 / 攻略 → 候选景点
+# ---------------------------------------------------------------------------
+
+def _cand_path() -> Path:
+    return trip_path().with_name("candidates.json")
+
+
+def _load_cands() -> list[dict[str, Any]]:
+    p = _cand_path()
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+
+
+def _save_cands(items: list[dict[str, Any]]) -> None:
+    p = _cand_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(p)
+
+
+def submit_candidates(text: str, items: list[dict[str, Any]], source: str = "游记") -> dict[str, Any]:
+    """把用户粘贴的游记/攻略里提到的地点整理成候选清单（不加入行程，不查坐标）。
+    text：用户粘贴的原文，必须完整原样传入；source：给这篇游记起个简短名字。
+    items：每项 {name, kind, quote, clues}。name 是地点名；kind 是 attraction（景点）/area（街区、步道）/food（餐馆、小吃）/other；
+    quote 必须是原文里逐字摘录的一句话，且包含 name；clues 是原文里逐字摘录的价格、时间、建议等片段（没有就留空），
+    它们只是“待核实线索”。代码会核对 quote 和 clues 是否真在原文里，对不上的拒收，所以不要改写、不要补充原文没有的内容。
+    候选按它们在原文中出现的先后排序（游记若是一条顺路路线，这就是游览顺序）。之后由用户挑选，再调用 adopt_candidates。"""
+    if not text.strip():
+        raise ToolError("text 不能为空，请把用户粘贴的游记原文完整传入。")
+    ok, rejected = _validate_items(text, items)
+    trip = None
+    try:
+        trip = _load()
+    except ToolError:
+        pass
+    existing = _load_cands()
+    have = [c["name"] for c in existing if c["status"] != "dropped"] + ([p.name for p in trip.places] if trip else [])
+    added, dup = [], []
+    n = max([int(c["id"][1:]) for c in existing] or [0])
+    for e in ok:
+        if any(_similar_name(e["name"], h) for h in have):
+            dup.append(e["name"])
+            continue
+        n += 1
+        cand = {"id": f"c{n}", "name": e["name"], "kind": e["kind"], "quote": e["quote"], "clues": e["clues"],
+                "source": source, "order": e["order"], "status": "pending", "place_id": ""}
+        existing.append(cand)
+        added.append({**cand, **({"dropped_clues": e["dropped_clues"]} if e.get("dropped_clues") else {})})
+        have.append(e["name"])
+    _save_cands(existing)
+    return {"added": added, "skipped_duplicates": dup, "rejected": rejected,
+            "note": "这些只是候选，还没加入行程。请把候选和原文出处展示给用户，由用户选择后再调用 adopt_candidates；"
+                    "clues 只是游记里的说法，价格和营业时间不要当作事实。"}
+
+
+def list_candidates(status: str = "pending") -> list[dict[str, Any]]:
+    """列出游记候选。status：pending（待选，默认）/ added（已加入）/ dropped（已放弃）/ all。"""
+    items = _load_cands()
+    return [c for c in items if status == "all" or c["status"] == status]
+
+
+def drop_candidates(ids: list[str]) -> str:
+    """把用户不要的候选标记为放弃（候选清单里不再提示，也不会被重复提取）。"""
+    items = _load_cands()
+    hit = [c for c in items if c["id"] in ids]
+    if not hit:
+        raise ToolError("没有找到这些候选 id。")
+    for c in hit:
+        c["status"] = "dropped"
+    _save_cands(items)
+    return "已放弃：" + "、".join(c["name"] for c in hit)
+
+
+MAX_ADOPT = 10
+
+
+def adopt_candidates(ids: list[str]) -> str:
+    """把用户选中的候选（attraction / area）加入行程：用地图查坐标，名字相符且不歧义才加入；
+    坐标之外的信息（游记里的价格、时间）只作为“待核实线索”写进备注，不当事实。
+    查不到、有多个同名地点、或和已有景点太近的，不会加入，会说明原因让用户决定。food 类请用 find_food 搜餐厅。
+    加入后请再调用 schedule_days 重新分天。需要 AMAP_KEY（没有则退回 OpenStreetMap，精度较低）。"""
+    if len(ids) > MAX_ADOPT:
+        raise ToolError(f"一次最多加入 {MAX_ADOPT} 个，请分批。")
+    items = _load_cands()
+    by_id = {c["id"]: c for c in items}
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        raise ToolError(f"没有这些候选：{'、'.join(missing)}")
+    trip = _load()
+    lines: list[str] = []
+    for cid in ids:
+        c = by_id[cid]
+        if c["status"] == "added":
+            lines.append(f"· {c['name']}：此前已加入（{c['place_id']}）")
+            continue
+        if c["kind"] in ("food", "other"):
+            lines.append(f"· {c['name']}：是{'餐饮' if c['kind'] == 'food' else '其他'}类，请用 find_food 搜店后 choose_food 安排，没有加入景点")
+            continue
+        res = lookup_coords(c["name"])
+        hits = res.get("candidates") or ([{"name": res["name"], "lat": res["lat"], "lon": res["lon"]}] if res.get("found") else [])
+        pick, why = _pick_hit(c["name"], hits)
+        if pick is None:
+            show = "；".join(f"{h['name']}({h['lat']:.4f},{h['lon']:.4f})" for h in hits[:3])
+            lines.append(f"· {c['name']}：没有加入——{why}" + (f"。地图候选：{show}" if show else ""))
+            continue
+        near = next((p for p in _load().places
+                     if _similar_name(p.name, c["name"]) or haversine_km(p.lat, p.lon, pick["lat"], pick["lon"]) < 0.3), None)
+        if near is not None:
+            lines.append(f"· {c['name']}：没有加入——和已有景点「{near.name}」({near.id}) 重合或相距不到 300 米")
+            continue
+        clue = f"[游记线索，待核实：{'；'.join(c['clues'])}] " if c["clues"] else ""
+        msg = add_place(pick["name"], round(pick["lat"], 6), round(pick["lon"], 6), source=f"{c['source']}（{c['id']}）",
+                        notes=f"{clue}游记原话：{c['quote']}")
+        pid = msg.split("id=")[1].split(")")[0]
+        c["status"], c["place_id"] = "added", pid
+        lines.append(f"· {c['name']}：已加入（{pick['name']}，{pid}）")
+    _save_cands(items)
+    return "\n".join(lines) + "\n请再调用 schedule_days 重新分天（门票、时长、营业时间仍待核实，可用 fill_hours 补营业时间）。"
+
 # ---------------------------------------------------------------------------
 # MCP 注册
 # ---------------------------------------------------------------------------
@@ -1375,6 +1497,7 @@ TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
+    submit_candidates, list_candidates, drop_candidates, adopt_candidates,
 ]
 
 

@@ -148,7 +148,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 17 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 34 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
@@ -217,6 +217,10 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 ## 机场/车站接驳的时间感知
 
 机场/车站 ↔ 酒店这两段会带上预计出发时间去问高德（含夜班车）。出发时间落在 23:00–05:30 时，按经验规则视为公共交通已停运，改按打车（驾车）计算，路线说明里会写明；这是经验规则，不是真实末班车时间。出发时间（精确到小时）变了，会自动重查。地图在到达日/离开日显示 ✈/🚄 标记和酒店标记，即使当天没有景点。
+
+## 游记/攻略 → 候选景点（`submit_candidates` / `adopt_candidates`）
+
+用户粘贴游记后，模型只负责读文字、列清单；代码核对：每个候选的原话 `quote` 必须逐字出现在原文里且包含地名，线索 `clues` 也必须是原文片段，对不上的拒收；候选按原文出现先后排序（顺路路线即游览顺序）并去重。候选存在 `~/.tripcore/candidates.json`，用户挑选后 `adopt_candidates` 才用地图查坐标：名字相符且无歧义、与已有景点相距 ≥ 300 米才加入，价格/时间只作“待核实线索”写进备注。餐饮类走 `find_food`。工具：`submit_candidates` `list_candidates` `drop_candidates` `adopt_candidates`。
 
 ## 出行偏好会真正影响路线
 
