@@ -187,7 +187,9 @@ function show(di) {
   const markers = [], legLines = [];
   d.timeline.forEach((e, idx) => {
     const row = document.createElement('div');
-    if (e.type === 'leg') {
+    if (e.type === 'conn') {
+      row.className = 'leg'; row.style.cursor = 'default'; row.textContent = '⏱ ' + e.text;
+    } else if (e.type === 'leg') {
       row.className = 'leg';
       row.innerHTML = '↓ '+esc(e.mode)+' 约'+e.minutes+'分钟 · '+e.km+' km · '+(e.real?'高德路线':'<span class="est">估算</span>')
         + (e.note ? '<br>'+esc(e.note) : '') + '<a href="'+esc(e.link)+'" target="_blank" rel="noopener">在高德打开</a>';

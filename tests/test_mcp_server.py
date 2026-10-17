@@ -839,3 +839,13 @@ def test_terminal_not_found_falls_back(monkeypatch):
     assert "没有找到" in msg and "经验值" in msg
     from tripcore.connections import day_window
     assert day_window(s._load(), 2)[1] == 15 * 60
+
+
+def test_map_template_handles_every_timeline_type(monkeypatch):
+    """地图脚本必须认识时间线里出现的每种类型（曾因不认识 conn 导致第1天/第4天整页脚本报错）。"""
+    _arrival_trip()
+    from tripcore.mapview import build_map_data, build_map_html
+    types = {e["type"] for d in build_map_data(s._load())["days"] for e in d["timeline"]}
+    html = build_map_html(s._load())
+    for ty in types - {'stop'}:      # stop 是默认分支
+        assert f"e.type === '{ty}'" in html, ty
