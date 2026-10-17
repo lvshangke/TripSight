@@ -39,7 +39,7 @@ def test_full_chat_flow():
     before = s.show_trip()
     assert s.show_trip() == before  # 提案不会改行程
 
-    s.apply_proposal(r["proposal_id"])
+    s.apply_proposal(r["proposal_id"], r["confirm_code"])
     assert s._load().plan.days[1].items[-1].place_id == "p2"
 
     s.undo()
@@ -62,18 +62,18 @@ def test_stale_proposal_rejected():
     r = s.propose_change("移动", [{"kind": "move", "place_id": "p1", "to_day": 1}])
     s.add_place("新景点", 39.95, 116.4)  # 版本变化
     with pytest.raises(s.ToolError, match="过期|版本"):
-        s.apply_proposal(r["proposal_id"])
+        s.apply_proposal(r["proposal_id"], r["confirm_code"])
 
 
 def test_locked_item_cannot_be_moved_and_failure_changes_nothing():
     _setup_trip()
     s.schedule_days()
     r1 = s.propose_change("锁定故宫", [{"kind": "lock", "place_id": "p1"}])
-    s.apply_proposal(r1["proposal_id"])
+    s.apply_proposal(r1["proposal_id"], r1["confirm_code"])
     rev = s._load().revision
     r2 = s.propose_change("移动故宫", [{"kind": "move", "place_id": "p1", "to_day": 1}])
     with pytest.raises(s.ToolError, match="锁定"):
-        s.apply_proposal(r2["proposal_id"])
+        s.apply_proposal(r2["proposal_id"], r2["confirm_code"])
     assert s._load().revision == rev
 
 
@@ -84,7 +84,7 @@ def test_bad_inputs_give_readable_errors():
     with pytest.raises(s.ToolError):
         s.propose_change("x", [{"kind": "remove", "place_id": "nope"}])
     with pytest.raises(s.ToolError):
-        s.apply_proposal("zzzz")
+        s.apply_proposal("zzzz", "0000")
     with pytest.raises(s.ToolError):
         s.add_place("坏坐标", 200, 0)
     with pytest.raises(s.ToolError):
@@ -108,4 +108,55 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 11
+    assert len(names) == 13
+
+
+def test_wrong_confirm_code_is_rejected():
+    _setup_trip()
+    s.schedule_days()
+    r = s.propose_change("移动", [{"kind": "move", "place_id": "p1", "to_day": 1}])
+    wrong = "0000" if r["confirm_code"] != "0000" else "1111"
+    rev = s._load().revision
+    with pytest.raises(s.ToolError, match="确认码"):
+        s.apply_proposal(r["proposal_id"], wrong)
+    assert s._load().revision == rev
+    s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    assert s._load().revision == rev + 1
+
+
+def test_update_and_remove_place():
+    _setup_trip()
+    s.schedule_days()
+    s.update_place("p2", ticket_price=35, duration_min=60)
+    assert s._load().place("p2").ticket_price == 35
+    with pytest.raises(s.ToolError):
+        s.update_place("p2")
+    with pytest.raises(s.ToolError):
+        s.update_place("p2", duration_min=1)
+    s.remove_place("p2")
+    t = s._load()
+    assert all(p.id != "p2" for p in t.places)
+    assert all(it.place_id != "p2" for d in t.plan.days for it in d.items)
+    s.undo()
+    assert any(p.id == "p2" for p in s._load().places)
+
+
+def test_unverified_place_is_marked_and_city_saved():
+    s.new_trip(city="哈尔滨")
+    s.add_place("甲", 45.77, 126.62)
+    s.add_place("乙", 45.78, 126.63, verified=True)
+    t = s._load()
+    assert "待核实" in t.place("p1").notes and "待核实" not in t.place("p2").notes
+    assert s._load_context()["city"] == "哈尔滨"
+
+
+def test_lookup_warns_when_far_from_city(monkeypatch):
+    s.new_trip(city="哈尔滨")
+
+    def fake(q, city=None, **kw):
+        return {"name": q, "lat": 45.8360, "lon": 128.8278, "display_name": "x"} if q == "中央大街" \
+            else {"name": q, "lat": 45.7576, "lon": 126.6424, "display_name": "哈尔滨"}
+
+    monkeypatch.setattr(s, "_geocode", fake)
+    r = s.lookup_coords("中央大街")
+    assert r["found"] and r["warning"] and r["distance_from_city_km"] > 60

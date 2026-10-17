@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import TypeAdapter, ValidationError
 
+from .geo import haversine_km
 from .geocode import GeocodeError, geocode as _geocode
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost
@@ -90,6 +92,21 @@ def _save_proposals(data: dict[str, dict]) -> None:
     tmp.replace(p)
 
 
+def _context_path() -> Path:
+    return trip_path().with_name("context.json")
+
+
+def _load_context() -> dict:
+    p = _context_path()
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+
+
+def _save_context(data: dict) -> None:
+    p = _context_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def _next_id(prefix: str, existing: list[str]) -> str:
     n = 1
     while f"{prefix}{n}" in existing:
@@ -120,9 +137,10 @@ def new_trip(
     earliest_start: Optional[str] = None,
     latest_end: Optional[str] = None,
     budget_total: Optional[float] = None,
+    city: Optional[str] = None,
 ) -> str:
-    """创建一个新行程（会覆盖当前行程）。日期可不填；填 start_date+end_date 为确定日期，
-    填 earliest_start+latest_end 为大致范围。"""
+    """创建一个新行程（会覆盖当前行程）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
+    日期可不填；填 start_date+end_date 为确定日期，填 earliest_start+latest_end 为大致范围。"""
     sd, ed = _parse_date(start_date, "start_date"), _parse_date(end_date, "end_date")
     es, le = _parse_date(earliest_start, "earliest_start"), _parse_date(latest_end, "latest_end")
     if sd or ed:
@@ -142,6 +160,7 @@ def new_trip(
     trip = Trip(meta=meta)
     _save(trip)
     _save_proposals({})
+    _save_context({"city": city} if city else {})
     return f"已创建行程「{meta.name}」，共 {meta.num_days} 天，节奏 {meta.pace.value}，交通偏好 {_MODE_NAMES[meta.mode]}。"
 
 
@@ -156,10 +175,15 @@ def add_place(
     closed_weekdays: Optional[list[int]] = None,
     reservation_required: bool = False,
     notes: str = "",
-    source: str = "user",
+    source: str = "agent",
+    verified: bool = False,
 ) -> str:
-    """添加一个景点。lat/lon 必须来自 lookup_coords 或用户，不要自己编。
+    """添加一个景点。lat/lon 必须来自 lookup_coords 或用户，绝不能自己编。
+    ticket_price（元）、duration_min、closed_weekdays 如果没有可靠来源，请保持默认（门票填 0），
+    不要凭印象编数字；verified=False 时会在备注里标“待核实”，用户确认过的数据才传 verified=True。
     closed_weekdays：闭馆的星期，0=周一 … 6=周日。"""
+    if not verified:
+        notes = (notes + " " if notes else "") + "[门票/时长/闭馆日待核实]"
     trip = _load()
     pid = _next_id("p", [p.id for p in trip.places])
     try:
@@ -203,12 +227,91 @@ def add_lodging(
 
 
 def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
-    """查询地点坐标（目前用 OpenStreetMap，第 2 步会换成高德）。找不到时返回 found=false。"""
+    """查询地点坐标（目前用 OpenStreetMap，第 2 步会换成高德）。city 不填则用行程的目的地城市。
+    会检查结果离城市中心有多远：超过 60 km 时 warning 非空，说明很可能查到了别处同名地点，
+    请换更具体的关键词重查（如加区名），不要自己改坐标。找不到时 found=false。"""
+    city = city or _load_context().get("city")
     try:
         r = _geocode(query, city)
     except GeocodeError as e:
         return {"found": False, "error": str(e)}
-    return {"found": True, "name": r["name"], "lat": r["lat"], "lon": r["lon"], "display_name": r["display_name"]}
+    out: dict[str, Any] = {"found": True, "name": r["name"], "lat": r["lat"], "lon": r["lon"],
+                           "display_name": r["display_name"], "warning": ""}
+    if city:
+        try:
+            c = _geocode(city)
+            d = haversine_km(r["lat"], r["lon"], c["lat"], c["lon"])
+            out["distance_from_city_km"] = round(d, 1)
+            if d > 60:
+                out["warning"] = f"离“{city}”约 {d:.0f} km，可能查到了别处的同名地点；请换更具体的关键词，或向用户确认。"
+        except GeocodeError:
+            pass
+    return out
+
+
+def update_place(
+    place_id: str,
+    name: Optional[str] = None,
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+    duration_min: Optional[int] = None,
+    priority: Optional[int] = None,
+    must_go: Optional[bool] = None,
+    ticket_price: Optional[float] = None,
+    closed_weekdays: Optional[list[int]] = None,
+    reservation_required: Optional[bool] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """修改景点的资料（只改传入的字段）。这不改变它在行程里的位置；改完后请再 schedule_days。
+    坐标/价格必须来自工具或用户。"""
+    trip = _load()
+    try:
+        trip.place(place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+    changes = {k: v for k, v in dict(
+        name=name, lat=lat, lon=lon, duration_min=duration_min, priority=priority, must_go=must_go,
+        ticket_price=ticket_price, closed_weekdays=closed_weekdays,
+        reservation_required=reservation_required, notes=notes).items() if v is not None}
+    if not changes:
+        raise ToolError("没有传入要修改的字段。")
+
+    def mutate(t: Trip) -> None:
+        old = t.place(place_id)
+        new = Place.model_validate({**old.model_dump(), **changes})
+        t.places[t.places.index(old)] = new
+
+    try:
+        new_trip_ = commit(trip, mutate)
+    except ValidationError as e:
+        raise ToolError(f"参数不合法：{e}")
+    _save(new_trip_)
+    return f"已更新景点 {place_id}：" + "、".join(changes) + "。"
+
+
+def remove_place(place_id: str) -> str:
+    """彻底删除一个景点（同时从行程里移出）。只是不想去了/暂时不去，优先用 propose_change 的 set_status=excluded。
+    已锁定的景点不能删除。"""
+    trip = _load()
+    try:
+        place = trip.place(place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+    if trip.plan:
+        for d in trip.plan.days:
+            for it in d.items:
+                if it.place_id == place_id and it.locked:
+                    raise ToolError(f"「{place.name}」已锁定，不能删除。")
+
+    def mutate(t: Trip) -> None:
+        t.places = [p for p in t.places if p.id != place_id]
+        if t.plan:
+            for d in t.plan.days:
+                d.items = [it for it in d.items if it.place_id != place_id]
+            t.plan.unscheduled = [u for u in t.plan.unscheduled if u.place_id != place_id]
+
+    _save(commit(trip, mutate))
+    return f"已删除景点「{place.name}」({place_id})。"
 
 
 def schedule_days(keep_locked: bool = True) -> str:
@@ -260,7 +363,9 @@ def propose_change(summary: str, ops: list[dict[str, Any]], rationale: str = "")
     {"kind":"remove","place_id":"p2"}
     {"kind":"set_status","place_id":"p3","status":"excluded"}  （idea/shortlist/planned/confirmed/excluded）
     {"kind":"lock","place_id":"p1","locked":true}
-    返回提案 id 和“改前→改后”说明；用户确认后再调用 apply_proposal。"""
+    返回提案 id、confirm_code 和“改前→改后”说明。
+    必须把 changes 和 confirm_code 展示给用户，请用户回复该确认码；用户回复后才能调用 apply_proposal。
+    绝对不能自己代填确认码或在用户没回复时套用。"""
     trip = _load()
     try:
         parsed = [_OP_ADAPTER.validate_python(o) for o in ops]
@@ -273,20 +378,24 @@ def propose_change(summary: str, ops: list[dict[str, Any]], rationale: str = "")
     except KeyError as e:
         raise ToolError(str(e))
     proposal = make_proposal(trip, summary, parsed, rationale=rationale, created_by="agent")
+    code = f"{secrets.randbelow(10000):04d}"
     store = _load_proposals()
-    store[proposal.id] = proposal.model_dump(mode="json")
+    store[proposal.id] = {"proposal": proposal.model_dump(mode="json"), "confirm_code": code}
     _save_proposals(store)
-    return {"proposal_id": proposal.id, "summary": summary, "changes": lines,
+    return {"proposal_id": proposal.id, "confirm_code": code, "summary": summary, "changes": lines,
             "base_revision": proposal.base_revision,
-            "next": "请把 changes 展示给用户，用户明确同意后再调用 apply_proposal。"}
+            "next": f"请把 changes 展示给用户，并告诉用户：回复“确认 {code}”即可执行。用户回复前不要调用 apply_proposal。"}
 
 
-def apply_proposal(proposal_id: str) -> str:
-    """套用已确认的提案。只有用户明确同意后才能调用。过期、被锁定或不合法时会报错且不改动行程。"""
+def apply_proposal(proposal_id: str, confirm_code: str) -> str:
+    """套用提案。confirm_code 必须是用户在聊天里亲自回复的 4 位确认码（propose_change 返回的那个），
+    不能自己代填。过期、被锁定或不合法时会报错且不改动行程。"""
     store = _load_proposals()
     if proposal_id not in store:
         raise ToolError(f"找不到提案 {proposal_id}（可能已套用或已被清除）。")
-    proposal = Proposal.model_validate(store[proposal_id])
+    if str(confirm_code).strip() != store[proposal_id]["confirm_code"]:
+        raise ToolError("确认码不对。请把改动展示给用户，让用户回复确认码后再套用。")
+    proposal = Proposal.model_validate(store[proposal_id]["proposal"])
     trip = _load()
     try:
         new = _apply_proposal(trip, proposal)
@@ -357,7 +466,7 @@ def _render(trip: Trip) -> str:
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    new_trip, add_place, add_lodging, lookup_coords, schedule_days, check_plan,
+    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

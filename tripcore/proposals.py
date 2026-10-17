@@ -98,6 +98,13 @@ def _apply_one(t: Trip, op: Op) -> None:
     t.place(op.place_id)  # 不存在会抛 KeyError
 
     if isinstance(op, SetStatusOp):
+        # 设为“排除/想法”的景点不该继续留在行程里：一并移出（锁定的不允许）
+        if op.status in (PlaceStatus.EXCLUDED, PlaceStatus.IDEA) and t.plan is not None:
+            loc = _find(t.plan, op.place_id)
+            if loc is not None:
+                if t.plan.days[loc[0]].items[loc[1]].locked:
+                    raise LockedItemError(f"「{t.place(op.place_id).name}」已锁定，不能排除")
+                t.plan.days[loc[0]].items.pop(loc[1])
         t.place(op.place_id).status = op.status
         return
 

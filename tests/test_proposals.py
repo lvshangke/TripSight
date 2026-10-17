@@ -113,3 +113,17 @@ def test_proposal_json_roundtrip(planned):
     again = Proposal.model_validate_json(prop.model_dump_json())
     assert again == prop
     assert isinstance(again.ops[0], MoveOp)
+
+
+def test_excluding_a_place_also_removes_it_from_the_plan():
+    from tripcore.proposals import SetStatusOp, apply_proposal, make_proposal
+    from tripcore.scheduler import schedule
+    from tripcore.models import PlaceStatus
+    from tests.conftest import make_place, make_trip
+
+    trip = schedule(make_trip([make_place("a"), make_place("b", lat=39.91)], num_days=1))
+    assert any(it.place_id == "a" for d in trip.plan.days for it in d.items)
+    prop = make_proposal(trip, "排除 a", [SetStatusOp(place_id="a", status=PlaceStatus.EXCLUDED)])
+    new = apply_proposal(trip, prop)
+    assert new.place("a").status == PlaceStatus.EXCLUDED
+    assert all(it.place_id != "a" for d in new.plan.days for it in d.items)

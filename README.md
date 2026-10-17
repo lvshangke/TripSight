@@ -148,8 +148,8 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 11 个工具，供 nanobot 等 Agent 通过聊天调用：
-`new_trip` `add_place` `add_lodging` `lookup_coords` `schedule_days` `check_plan`
+`tripcore/mcp_server.py` 把 tripcore 包装成 13 个工具，供 nanobot 等 Agent 通过聊天调用：
+`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
 - 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
@@ -172,3 +172,5 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
   }
 }
 ```
+
+提案需要确认码：`propose_change` 返回 4 位 `confirm_code`，用户回复后才能 `apply_proposal`（这只是减速带，不是安全边界）。
