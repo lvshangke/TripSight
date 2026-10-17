@@ -51,6 +51,16 @@ class RouteResult:
     mode: str                  # walk / transit / drive
     distance_km: float
     minutes: int
+    # 以下只有公交/地铁方案才有
+    transfers: Optional[int] = None
+    walking_km: Optional[float] = None
+    cost_yuan: Optional[float] = None
+    lines: list[str] = field(default_factory=list)
+    uses_subway: bool = False
+
+
+# 公交策略（高德 transit 接口的 strategy 参数）
+TRANSIT_STRATEGIES = {"fastest": 0, "cheapest": 1, "fewest_transfers": 2, "least_walking": 3, "no_subway": 5}
 
 
 def _num(v: Any) -> Optional[float]:
@@ -170,7 +180,7 @@ class AmapClient:
 
     # ---- 路线 ----
     def route(self, mode: str, from_lat: float, from_lon: float, to_lat: float, to_lon: float,
-              city: Optional[str] = None) -> RouteResult:
+              city: Optional[str] = None, transit_strategy: str = "fastest") -> RouteResult:
         o_lat, o_lon = wgs84_to_gcj02(from_lat, from_lon)
         d_lat, d_lon = wgs84_to_gcj02(to_lat, to_lon)
         origin, dest = f"{o_lon:.6f},{o_lat:.6f}", f"{d_lon:.6f},{d_lat:.6f}"
@@ -183,8 +193,11 @@ class AmapClient:
         if mode == "transit":
             if not city:
                 raise AmapError("公交路线需要城市名")
+            if transit_strategy not in TRANSIT_STRATEGIES:
+                raise AmapError(f"不支持的公交策略：{transit_strategy}")
             data = self._get("/v3/direction/transit/integrated",
-                             {"origin": origin, "destination": dest, "city": city, "cityd": city})
+                             {"origin": origin, "destination": dest, "city": city, "cityd": city,
+                              "strategy": TRANSIT_STRATEGIES[transit_strategy]})
             route = data.get("route") or {}
             transits = route.get("transits") or []
             if not transits:
@@ -193,7 +206,20 @@ class AmapClient:
             dur, dist = _num(t.get("duration")), _num(t.get("distance")) or _num(route.get("distance"))
             if dur is None or dist is None:
                 raise AmapError("公交结果缺少时间或距离")
-            return RouteResult("transit", round(dist / 1000, 2), max(1, round(dur / 60)))
+            lines: list[tuple[str, str]] = []
+            for seg in t.get("segments") or []:
+                buslines = ((seg.get("bus") or {}).get("buslines")) or []
+                if buslines:
+                    lines.append((_text(buslines[0].get("name")).split("(")[0], _text(buslines[0].get("type"))))
+            walk_m = _num(t.get("walking_distance"))
+            return RouteResult(
+                "transit", round(dist / 1000, 2), max(1, round(dur / 60)),
+                transfers=max(len(lines) - 1, 0),
+                walking_km=None if walk_m is None else round(walk_m / 1000, 2),
+                cost_yuan=_num(t.get("cost")),
+                lines=[n for n, _ in lines],
+                uses_subway=any("地铁" in n or "地铁" in ty for n, ty in lines),
+            )
         raise AmapError(f"不支持的出行方式：{mode}")
 
     @staticmethod

@@ -26,7 +26,7 @@ from .amap import AmapClient, AmapError
 from .geo import estimate_leg, haversine_km
 from .geocode import GeocodeError, geocode as _geocode
 from .lodging import rank_lodgings, suggest_stay_area
-from .metrics import day_stats, estimate_cost, leg_key
+from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .models import DateMode, Leg, Lodging, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
@@ -389,7 +389,6 @@ def refine_routes(day: Optional[int] = None) -> str:
     if day is not None and not (1 <= day <= len(trip.plan.days)):
         raise ToolError(f"没有第 {day} 天（共 {len(trip.plan.days)} 天）")
     city = _load_context().get("city")
-    mode = trip.meta.mode
 
     wanted: list[tuple[Any, Any]] = []   # (起点对象, 终点对象)，对象有 id/lat/lon
     for d in trip.plan.days:
@@ -404,8 +403,11 @@ def refine_routes(day: Optional[int] = None) -> str:
     new_legs: dict[str, Leg] = {}
     failures: list[str] = []
     requested = skipped = 0
+    all_keys: set[str] = set()
     for a, b in wanted:
+        mode = leg_mode(trip, a.id, b.id)
         key = leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode)
+        all_keys.add(key)
         if key in trip.route_overrides or key in new_legs:
             skipped += 1
             continue
@@ -423,14 +425,125 @@ def refine_routes(day: Optional[int] = None) -> str:
 
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
-    todo = max(0, len({leg_key(a.id, a.lat, a.lon, b.id, b.lat, b.lon, mode) for a, b in wanted})
-               - len(trip.route_overrides) - len(new_legs) - len(failures))
+    todo = len(all_keys - set(trip.route_overrides) - set(new_legs)) - len(failures)
     msg = f"已更新 {len(new_legs)} 段为高德真实路线，{skipped} 段此前已查过。"
     if failures:
         msg += "\n失败：" + "；".join(failures[:5]) + "（这些路段仍用估算值）"
     if todo > 0 and requested >= MAX_ROUTE_REQUESTS:
         msg += f"\n还有部分路段没查，请再调用一次 refine_routes。"
     return msg + "\n" + _render(_load())
+
+
+def _point(trip: Trip, pid: str):
+    for x in [*trip.places, *trip.lodgings]:
+        if x.id == pid:
+            return x
+    raise ToolError(f"找不到地点或住宿：{pid}")
+
+
+def set_transport_prefs(
+    walk_max_min: Optional[int] = None,
+    prefer_subway: Optional[bool] = None,
+    max_transfers: Optional[int] = None,
+    taxi_ok: Optional[bool] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """设置出行偏好（只改传入的项）：单段步行最多几分钟、是否更愿意坐地铁、最多换乘几次、是否接受打车、其他说明
+    （如带老人/小孩）。这些偏好会用于 compare_transport 的建议，但不会自动改行程。"""
+    trip = _load()
+    changes = {k: v for k, v in dict(walk_max_min=walk_max_min, prefer_subway=prefer_subway,
+                                     max_transfers=max_transfers, taxi_ok=taxi_ok, notes=notes).items() if v is not None}
+    if not changes:
+        p = trip.meta.transport_prefs
+        return f"当前出行偏好：{p.model_dump()}"
+
+    def mutate(t: Trip) -> None:
+        t.meta.transport_prefs = t.meta.transport_prefs.model_validate({**t.meta.transport_prefs.model_dump(), **changes})
+
+    try:
+        new = commit(trip, mutate)
+    except ValidationError as e:
+        raise ToolError(f"参数不合法：{e}")
+    _save(new)
+    return f"已更新出行偏好：{new.meta.transport_prefs.model_dump()}"
+
+
+def set_leg_mode(from_id: str, to_id: str, mode: str) -> str:
+    """指定某一段（从 from_id 到 to_id，景点或住宿的 id）的出行方式：walk / transit / drive；
+    填 default 则恢复为行程的默认方式。指定后请再调用 refine_routes 更新这一段的真实时间。
+    应该是用户选定后再调用。"""
+    if mode not in ("walk", "transit", "drive", "default"):
+        raise ToolError("mode 只能是 walk / transit / drive / default")
+    trip = _load()
+    a, b = _point(trip, from_id), _point(trip, to_id)
+    key = f"{from_id}>{to_id}"
+
+    def mutate(t: Trip) -> None:
+        if mode == "default":
+            t.leg_modes.pop(key, None)
+        else:
+            t.leg_modes[key] = mode  # type: ignore[assignment]
+
+    _save(commit(trip, mutate))
+    label = {"walk": "步行", "transit": "公共交通", "drive": "驾车", "default": "默认方式"}[mode]
+    return f"已把「{a.name}」→「{b.name}」设为{label}。"
+
+
+def compare_transport(from_id: str, to_id: str, transit_strategy: str = "fastest") -> dict[str, Any]:
+    """用高德同时查两点之间的步行、公交/地铁、驾车，返回各自的时间、距离，公交还有换乘次数、步行距离、
+    票价、线路和是否含地铁，并按用户的出行偏好给出建议 recommended 和理由。需要 AMAP_KEY。
+    transit_strategy：fastest / cheapest / fewest_transfers / least_walking / no_subway。
+    建议只是参考，请把对比展示给用户，由用户选定后再调用 set_leg_mode。"""
+    client = _amap()
+    if client is None:
+        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法比较出行方式。")
+    trip = _load()
+    a, b = _point(trip, from_id), _point(trip, to_id)
+    city = _load_context().get("city")
+    options: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    for m in ("walk", "transit", "drive"):
+        try:
+            options[m] = client.route(m, a.lat, a.lon, b.lat, b.lon, city, transit_strategy=transit_strategy) \
+                if m == "transit" else client.route(m, a.lat, a.lon, b.lat, b.lon, city)
+        except AmapError as e:
+            errors[m] = str(e)
+    prefs = trip.meta.transport_prefs
+    rec, reason = _recommend(options, prefs)
+    shown = {}
+    for m, r in options.items():
+        d: dict[str, Any] = {"minutes": r.minutes, "distance_km": r.distance_km}
+        if m == "transit":
+            d.update(transfers=r.transfers, walking_km=r.walking_km, cost_yuan=r.cost_yuan,
+                     lines=r.lines, uses_subway=r.uses_subway)
+        shown[m] = d
+    cur = leg_mode(trip, from_id, to_id)
+    return {"from": a.name, "to": b.name, "current_mode": cur, "options": shown, "errors": errors,
+            "recommended": rec, "reason": reason,
+            "note": "时间来自高德，是路线规划的预计值，高峰期和实际走法可能有差异。"}
+
+
+def _recommend(options: dict[str, Any], prefs) -> tuple[Optional[str], str]:
+    """按偏好给出建议（确定性规则，只是参考）。"""
+    walk, tr, drive = options.get("walk"), options.get("transit"), options.get("drive")
+    if walk and walk.minutes <= prefs.walk_max_min:
+        return "walk", f"步行约 {walk.minutes} 分钟，在你能接受的 {prefs.walk_max_min} 分钟以内"
+    if tr is not None:
+        transfers_ok = prefs.max_transfers is None or tr.transfers is None or tr.transfers <= prefs.max_transfers
+        faster_by_car = drive is not None and prefs.taxi_ok and drive.minutes * 1.6 < tr.minutes
+        if transfers_ok and not (faster_by_car and not (prefs.prefer_subway and tr.uses_subway)):
+            tail = "，含地铁" if tr.uses_subway else ""
+            return "transit", f"公共交通约 {tr.minutes} 分钟，换乘 {tr.transfers if tr.transfers is not None else '?'} 次{tail}"
+    if drive is not None and prefs.taxi_ok:
+        why = "公共交通换乘超过你的上限" if tr is not None else "没有可用的公共交通方案"
+        if tr is not None and (prefs.max_transfers is None or tr.transfers is None or tr.transfers <= prefs.max_transfers):
+            why = f"驾车约 {drive.minutes} 分钟，明显快于公共交通 {tr.minutes} 分钟"
+        return "drive", why
+    if tr is not None:
+        return "transit", "没有更合适的方式；公共交通换乘可能超出你的上限"
+    if walk:
+        return "walk", f"只有步行方案，约 {walk.minutes} 分钟，超过了你能接受的 {prefs.walk_max_min} 分钟"
+    return None, "没有查到任何路线"
 
 
 def schedule_days(keep_locked: bool = True) -> str:
@@ -586,7 +699,8 @@ def _render(trip: Trip) -> str:
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes, schedule_days, check_plan,
+    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
+    set_transport_prefs, set_leg_mode, compare_transport, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

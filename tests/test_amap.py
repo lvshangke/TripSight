@@ -102,3 +102,23 @@ def test_audit_log_records_calls_without_key(tmp_path):
     assert "/v5/place/text" in text and "兵马俑" in text and "OK" in text and "INVALID_USER_KEY" in text
     assert "SECRETKEY" not in text
     assert len(text.strip().splitlines()) == 2
+
+
+def test_transit_details_and_strategy():
+    seg = lambda name, typ: {"bus": {"buslines": [{"name": name, "type": typ}]}}
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [{
+        "duration": "2400", "distance": "9500", "walking_distance": "700", "cost": "4",
+        "segments": [seg("地铁2号线(北客站--韦曲南)", "地铁线路"), {"walking": {}}, seg("201路(A--B)", "普通公交线路")]}]}}})
+    r = c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", transit_strategy="least_walking")
+    assert (r.minutes, r.transfers, r.walking_km, r.cost_yuan) == (40, 1, 0.7, 4.0)
+    assert r.lines == ["地铁2号线", "201路"] and r.uses_subway
+    assert "strategy=3" in c.calls[0]
+    with pytest.raises(AmapError):
+        c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", transit_strategy="teleport")
+
+
+def test_transit_without_segments_is_walk_only():
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "800", "transits": [
+        {"duration": "700", "distance": "800", "segments": []}]}}})
+    r = c.route("transit", 34.26, 108.94, 34.26, 108.95, "西安")
+    assert r.transfers == 0 and r.lines == [] and not r.uses_subway

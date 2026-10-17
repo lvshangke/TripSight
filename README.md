@@ -148,8 +148,8 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 14 个工具，供 nanobot 等 Agent 通过聊天调用：
-`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `schedule_days` `check_plan`
+`tripcore/mcp_server.py` 把 tripcore 包装成 17 个工具，供 nanobot 等 Agent 通过聊天调用：
+`new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
 - 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
@@ -185,3 +185,5 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - 目前所有高德代码只用假数据测试过，还没有用真实 key 联调。
 
 景点新增 `opening_hours` / `hours_source`（营业时间及来源）和 `backups`（备选景点；预约没约上时 `check_plan` 会提示）。高德每次调用会记到 `~/.tripcore/amap_calls.log`（不含 key）。
+
+出行方式：`set_transport_prefs`（步行上限、偏好地铁、最大换乘、是否打车）、`set_leg_mode`（单段指定方式）、`compare_transport`（高德比较步行/公交/驾车并按偏好给建议）。公交结果含换乘次数、步行距离、票价、线路、是否含地铁（字段按高德文档解析，待真实 key 联调确认）。

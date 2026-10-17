@@ -40,9 +40,14 @@ def leg_key(a_id: str, a_lat: float, a_lon: float, b_id: str, b_lat: float, b_lo
     return f"{a_id}@{a_lat:.5f},{a_lon:.5f}>{b_id}@{b_lat:.5f},{b_lon:.5f}|{mode}"
 
 
+def leg_mode(trip: Trip, a_id: str, b_id: str) -> str:
+    """这一段用哪种出行方式：用户单独指定的优先，否则用行程的默认偏好。"""
+    return trip.leg_modes.get(f"{a_id}>{b_id}", trip.meta.mode)
+
+
 def _leg(trip: Trip, a_id, a_lat, a_lon, b_id, b_lat, b_lon) -> Leg:
     """优先用缓存的真实路线，没有就估算。"""
-    mode = trip.meta.mode
+    mode = leg_mode(trip, a_id, b_id)
     cached = trip.route_overrides.get(leg_key(a_id, a_lat, a_lon, b_id, b_lat, b_lon, mode))
     if cached is not None:
         return cached

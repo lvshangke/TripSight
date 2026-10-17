@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 14
+    assert len(names) == 17
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -173,7 +173,7 @@ class FakeAmap:
     def search_places(self, query, city=None, limit=5):
         return self.hits
 
-    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None):
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
         self.route_calls.append(mode)
         if self.fail_routes:
             raise AmapError("没有找到路线")
@@ -282,3 +282,79 @@ def test_unbooked_issue_lists_backups_and_removal_cleans_them():
     assert s._load().place("p5").backups == []
     msgs = [i["message"] for i in s.check_plan()["issues"] if i["code"] == "RESERVATION_NOT_BOOKED"]
     assert msgs and "还没有设置备选景点" in msgs[0]
+
+
+# ---------------- 出行方式 ----------------
+class ModeAmap(FakeAmap):
+    """按出行方式返回不同结果：走路 25 分钟，公交 14 分钟（1 次换乘，含地铁），驾车 10 分钟。"""
+
+    def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest"):
+        self.route_calls.append(mode)
+        if mode == "walk":
+            return RouteResult("walk", 1.9, 25)
+        if mode == "drive":
+            return RouteResult("drive", 5.0, 10)
+        return RouteResult("transit", 5.5, 14, transfers=1, walking_km=0.5, cost_yuan=3, lines=["地铁2号线", "21路"], uses_subway=True)
+
+
+def test_compare_transport_recommends_by_preferences(monkeypatch):
+    _setup_trip()
+    monkeypatch.setattr(s, "_amap", lambda: ModeAmap())
+    r = s.compare_transport("p1", "p2")
+    assert set(r["options"]) == {"walk", "transit", "drive"} and r["options"]["transit"]["uses_subway"]
+    assert r["recommended"] == "transit"                      # 步行 25 分钟超过默认 20 分钟
+    s.set_transport_prefs(walk_max_min=30)
+    assert s.compare_transport("p1", "p2")["recommended"] == "walk"
+    s.set_transport_prefs(walk_max_min=10, max_transfers=0)
+    assert s.compare_transport("p1", "p2")["recommended"] == "drive"      # 换乘超限，接受打车
+    s.set_transport_prefs(taxi_ok=False)
+    r = s.compare_transport("p1", "p2")
+    assert r["recommended"] == "transit" and "超出" in r["reason"]
+
+
+def test_compare_needs_key_and_known_ids(monkeypatch):
+    _setup_trip()
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    with pytest.raises(s.ToolError, match="AMAP_KEY"):
+        s.compare_transport("p1", "p2")
+    monkeypatch.setattr(s, "_amap", lambda: ModeAmap())
+    with pytest.raises(s.ToolError, match="找不到"):
+        s.compare_transport("p1", "zz")
+
+
+def test_prefs_validation_and_view():
+    s.new_trip()
+    assert "walk_max_min" in s.set_transport_prefs()
+    with pytest.raises(s.ToolError):
+        s.set_transport_prefs(walk_max_min=0)
+    s.set_transport_prefs(prefer_subway=True, notes="带老人")
+    p = s._load().meta.transport_prefs
+    assert p.prefer_subway and p.notes == "带老人"
+
+
+def test_leg_mode_changes_stats_and_refine_uses_it(monkeypatch):
+    s.new_trip(num_days=1, mode="transit")
+    s.add_place("故宫", 39.9163, 116.3972)
+    s.add_place("颐和园", 39.9999, 116.2755)          # 与故宫相距十几公里
+    s.schedule_days()
+    from tripcore.metrics import day_stats
+    t = s._load()
+    ids = [it.place_id for it in t.plan.days[0].items]
+    a, b = ids[0], ids[1]
+    before = day_stats(t, t.plan.days[0]).legs[0]
+    assert before.mode == "transit"
+    s.set_leg_mode(a, b, "drive")
+    t2 = s._load()
+    after = day_stats(t2, t2.plan.days[0]).legs[0]
+    assert t2.leg_modes[f"{a}>{b}"] == "drive" and after.mode == "drive" and after.minutes != before.minutes
+    fake = ModeAmap()
+    monkeypatch.setattr(s, "_amap", lambda: fake)
+    s.refine_routes()
+    assert fake.route_calls == ["drive"]                 # 按这一段单独指定的方式查询
+    assert day_stats(s._load(), s._load().plan.days[0]).legs[0].detail_level == "route"
+    s.set_leg_mode(a, b, "default")
+    assert f"{a}>{b}" not in s._load().leg_modes
+    with pytest.raises(s.ToolError):
+        s.set_leg_mode(a, b, "bike")
+    with pytest.raises(s.ToolError, match="找不到"):
+        s.set_leg_mode(a, "zz", "walk")

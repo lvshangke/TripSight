@@ -152,6 +152,16 @@ class Plan(BaseModel):
 # 旅行本身
 # ---------------------------------------------------------------------------
 
+class TransportPrefs(BaseModel):
+    """出行偏好：用来在“步行 / 公交地铁 / 打车”之间给出建议（最终由用户选择）。"""
+
+    walk_max_min: int = Field(default=20, ge=1, le=120, description="单段步行能接受的最长分钟数")
+    prefer_subway: bool = Field(default=False, description="更愿意坐地铁")
+    max_transfers: Optional[int] = Field(default=None, ge=0, le=5, description="公交/地铁最多换乘几次；不填不限")
+    taxi_ok: bool = Field(default=True, description="是否接受打车")
+    notes: str = Field(default="", description="其他说明，如带老人/小孩、行李多")
+
+
 class TripMeta(BaseModel):
     name: str = "我的旅行"
     date_mode: DateMode = DateMode.UNKNOWN
@@ -164,6 +174,7 @@ class TripMeta(BaseModel):
     mode: TravelMode = "transit"
     budget_total: Optional[float] = Field(default=None, ge=0)
     currency: str = "CNY"
+    transport_prefs: TransportPrefs = Field(default_factory=TransportPrefs)
 
     @model_validator(mode="after")
     def _derive(self) -> "TripMeta":
@@ -184,6 +195,10 @@ class Trip(BaseModel):
     chosen_lodging_id: Optional[str] = None
     plan: Optional[Plan] = None
     revision: int = Field(default=0, description="版本号：每次改动 +1，用来防止过期的提案被误用")
+    leg_modes: dict[str, TravelMode] = Field(
+        default_factory=dict,
+        description="单段出行方式：键是“起点id>终点id”，没有的段用 meta.mode",
+    )
     route_overrides: dict[str, Leg] = Field(
         default_factory=dict,
         description="真实路线缓存（来自地图服务）。键见 metrics.leg_key；坐标变了键就变，旧缓存自动失效",
