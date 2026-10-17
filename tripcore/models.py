@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Literal, Optional
 
@@ -104,6 +104,29 @@ class Meal(BaseModel):
     distance_m: Optional[int] = Field(default=None, description="离挂靠景点的直线距离（米）")
     amap_id: str = ""
     source: str = "amap"
+
+
+class Connection(BaseModel):
+    """大交通（到达或离开本次旅行目的地的航班/火车等）。决定第一天和最后一天能玩多久。
+    信息必须来自用户或查询工具，价格要写来源和日期。"""
+
+    kind: Literal["flight", "train", "other"] = "flight"
+    number: str = Field(default="", description="航班号/车次")
+    from_name: str
+    to_name: str
+    dep_time: datetime
+    arr_time: datetime
+    price_per_person: Optional[float] = Field(default=None, ge=0, description="每人价格（元），参考价")
+    price_source: str = ""
+    price_date: str = ""
+    booked: bool = Field(default=False, description="用户是否已经订好（只能由用户告知）")
+    note: str = ""
+
+    @model_validator(mode="after")
+    def _check_times(self) -> "Connection":
+        if self.arr_time <= self.dep_time:
+            raise ValueError("到达时间必须晚于出发时间")
+        return self
 
 
 class Lodging(BaseModel):
@@ -221,6 +244,8 @@ class Trip(BaseModel):
     plan: Optional[Plan] = None
     revision: int = Field(default=0, description="版本号：每次改动 +1，用来防止过期的提案被误用")
     meals: list[Meal] = Field(default_factory=list, description="用户选定的用餐点")
+    arrival: Optional[Connection] = Field(default=None, description="到达目的地的大交通")
+    departure: Optional[Connection] = Field(default=None, description="离开目的地的大交通")
     leg_modes: dict[str, TravelMode] = Field(
         default_factory=dict,
         description="单段出行方式：键是“起点id>终点id”，没有的段用 meta.mode",

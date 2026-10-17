@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from .connections import arrival_day, day_window, departure_day
 from .metrics import PACE_LIMITS, day_stats, estimate_cost
 from .models import Trip
 
@@ -66,6 +67,18 @@ def validate(trip: Trip) -> list[Issue]:
                 )
             )
 
+        w_start, w_end, w_why = day_window(trip, day.index)
+        if w_why and st.total_min > (w_end - w_start):
+            issues.append(
+                Issue(
+                    "CONNECTION_WINDOW_TOO_SMALL",
+                    "warning",
+                    f"{label}（{'；'.join(w_why)}）只有约 {w_end - w_start} 分钟可玩，"
+                    f"但安排了游览 {st.visit_min} 分钟 + 交通 {st.travel_min} 分钟，需要减少或挪到别的天。",
+                    day.index,
+                )
+            )
+
         for leg in st.legs:
             if leg.minutes > LONG_LEG_MIN:
                 a, b = trip.place(leg.from_id), trip.place(leg.to_id)
@@ -118,6 +131,12 @@ def validate(trip: Trip) -> list[Issue]:
                         p.id,
                     )
                 )
+
+    for which, c, idx in (("到达", trip.arrival, arrival_day(trip)), ("离开", trip.departure, departure_day(trip))):
+        if c is not None and idx is None:
+            issues.append(Issue("CONNECTION_DATE_MISMATCH", "warning",
+                                f"{which}的大交通（{c.number or c.kind}，{c.dep_time:%Y-%m-%d %H:%M}→{c.arr_time:%Y-%m-%d %H:%M}）"
+                                f"不在行程的日期范围内，请核对日期。"))
 
     for u in trip.plan.unscheduled:
         name = trip.place(u.place_id).name

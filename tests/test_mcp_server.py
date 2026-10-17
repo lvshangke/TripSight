@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 28
+    assert len(names) == 30
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -738,3 +738,60 @@ def test_create_amap_map_needs_key(monkeypatch):
     monkeypatch.delenv("AMAP_KEY", raising=False)
     with pytest.raises(s.ToolError, match="AMAP_KEY"):
         s.create_amap_map()
+
+
+def _arrival_trip(arr="2026-10-19 14:00", dep="2026-10-21 18:00"):
+    s.new_trip(start_date="2026-10-19", end_date="2026-10-21", city="北京", name="北京行", travelers=2)
+    for name, lat, lon in [("故宫", 39.9163, 116.3972), ("天坛", 39.8822, 116.4066), ("颐和园", 39.9999, 116.2755),
+                           ("鸟巢", 39.9928, 116.3965), ("国博", 39.9050, 116.4010), ("景山", 39.9254, 116.3970)]:
+        s.add_place(name, lat, lon, duration_min=150)
+    s.add_lodging("酒店A", 39.9100, 116.4000, choose=True)
+    s.schedule_days()
+    s.set_connection("arrival", "flight", "上海", "北京", "2026-10-19 10:30", arr, number="CA1883",
+                     price_per_person=800, price_source="flyai", price_date="2026-10-17")
+    s.set_connection("departure", "flight", "北京", "上海", dep, "2026-10-21 20:10", number="CA1884")
+
+
+def test_connections_shrink_first_and_last_day_and_warn():
+    _arrival_trip()
+    from tripcore.connections import day_window
+    t = s._load()
+    assert day_window(t, 0)[0] == 15 * 60 + 30            # 14:00 到 + 90 分钟 = 15:30 才能开始
+    assert day_window(t, 2)[1] == 15 * 60                 # 18:00 飞，提前 180 分钟 = 15:00 就要走
+    out = s.check_plan()
+    codes = [i["code"] for i in out["issues"]]
+    assert "CONNECTION_WINDOW_TOO_SMALL" in codes
+    shown = s.show_trip()
+    assert "到达：CA1883" in shown and "离开：CA1884" in shown and "可玩约" in shown and "大交通" in shown
+    assert "800 元/人（flyai 2026-10-17，参考价）" in shown
+
+
+def test_connection_date_mismatch_and_validation():
+    _arrival_trip()
+    s.set_connection("departure", "train", "北京", "上海", "2026-11-30 09:00", "2026-11-30 14:00", number="G1")
+    assert "CONNECTION_DATE_MISMATCH" in [i["code"] for i in s.check_plan()["issues"]]
+    with pytest.raises(s.ToolError, match="来源"):
+        s.set_connection("arrival", "flight", "上海", "北京", "2026-10-19 10:00", "2026-10-19 12:00", price_per_person=500)
+    with pytest.raises(s.ToolError):
+        s.set_connection("arrival", "flight", "上海", "北京", "2026-10-19 12:00", "2026-10-19 10:00")   # 到达早于出发
+    with pytest.raises(s.ToolError):
+        s.set_connection("arrival", "flight", "上海", "北京", "明天下午", "2026-10-19 12:00")
+    with pytest.raises(s.ToolError):
+        s.set_connection("somewhere", "flight", "a", "b", "2026-10-19 10:00", "2026-10-19 12:00")
+    s.clear_connection("departure")
+    assert s._load().departure is None
+    s.undo()
+    assert s._load().departure is not None
+    with pytest.raises(s.ToolError):
+        s.clear_connection("arrival") if s._load().arrival is None else s.clear_connection("nothing")
+
+
+def test_map_timeline_starts_after_arrival_and_flags_overrun():
+    _arrival_trip()
+    from tripcore.mapview import build_map_data
+    d = build_map_data(s._load())["days"]
+    first = d[0]["timeline"]
+    assert first[0]["type"] == "conn" and "14:00 到达" in first[0]["text"]
+    hotel = [e for e in first if e["type"] == "hotel"][0]
+    assert hotel["time"] >= "15:30"
+    assert any(e["type"] == "conn" and "⚠" in e["text"] for e in d[2]["timeline"] + first)

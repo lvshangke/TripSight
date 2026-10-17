@@ -30,7 +30,8 @@ from .gpx import build_gpx
 from .mapview import build_map_html
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
-from .models import DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
+from .connections import day_window, leave_by, ready_time
+from .models import Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -862,6 +863,64 @@ def export_gpx(day: Optional[int] = None) -> str:
     return "已导出 GPX（坐标为标准 WGS84）：\n" + "\n".join(written)
 
 
+def _parse_dt(text: str, label: str):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(text.strip().replace("/", "-").replace(" ", "T"))
+    except ValueError:
+        raise ToolError(f"{label} 格式不对，请用 2026-10-19 14:30 这样的写法。")
+
+
+def set_connection(
+    which: str,
+    kind: str,
+    from_name: str,
+    to_name: str,
+    dep_time: str,
+    arr_time: str,
+    number: str = "",
+    price_per_person: Optional[float] = None,
+    price_source: str = "",
+    price_date: str = "",
+    booked: bool = False,
+    note: str = "",
+) -> str:
+    """记录到达或离开目的地的大交通（航班/火车）。which：arrival（到达）/ departure（离开）；
+    kind：flight / train / other；时间写成 2026-10-19 14:30（当地时间）。
+    所有字段必须来自用户选定的方案或查询工具的原始结果，逐字照抄，不要估算或编造；
+    价格（每人）必须同时写来源 price_source（如 flyai / user）和日期 price_date，否则不要填。
+    booked 只有用户明确说已经订好才能填 True。工具会据此缩短第一天/最后一天可玩的时间，并在 check_plan 里提醒。"""
+    if which not in ("arrival", "departure"):
+        raise ToolError("which 只能是 arrival 或 departure")
+    if price_per_person is not None and not (price_source and price_date):
+        raise ToolError("填价格必须同时填 price_source 和 price_date；没有来源就不要填价格。")
+    trip = _load()
+    try:
+        conn = Connection(kind=kind, number=number, from_name=from_name, to_name=to_name,  # type: ignore[arg-type]
+                          dep_time=_parse_dt(dep_time, "dep_time"), arr_time=_parse_dt(arr_time, "arr_time"),
+                          price_per_person=price_per_person, price_source=price_source, price_date=price_date,
+                          booked=booked, note=note)
+    except (ValidationError, ValueError) as e:
+        raise ToolError(f"参数不合法：{e}")
+    _save(commit(trip, lambda t: setattr(t, which, conn)))
+    if which == "arrival":
+        r = ready_time(conn)
+        return f"已记录到达：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.arr_time:%m-%d %H:%M} 到，约 {r:%H:%M} 后才能开始游玩。"
+    lv = leave_by(conn)
+    return f"已记录离开：{conn.number or conn.kind} {conn.from_name}→{conn.to_name}，{conn.dep_time:%m-%d %H:%M} 出发，最晚 {lv:%H:%M} 就要动身。"
+
+
+def clear_connection(which: str) -> str:
+    """删除已记录的到达或离开大交通（which：arrival / departure），可用 undo 撤销。"""
+    if which not in ("arrival", "departure"):
+        raise ToolError("which 只能是 arrival 或 departure")
+    trip = _load()
+    if getattr(trip, which) is None:
+        raise ToolError("没有这条记录。")
+    _save(commit(trip, lambda t: setattr(t, which, None)))
+    return "已删除。"
+
+
 def set_travelers(n: int) -> str:
     """设置出行人数（门票、餐饮按人数估算）。"""
     if not (1 <= n <= 50):
@@ -1185,6 +1244,11 @@ def _render(trip: Trip) -> str:
     out = [f"【{m.name}】{m.num_days} 天，节奏 {m.pace.value}，交通偏好 {_MODE_NAMES[m.mode]}，版本 {trip.revision}"]
     if trip.chosen_lodging:
         out.append(f"住宿：{trip.chosen_lodging.name}")
+    for label, c in (("到达", trip.arrival), ("离开", trip.departure)):
+        if c is not None:
+            price = f"，约 {c.price_per_person:g} 元/人（{c.price_source} {c.price_date}，参考价）" if c.price_per_person is not None else ""
+            out.append(f"{label}：{c.number or c.kind} {c.from_name}→{c.to_name} {c.dep_time:%m-%d %H:%M}→{c.arr_time:%m-%d %H:%M}"
+                       f"{'（已订）' if c.booked else '（未订）'}{price}")
     if trip.plan is None:
         if trip.places:
             out.append("还没有分天。景点：" + "、".join(f"{p.name}({p.id})" for p in trip.places))
@@ -1196,6 +1260,9 @@ def _render(trip: Trip) -> str:
         d = trip.day_date(day.index)
         date_txt = f" {d.isoformat()}（{_WEEKDAYS[d.weekday()]}）" if d else ""
         out.append(f"第{day.index + 1}天{date_txt}：游览 {st.visit_min} 分钟 + 交通约 {st.travel_min} 分钟")
+        _ws, _we, _why = day_window(trip, day.index)
+        if _why:
+            out.append(f"  ⏱ {'；'.join(_why)}，可玩约 {_we - _ws} 分钟")
         if not st.places:
             out.append("  （空）")
             continue
@@ -1225,10 +1292,11 @@ def _render(trip: Trip) -> str:
     if costs:
         out.append(f"餐饮（已选 {len(trip.meals)} 处）人均参考合计 {sum(costs):.0f} 元/人")
     out.append(f"粗略费用（仅门票+住宿，门票按 1 人计）：{c.total:.0f} {m.currency}")
-    if n > 1 or costs:
+    if n > 1 or costs or trip.arrival or trip.departure:
         food = sum(costs) * n
-        total = c.tickets * n + food + c.lodging
-        out.append(f"按 {n} 人估算：门票 {c.tickets * n:.0f} + 已选餐厅 {food:.0f} + 住宿 {c.lodging:.0f}（按整间/整晚价，未乘人数）"
+        fare = sum(x.price_per_person for x in (trip.arrival, trip.departure) if x and x.price_per_person is not None) * n
+        total = c.tickets * n + food + c.lodging + fare
+        out.append(f"按 {n} 人估算：门票 {c.tickets * n:.0f} + 已选餐厅 {food:.0f} + 大交通 {fare:.0f} + 住宿 {c.lodging:.0f}（按整间/整晚价，未乘人数）"
                    f" = 约 {total:.0f} {m.currency}（未含交通和未选的餐食，均为参考值）")
     return "\n".join(out)
 
@@ -1239,7 +1307,7 @@ def _render(trip: Trip) -> str:
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     suggest_lodging, propose_change, apply_proposal, undo, show_trip,
 ]
 

@@ -213,3 +213,10 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 `create_amap_map(day, per_day)`：tripcore 用 `AMAP_KEY` 直接请求高德官方 MCP（`https://mcp.amap.com/mcp`，streamable HTTP，需要 `mcp>=1.8`）的 `maps_schema_personal_map`，返回高德 App 的唤起链接（`amapuri://…`，要在装了高德的手机上打开）。参数由 `personal_map_payload` 生成：`orgName`、`lineList[{title, pointInfoList[{name, lon, lat, poiId}]}]`，每天一条行程，酒店→景点（用餐点挂在景点后）→酒店；`poiId` 由代码按名称+距离（景点 1.5 km、酒店 1 km 内）在高德里匹配并存下来，匹配不上的点跳过并列出；坐标转成高德坐标系。整个过程不经过模型，请求记在 `amap_calls.log`（不含 key）。默认 `per_day=True`：每天一个链接（实测高德 App 的专属地图一次只显示 `lineList` 里的第一条行程）；`per_day=False` 才合成一张。
 测试时可用环境变量 `AMAP_MCP_URL` 指向本地假服务。
+
+## 到达与离开（`set_connection` / `clear_connection`）
+
+`Trip.arrival` / `Trip.departure`：到达、离开目的地的航班/火车（班次、出发和到达时间、每人参考价及来源日期、是否已订）。确定性规则：到达后飞机 90 分钟、火车 45 分钟才能开始玩；离开前飞机提前 180 分钟、火车提前 60 分钟出发；每天默认 9:00–21:00。第一天/最后一天的可玩时间据此缩短：`check_plan` 报 `CONNECTION_WINDOW_TOO_SMALL`（装不下）和 `CONNECTION_DATE_MISMATCH`（日期不在行程内）；`show_trip` 和地图时间线显示可玩时段，地图第一天从到达后的时间开始；大交通价格 × 人数计入“按 N 人估算”。排程算法本身不变，调整由提案走确认。
+
+查询机票/火车票/酒店价格使用飞猪 `flyai` 命令行，技能 `flyai-search` 限制为只读（只用 `search-flight`/`search-train`/`search-hotel`，不预订，不安装，不配置 key，价格标来源和日期；酒店坐标一律由高德查，不用 FlyAI 的）。
+

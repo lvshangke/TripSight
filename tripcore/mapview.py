@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .coords import wgs84_to_gcj02
+from .connections import day_window, leave_by
 from .metrics import day_stats
 from .models import Trip
 
@@ -77,7 +78,10 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             st = day_stats(trip, day)
             d = trip.day_date(day.index)
             timeline: list[dict[str, Any]] = []
-            t = float(DAY_START_MIN)
+            w_start, w_end, w_why = day_window(trip, day.index)
+            t = float(w_start)
+            if w_why:
+                timeline.append({"type": "conn", "text": "；".join(w_why)})
             if lodging and st.places:
                 timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
                 if st.lodging_out:
@@ -109,6 +113,8 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     timeline.append(_leg_entry(st.lodging_back, st.places[-1].name, st.places[-1], lodging.name, lodging))
                     t += st.lodging_back.minutes
                 timeline.append({"type": "hotel", "role": "返回", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
+            if w_why and t > w_end:
+                timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）
             marks = [e for e in timeline if e["type"] in ("stop", "meal")]
             hotel_pos = [_gcj(lodging.lat, lodging.lon)] if lodging and st.places else []
