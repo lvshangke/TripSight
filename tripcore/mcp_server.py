@@ -1357,7 +1357,7 @@ def _render(trip: Trip) -> str:
     for ml in orphan:
         out.append(f"🍜 第{ml.day + 1}天用餐点（⚠ 挂靠的景点已不在这一天）：{_meal_text(ml)}")
     if trip.plan.unscheduled:
-        out.append("未安排：" + "；".join(f"{trip.place(u.place_id).name}：{u.reason}" for u in trip.plan.unscheduled))
+        out.append("未安排：" + "；".join(f"{trip.place(u.place_id).name}({u.place_id})：{u.reason}" for u in trip.plan.unscheduled))
     c = estimate_cost(trip)
     costs = [ml.cost_per_person for ml in trip.meals if ml.cost_per_person is not None]
     n = m.travelers
@@ -1498,7 +1498,7 @@ def adopt_candidates(ids: list[str]) -> str:
                         notes=f"{clue}游记原话：{c['quote']}")
         pid = msg.split("id=")[1].split(")")[0]
         c["status"], c["place_id"] = "added", pid
-        lines.append(f"· {c['name']}：已加入（{pick['name']}，{pid}）")
+        lines.append(f"· {c['name']}：已加入（地图点：{pick['name']}，{pick.get('address') or ''}；{pid}）")
     _save_cands(items)
     return "\n".join(lines) + "\n请再调用 schedule_days 重新分天（门票、时长、营业时间仍待核实，可用 fill_hours 补营业时间）。"
 
@@ -1568,7 +1568,9 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
         _save_cands(items)
     overlap = [p.name for p in trip.places if any(haversine_km(p.lat, p.lon, w.lat, w.lon) < 0.3 for w in wps)]
     warn = f"\n注意：途经点离已有景点「{'、'.join(overlap)}」不到 300 米，可能重复，请和用户确认是否保留。" if overlap else ""
-    return (f"已添加路线型景点「{name}」(id={pid})：{len(wps)} 个途经点，步行约 {walk} 分钟，估算总时长 {duration} 分钟"
+    listing = "；".join(f"{k + 1}.{w.name}（{pk.get('address') or pk.get('district') or ''}，{pk.get('category') or '类别未知'}）"
+                      for k, (w, (_n, pk, _c)) in enumerate(zip(wps, resolved)))
+    return (f"已添加路线型景点「{name}」(id={pid})，地图上匹配到的点：{listing}。请把这些点展示给用户核对。\n{len(wps)} 个途经点，步行约 {walk} 分钟，估算总时长 {duration} 分钟"
             f"（{'步行路线来自高德' if all(w.next_real for w in wps[:-1]) else '部分路段为直线估算'}）。请再 schedule_days。{warn}")
 
 # ---------------------------------------------------------------------------

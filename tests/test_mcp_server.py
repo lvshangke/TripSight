@@ -1046,3 +1046,31 @@ def test_route_place_warns_when_overlapping_existing(monkeypatch):
     s.add_place("西安城墙", 34.2582, 108.9402)
     monkeypatch.setattr(s, "_amap", lambda: WalkAmap())
     assert "可能重复" in s.add_route_place("Citywalk", ["书院门", "永宁门"])
+
+
+def test_pick_hit_rejects_restaurants_and_stations_with_longer_names():
+    from tripcore.candidates import pick_hit
+    rest = {"name": "建国门老菜场老马家牛羊肉店", "lat": 34.2546, "lon": 108.9641, "category": "餐饮服务;中餐厅"}
+    street = {"name": "老菜场", "lat": 34.2540, "lon": 108.9650, "category": "风景名胜;公园广场"}
+    assert pick_hit("老菜场", [rest, street])[0] == street
+    got, why = pick_hit("老菜场", [rest])
+    assert got is None and "不相关" in why
+    metro = {"name": "永宁门(地铁站)", "lat": 34.2580, "lon": 108.9400, "category": "交通设施服务;地铁站"}
+    gate = {"name": "永宁门", "lat": 34.2582, "lon": 108.9402, "category": "风景名胜;旅游景点"}
+    assert pick_hit("永宁门", [metro, gate])[0] == gate
+    assert pick_hit("永宁门", [metro])[0] is None
+    alley = {"name": "德福巷酒吧街", "lat": 34.2640, "lon": 108.9420, "category": "购物服务;特色商业街"}
+    assert pick_hit("德福巷", [alley])[0] == alley                       # 只多几个字、类别正常：接受
+    far = [{"name": "顺城巷", "lat": 34.25, "lon": 108.94, "category": "地名地址信息"}, {"name": "顺城巷", "lat": 34.30, "lon": 109.05, "category": "地名地址信息"}]
+    assert pick_hit("顺城巷", far)[0] is None
+
+
+def test_show_trip_lists_ids_of_unscheduled_places():
+    s.new_trip(start_date="2026-10-30", end_date="2026-10-30", city="西安", name="一日")
+    for i, (n, lat, lon) in enumerate([("A", 34.26, 108.94), ("B", 34.27, 108.95), ("C", 34.28, 108.96), ("D", 34.29, 108.97)]):
+        s.add_place(n, lat, lon, duration_min=240, priority=1)
+    s.schedule_days()
+    out = s.show_trip()
+    if "未安排：" in out:
+        import re
+        assert re.search(r"未安排：.*\(p\d+\)", out)
