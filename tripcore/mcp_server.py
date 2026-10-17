@@ -110,7 +110,7 @@ def _save_context(data: dict) -> None:
 
 def _amap() -> Optional[AmapClient]:
     """有 AMAP_KEY 才启用高德；测试里会替换这个函数。"""
-    return AmapClient.from_env()
+    return AmapClient.from_env(log_path=trip_path().with_name("amap_calls.log"))
 
 
 def _next_id(prefix: str, existing: list[str]) -> str:

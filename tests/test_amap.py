@@ -89,3 +89,16 @@ def test_geocode():
     assert c.geocode("哈尔滨") == pytest.approx((45.7576, 126.6424), abs=1e-5)
     c2 = client({"/v3/geocode/geo": {"status": "1", "geocodes": []}})
     assert c2.geocode("不存在") is None
+
+
+def test_audit_log_records_calls_without_key(tmp_path):
+    log = tmp_path / "amap_calls.log"
+    c = AmapClient("SECRETKEY", log_path=log, opener=lambda url: {"status": "1", "pois": []})
+    c.search_places("兵马俑", "西安")
+    c2 = AmapClient("SECRETKEY", log_path=log, opener=lambda url: {"status": "0", "info": "INVALID_USER_KEY"})
+    with pytest.raises(AmapError):
+        c2.search_places("x")
+    text = log.read_text(encoding="utf-8")
+    assert "/v5/place/text" in text and "兵马俑" in text and "OK" in text and "INVALID_USER_KEY" in text
+    assert "SECRETKEY" not in text
+    assert len(text.strip().splitlines()) == 2

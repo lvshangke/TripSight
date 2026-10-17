@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime
+from pathlib import Path
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
@@ -63,18 +65,32 @@ def _text(v: Any) -> str:
 
 
 class AmapClient:
-    def __init__(self, key: str, timeout: int = 15, opener: Optional[Callable[[str], dict]] = None):
+    def __init__(self, key: str, timeout: int = 15, opener: Optional[Callable[[str], dict]] = None,
+                 log_path: Optional[Path] = None):
         if not key:
             raise AmapError("没有高德 key")
         self._key = key
+        self._log_path = log_path
         self._timeout = timeout
         self._opener = opener          # 测试时注入假的网络层
         self._last = 0.0
 
     @classmethod
-    def from_env(cls) -> Optional["AmapClient"]:
+    def from_env(cls, log_path: Optional[Path] = None) -> Optional["AmapClient"]:
         key = os.environ.get("AMAP_KEY", "").strip()
-        return cls(key) if key else None
+        return cls(key, log_path=log_path) if key else None
+
+    def _audit(self, path: str, params: dict[str, Any], outcome: str) -> None:
+        """每次请求记一行（时间、接口、参数、结果），方便确认确实调用了高德。不含 key。"""
+        if self._log_path is None:
+            return
+        try:
+            self._log_path.parent.mkdir(parents=True, exist_ok=True)
+            shown = {k: v for k, v in params.items() if k not in ("key", "show_fields")}
+            with self._log_path.open("a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat(timespec='seconds')} | {path} | {shown} | {outcome}\n")
+        except OSError:
+            pass
 
     # ---- 底层请求 ----
     def _get(self, path: str, params: dict[str, Any]) -> dict:
@@ -92,12 +108,15 @@ class AmapClient:
                     with urllib.request.urlopen(url, timeout=self._timeout) as resp:
                         data = json.loads(resp.read().decode("utf-8"))
             except Exception as e:
+                self._audit(path, params, f"网络失败 {type(e).__name__}")
                 raise AmapError(f"高德请求失败：{type(e).__name__}") from None   # 不带 URL，避免把 key 打进日志
             finally:
                 self._last = time.monotonic()
             if str(data.get("status")) == "1":
+                self._audit(path, params, "OK")
                 return data
             info = str(data.get("info", ""))
+            self._audit(path, params, f"错误 {info}")
             if info in _RETRY_CODES and attempt < 2:
                 time.sleep(1.0)
                 continue
