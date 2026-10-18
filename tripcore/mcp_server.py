@@ -36,6 +36,7 @@ from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
 from . import workspace as _ws
+from . import review as _rv
 from .textview import build_text as _build_text, guard_text as _guard_text
 from .checklist import build_checklist as _build_checklist, render as _render_checklist
 from .metrics import intercity_hint
@@ -1138,6 +1139,73 @@ def clear_connection(which: str) -> str:
     return "已删除。"
 
 
+def _review_path() -> Path:
+    return trip_path().with_name("review.json")
+
+
+def _find_place_ref(trip: Trip, ref: str):
+    q = (ref or "").strip()
+    for p in trip.places:
+        if q in (p.id, p.name):
+            return p
+    hit = [p for p in trip.places if q and q in p.name]
+    if len(hit) == 1:
+        return hit[0]
+    raise ToolError(f"找不到景点「{ref}」。" if not hit else "匹配到多个景点：" + "、".join(p.name for p in hit) + "，请说得更具体。")
+
+
+def record_review(place: str, status: str, rating: Optional[int] = None, note: str = "") -> str:
+    """旅行结束后，记录某个景点的实际情况（只记用户说的，不要替用户编）。place：景点名或 id；
+    status：去了 / 没去 / 临时改了；rating 可选 1~5 分；note 可选一句话备注（如“排队太久”“走得累”）。
+    同一景点再次记录会覆盖上一次。不会改行程本身。"""
+    trip = _load()
+    p = _find_place_ref(trip, place)
+    data = _rv.load(_review_path())
+    try:
+        _rv.record_place(data, p.id, status, rating, note)
+    except ValueError as e:
+        raise ToolError(f"没有记下：{e}")
+    _rv.save(_review_path(), data)
+    return f"已记下「{p.name}」：{_rv.STATUS_NAMES[data['places'][p.id]['status']]}。"
+
+
+def record_actual_cost(category: str, amount: float, note: str = "") -> str:
+    """记录一笔实际花费（元）。category：门票 / 餐饮 / 交通 / 住宿 / 其他；同一类别多次记录会累加。
+    只记用户说的金额，不要估算。"""
+    _load()
+    data = _rv.load(_review_path())
+    try:
+        total = _rv.record_cost(data, category, amount, note)
+    except ValueError as e:
+        raise ToolError(f"没有记下：{e}")
+    _rv.save(_review_path(), data)
+    cat = _rv.COST_NAMES[_rv.COST_ALIASES[category.strip()]]
+    return f"已记下{cat} {amount:g} 元，{cat}累计 {total:g} 元。"
+
+
+def show_review() -> str:
+    """只读：回顾报告（计划 vs 实际：景点去了几个、各类花费偏差、评分备注），并按固定规则给出可写入长期偏好的建议。
+    没记录的项目显示“未记录”。建议只是展示：用户明确说“记下来”后，才用 remember_preference 写入。"""
+    trip = _load()
+    data = _rv.load(_review_path())
+    planned_ids: list[str] = []
+    if trip.plan:
+        for day in trip.plan.days:
+            for it in day.items:
+                if it.place_id not in planned_ids:
+                    planned_ids.append(it.place_id)
+    est = estimate_cost(trip)
+    planned = {"tickets": est.tickets, "lodging": est.lodging}
+    names = {p.id: p.name for p in trip.places}
+    text = _rv.report(data, names, planned_ids, planned, est.nights)
+    sug = _rv.suggestions(data, planned_ids, est.lodging, est.nights)
+    if sug:
+        text += "\n\n偏好建议（还没写入，你说“记下来”我再记）：\n" + "\n".join(f"  {i}. {s['text']}" for i, s in enumerate(sug, 1))
+    else:
+        text += "\n\n暂时没有偏好建议。"
+    return text
+
+
 def set_travelers(n: int) -> str:
     """设置出行人数（门票、餐饮按人数估算）。"""
     if not (1 <= n <= 50):
@@ -1942,7 +2010,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    list_trips, switch_trip, archive_trip, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 
