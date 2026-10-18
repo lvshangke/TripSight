@@ -49,6 +49,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #ap .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center}
 .dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
 .is{font-size:12px;margin-top:2px;color:#b45309;line-height:1.45}.is.error{color:#b91c1c;font-weight:600}
+.lk{margin-top:3px;font-size:12px;color:#888}.lk a{color:#1a6fe8;text-decoration:none;margin-left:6px}.lk a:hover{text-decoration:underline}
 .mealgap{padding:4px 12px;background:#f3f8ee;border-bottom:1px solid #dfe9d4;font-size:12.5px;color:#456}.mealgap button{margin-left:6px;font-size:12px;padding:1px 8px;border-radius:12px}
 .dayiss{padding:5px 12px;background:#fff8ed;border-bottom:1px solid #f1e3cd}
 .editonly{display:none}
@@ -272,6 +273,10 @@ function drawMap(di) {
 }
 // ---- 列表：一行 = 酒店/景点/通勤/用餐/航班车次 ----
 function lockedOf(pid) { for (const d of S.days) for (const it of d.items) if (it.place_id === pid) return it.locked; return false; }
+const linkHtml = (kw, kind, label) => {
+  const city = S.city || '', q0 = [city && kw.indexOf(city) < 0 ? city : '', kw].filter(Boolean).join(' '), suf = kind === 'food' ? '美食' : '攻略', q = q0.indexOf(suf) < 0 ? q0 + ' ' + suf : q0;
+  return '<span class="lk">' + label + (S.link_sites || []).filter(x => x.kinds.indexOf(kind) >= 0 && x.id !== 'google').map(x => '<a href="' + esc(x.tpl.replace('{q}', encodeURIComponent(q))) + '" target="_blank" rel="noopener noreferrer">' + esc(x.name) + '</a>').join('') + '</span>';
+};
 const issueHtml = arr => arr.map(x => '<div class="is ' + x.sev + '">' + (x.sev === 'error' ? '⛔ ' : '⚠ ') + esc(x.text) + '</div>').join('');
 function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   const row = document.createElement('div'), mk = ctx && ctx.m[idx], pl = ctx && ctx.l[idx];
@@ -291,6 +296,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   else {
     row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + (edit ? '<input class="dur" type="number" min="10" max="720" step="15" value="' + e.stay + '"> ' : e.stay + ' ') + '分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
     const pi = S.issues.places[e.pid]; if (pi) row.querySelector('.sub').insertAdjacentHTML('beforeend', issueHtml(pi));
+    row.querySelector('.sub').insertAdjacentHTML('beforeend', '<div>' + linkHtml(e.name, 'guide', '看攻略：') + '</div>');
     if (edit) {
       wireDur(row, e.pid, e.stay);
       row.dataset.pid = e.pid; row.draggable = true;
@@ -313,7 +319,7 @@ function renderList() {
     if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = '<span class="dot" style="background:' + d.color + '"></span>' + esc(d.label); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
     if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; box.appendChild(w); }
     const dayI = S.issues.days[String(d.index)]; if (dayI) { const w2 = document.createElement('div'); w2.className = 'dayiss'; w2.innerHTML = issueHtml(dayI); box.appendChild(w2); }
-    const mg = (S.meal_gaps || {})[String(d.index)]; if (mg) { const w3 = document.createElement('div'); w3.className = 'mealgap'; w3.innerHTML = '🍜 还没安排' + mg.join('、') + ' ' + mg.map(m => '<button data-m="' + m + '">找' + m + '</button>').join(''); w3.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); $('chat').classList.remove('hide'); syncSp2(); fit(); $('ctext').value = '帮我在第' + (d.index + 1) + '天的景点附近找' + b.dataset.m + '，给我几家对比；我选定后请直接加进行程。'; $('ctext').focus(); }); box.appendChild(w3); }
+    const mg = (S.meal_gaps || {})[String(d.index)]; if (mg) { const w3 = document.createElement('div'); w3.className = 'mealgap'; w3.innerHTML = '🍜 还没安排' + mg.join('、') + ' ' + mg.map(m => '<button data-m="' + m + '">找' + m + '</button>').join('') + linkHtml('', 'food', ' 看点评：'); w3.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); $('chat').classList.remove('hide'); syncSp2(); fit(); $('ctext').value = '帮我在第' + (d.index + 1) + '天的景点附近找' + b.dataset.m + '，给我几家对比；我选定后请直接加进行程。'; $('ctext').focus(); }); box.appendChild(w3); }
     const nStops = d.timeline.filter(e => e.type === 'stop').length; let si = 0;
     d.timeline.forEach((e, idx) => box.appendChild(rowEl(d, e, idx, di, di === selDay ? ctx : null, e.type === 'stop' ? si++ : 0, nStops)));
     if (edit && !nStops) box.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');

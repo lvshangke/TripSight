@@ -11,8 +11,8 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-362%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-51-8A2BE2)
+![Tests](https://img.shields.io/badge/tests-368%20passing-brightgreen)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
 <img src="docs/images/workbench-list.png" alt="TripSight 工作台行程列表（示例数据）" width="360">
 
@@ -29,12 +29,12 @@
 TripSight 把这两件事拆开：
 
 - **大模型**（通过聊天）只做它擅长的——听懂“我想去兵马俑、不想太累”，提出建议；
-- **tripcore**（确定性代码，通过 MCP 提供 51 个工具）负责排每天去哪、按营业时间检查到达是否来得及、查真实路线、记版本、随时撤销；
+- **tripcore**（确定性代码，通过 MCP 提供 52 个工具）负责排每天去哪、按营业时间检查到达是否来得及、查真实路线、记版本、随时撤销；
 - **你**确认每一次修改。
 
 它不是又一个“一键生成攻略”的模板，而是一个**能反复调整、每一步都可核对**的行程工作台。
 
-> ⚠️ 项目处于早期阶段。高德 / Google 地图、nanobot 聊天的接入目前主要用假服务做了自动化测试（362 个），真实服务联调还有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
+> ⚠️ 项目处于早期阶段。高德 / Google 地图、nanobot 聊天的接入目前主要用假服务做了自动化测试（368 个），真实服务联调还有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
 
 ## 💡 为什么是 TripSight
 
@@ -65,7 +65,7 @@ TripSight 把这两件事拆开：
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、362 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、368 个自动化测试 |
 
 ---
 
@@ -99,6 +99,8 @@ TripSight 把这两件事拆开：
 
 把一篇游记（比如从小红书、公众号复制的正文）整段贴给助手：模型只负责读文字、列清单，**代码负责核对**——每个候选的原话必须逐字出现在原文里且包含地名，线索必须是原文片段，对不上的直接拒收；候选按原文顺序排列并去重。你挑选后，才用地图查坐标，名字相符且不歧义、不与已有景点重合才会加入。游记里的价格、营业时间、“建议上午去”只作为待核实线索，营业时间再用 `fill_hours` 向地图核实。顺路路线（如 citywalk 老菜场→永宁门）可用 `add_route_place` 整条作为一项。
 > 目前的输入是你**粘贴的文字**；仓库里没有抓取小红书的代码。
+>
+> **想先去看看别人怎么玩？** 助手可以用 `search_links` 给你小红书、大众点评、马蜂窝的搜索链接（网页工作台里每个景点下面也有“看攻略”入口，每天缺饭的提示旁有“看点评”）。链接由你自己点开、用自己的账号登录，TripSight 不抓取、不碰你的账号；看到合适的攻略，把正文复制回来即可。链接格式没有用真实账号逐一验证，打不开时请告诉我们。
 
 ### 8. 大交通、天气与参考价
 
@@ -325,7 +327,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 51 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 52 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 

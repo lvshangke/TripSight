@@ -31,6 +31,7 @@ from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .gpx import build_gpx
 from .mapview import build_map_data, build_map_html, day_marker_links
+from . import links as _links
 from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
 from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -1699,6 +1700,25 @@ def set_provider(provider: str) -> str:
     return msg
 
 
+def search_links(keyword: str, kind: str = "guide", sites: Optional[list[str]] = None) -> dict[str, Any]:
+    """生成“去别的平台看别人攻略/点评”的搜索链接（小红书、大众点评、马蜂窝、百度、Google），由用户自己点开、用自己的账号登录。
+    keyword 是景点名或想查的内容（会自动补上行程的目的地城市）；kind：guide 看攻略/游记，food 看美食点评；
+    sites 可选，指定平台 id（xiaohongshu / dianping / mafengwo / baidu / google）。
+    不抓取、不读取这些平台的内容，也不碰任何账号；用户看到合适的攻略后，把正文复制回聊天，再走 submit_candidates 流程。
+    链接格式没有用真实账号逐一验证，打不开或搜不准时如实告诉用户。"""
+    if kind not in (_links.GUIDE, _links.FOOD):
+        raise ToolError("kind 只能是 guide 或 food。")
+    try:
+        city = _load_context().get("city")
+    except Exception:
+        city = None
+    try:
+        res = _links.search_links(keyword, city, kind, sites)
+    except ValueError as e:
+        raise ToolError(str(e))
+    return {"links": res, "note": "这些是搜索链接，请用户自己点开并登录自己的账号；看到合适的攻略，把正文复制回来即可。"}
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。
     segments 是按每晚/每段给的推荐：景点分布在不同区域或城市时会分成几段（建议中途换酒店），每段给出中心坐标、
@@ -2130,7 +2150,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]

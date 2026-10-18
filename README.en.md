@@ -10,8 +10,8 @@ An open-source travel-itinerary agent. The LLM only understands intent and propo
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-362%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-51-8A2BE2)
+![Tests](https://img.shields.io/badge/tests-368%20passing-brightgreen)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
 <img src="docs/images/workbench-list.png" alt="TripSight workbench itinerary list (sample data)" width="360">
 
@@ -28,10 +28,10 @@ Trip planning goes wrong in two ways: **the model confidently makes things up** 
 TripSight separates the two concerns:
 
 - The **LLM** (via chat) does what it is good at — understanding "I want to see the Terracotta Army and keep it relaxed" — and proposes changes.
-- **tripcore** (deterministic code, exposed as 51 MCP tools) decides which sight goes on which day, checks arrival against opening hours, fetches real routes, versions every change and undoes on request.
+- **tripcore** (deterministic code, exposed as 52 MCP tools) decides which sight goes on which day, checks arrival against opening hours, fetches real routes, versions every change and undoes on request.
 - **You** confirm every change.
 
-> ⚠️ Early-stage project. The Amap, Google Maps and nanobot integrations are mainly tested against fake services (362 automated tests); real-service testing is still limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
+> ⚠️ Early-stage project. The Amap, Google Maps and nanobot integrations are mainly tested against fake services (368 automated tests); real-service testing is still limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
 
 ## 💡 Why TripSight
 
@@ -53,7 +53,7 @@ TripSight separates the two concerns:
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
 | **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
-| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 362 automated tests |
+| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 368 automated tests |
 
 ## 🔍 Feature details
 
@@ -63,7 +63,7 @@ TripSight separates the two concerns:
 4. **Real routes and preferences.** With an Amap key, `refine_routes` upgrades estimates to real routes (time, transfers, walking distance, fares). Preferences (max transfers, prefer subway, max walking, taxi OK) change which option is chosen; `compare_transport` compares modes and `set_leg_mode` pins one leg. Legs over ~80 km are flagged as intercity. Overseas trips can use Google Maps; without keys OpenStreetMap is the fallback.
 5. **Stay areas.** `suggest_lodging` works per night: it uses the last stop of one day and the first stop of the next, merges neighbouring nights into one stay, and splits into several stays when places lie in different cities. One-day excursions (e.g. a mountain 100 km away) are detected so the hotel stays in the main area. Each segment gives a centre, radius and a "search near X" hint for the assistant.
 6. **Food.** `suggest_food` searches restaurants near a stop (rating, per-person price, hours, distance); nothing is added until you choose. `find_food` places a restaurant you name on the nearest day. The workbench shows "lunch not planned" per day with a one-click "find lunch" button.
-7. **Guides → candidates.** The model reads and lists; code verifies. Each candidate's quote must appear verbatim in the pasted text and contain the place name, otherwise it is rejected. Only after you pick are coordinates looked up, and only unambiguous, non-duplicate matches are added. Prices and hours in a guide are treated as unverified hints. *Input today is pasted text; there is no Xiaohongshu scraper in this repo.*
+7. **Guides → candidates.** The model reads and lists; code verifies. Each candidate's quote must appear verbatim in the pasted text and contain the place name, otherwise it is rejected. Only after you pick are coordinates looked up, and only unambiguous, non-duplicate matches are added. Prices and hours in a guide are treated as unverified hints. *Input today is pasted text; there is no Xiaohongshu scraper in this repo.* Want to browse other people's guides first? `search_links` (and the "look up guides" links under every stop in the workbench) opens search pages on Xiaohongshu, Dianping, Mafengwo and others — you click and log in with your own account; TripSight never scrapes or touches your accounts. Copy a guide's text back to continue. URL formats are not verified against real accounts.
 8. **Transport, weather, prices.** `set_connection` derives when the first day can start and when the last day must leave. `get_weather` covers days with confirmed dates and warns about rain or heat for outdoor sights. Flight/train/hotel reference prices use the flyai and RollingGo command-line tools through read-only skills — no booking, no payment.
 9. **Take it with you.** `export_text` makes plain text for phones and chat apps (including WeChat via nanobot's `weixin` channel) with an outbound check that rejects keys and local paths; `export_map` makes a mobile-friendly HTML map; `create_amap_map` hands each day's loop to Amap's official service for a link that opens in the Amap app; `export_gpx` exports daily tracks.
 10. **Web workbench.** `python -m tripcore web --open`: itinerary list, map and chat in three resizable columns. View mode shows details and problems; edit mode lets you move stops, edit stay times, add places (chosen from map search results, never typed coordinates), pick dates, switch or create trips, and preview every change before confirming. Listens on 127.0.0.1 with a one-time token, Host/Origin checks and revision checks.
