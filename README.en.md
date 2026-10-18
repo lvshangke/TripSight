@@ -22,17 +22,28 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ---
 
+## 😩 Pain points of guides and existing tools
+
+Following someone else's guide usually breaks down on a few things:
+
+1. **Other people's guides are incomplete.** A guide tells you *what to see*, not your whole trip: **where you sleep, when you arrive and leave**, and **which season** you travel in. Those are exactly what decide how much time the first day has, what fits on the last day, whether a place is open and whether the weather suits it. Copying a guide verbatim often means finding out on site that you are too late, it is closed, or the hotel is too far.
+2. **Personal touches are hard to merge.** The small shop you want to visit, a friend's tip, the pace your family needs, your dislike of walking — none of it is in the guide, and squeezing it in by hand means re-ordering everything and re-calculating every leg.
+3. **Looking up how to get between sights is repetitive.** Walk, transit or taxi for every pair of stops, one by one in a map app, again after every change.
+4. **Itineraries generated directly by an LLM are unreliable.** It confidently makes things up — a sight that is long closed, two places two hours apart called "nearby" — and fixing one thing can break the rest.
+
 ## ✨ What is TripSight
 
-Trip planning goes wrong in two ways: **the model confidently makes things up** (a sight that is long closed, two places two hours apart called "nearby"), and **fixing one thing breaks everything else**.
+TripSight attacks these one by one:
 
-TripSight separates the two concerns:
+- **Places can come from anywhere:** an **LLM recommendation**, **someone else's guide** (paste the text, every item verified, you pick), or **somewhere you want to go yourself** — all three are scheduled together in one trip.
+- **It fills in what guides leave out:** hotel, arrival/departure transport, dates and season are part of the trip and feed into day assignment, opening-hours checks and first/last-day playable time.
+- **Personal touches merge in place:** your preferences are remembered, and any single stop can be moved to another day, removed, locked or re-timed, with automatic re-checking — no starting over.
+- **No more repeated route look-ups:** with Amap configured, real routes for every leg are filled in at once, and one click generates a chained personal map for each day.
+- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 52 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
 
-- The **LLM** (via chat) does what it is good at — understanding "I want to see the Terracotta Army and keep it relaxed" — and proposes changes.
-- **tripcore** (deterministic code, exposed as 52 MCP tools) decides which sight goes on which day, checks arrival against opening hours, fetches real routes, versions every change and undoes on request.
-- **You** confirm every change.
+It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
-> ⚠️ Early-stage project. The Amap, Google Maps and nanobot integrations are mainly tested against fake services (368 automated tests); real-service testing is still limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
+> ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (368 automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
 
 ## 💡 Why TripSight
 
@@ -59,7 +70,7 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
 
   On the road you just open the link and follow it — no more looking up each leg again.
 
-> "Full configuration" means all keys and read-only skills are set up. The project is early-stage; real-service testing of Amap / Google / nanobot is still limited (the automated tests mostly use fake services). Always verify key details with official sources before you go.
+> "Full configuration" means all keys and read-only skills are set up. The Amap part has been tested by the author with a real key; real-service testing of Google Maps, the WeChat channel and others is still limited. Verify key details yourself before you go.
 
 ## 🧩 Capabilities
 
