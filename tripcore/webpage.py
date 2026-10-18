@@ -12,17 +12,22 @@ TEMPLATE = r"""<!doctype html>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#222;background:#fafafa}
 #app{display:flex;height:100%}
-#side{width:400px;max-width:50vw;display:flex;flex-direction:column;border-right:1px solid #ddd;background:#fff}
+#side{width:400px;max-width:50vw;display:flex;flex-direction:column;border-right:1px solid #ddd;background:#fafafa}
 #scroll{flex:1;overflow:auto}
 #map{flex:1;height:100%}
-header{padding:10px 12px;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:8px}
+header{padding:10px 12px;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:8px;background:#fff}
 header b{flex:1;font-size:16px}
 button{border:1px solid #bbb;border-radius:6px;background:#fff;padding:4px 10px;cursor:pointer;color:#222}
 button:disabled{opacity:.4;cursor:default}
 button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
-#msg{padding:6px 12px;font-size:13px;color:#555;min-height:18px}
+#msg{padding:4px 12px;font-size:13px;color:#555;min-height:6px}
 #msg.err{color:#b91c1c}
-.sec{border-bottom:1px solid #eee;padding:8px 12px}
+.editonly{display:none}
+#app.edit .editonly{display:block}
+#app.edit #tabs{display:none}
+#tabs{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ddd;display:flex;flex-wrap:wrap;gap:6px;z-index:5}
+#tabs button.on{color:#fff;border-color:transparent}
+.sec{border-bottom:1px solid #eee;padding:8px 12px;background:#fff}
 .sec h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
 #cal .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 #cal table{width:100%;border-collapse:collapse;text-align:center;font-size:13px}
@@ -33,28 +38,30 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #cal td.in button{background:#dbeafe}
 #cal td.edge button{background:#2563eb;color:#fff}
 #calinfo{font-size:13px;margin:6px 0;color:#444}
-.day{border:1px dashed transparent;border-radius:6px;margin:4px 0;padding:2px}
+.day{border:1px dashed transparent;border-radius:6px;margin:6px 0 10px;padding:0}
 .day.over{border-color:#2563eb;background:#eff6ff}
-.dh{font-weight:600;font-size:13px;padding:4px 2px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.dh{font-weight:700;font-size:14px;padding:8px 12px;cursor:pointer;display:flex;gap:6px;align-items:center;background:#fff;border-bottom:1px solid #eee}
 .dh .dot{width:10px;height:10px;border-radius:50%}
-.card{display:flex;gap:6px;align-items:center;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 8px;margin:4px 0;cursor:grab}
-.card.drag{opacity:.4}
-.card .n{font-size:12px;color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex:none}
-.card .nm{flex:1;font-size:14px}
-.card .tm{font-size:12px;color:#666;font-variant-numeric:tabular-nums}
-.card .mv button{padding:0 5px;font-size:11px}
-.ins{height:3px;background:#2563eb;border-radius:2px;margin:-2px 0}
-.empty{font-size:12px;color:#999;padding:6px}
-.leg,.meal,.info{font-size:12px;color:#555;padding:2px 8px 2px 34px}
-.leg .real{color:#15803d}.leg .est{color:#b45309}
-.sub{font-size:11px;color:#888;margin-top:1px}
-.meal{background:#fff8ed;border-radius:6px;margin:2px 0;padding:4px 8px 4px 34px}
-.card .nm small{display:block;font-size:11px;color:#888}
-a{color:#2563eb;text-decoration:none}
+.dh.cur{background:#eef3ff}
+.it{padding:8px 12px;border-bottom:1px solid #eee;cursor:pointer;background:#fafafa}
+.it:hover{background:#f0f4ff}
+.it .h{display:flex;gap:8px;align-items:baseline}
+.it .tm{font-variant-numeric:tabular-nums;color:#666;min-width:42px;font-size:13px}
+.it .nm{font-weight:600;flex:1}
+.it .sub{margin:2px 0 0 50px;font-size:12px;color:#555;line-height:1.5}
+.it.drag{opacity:.4}
+.it .mv button{padding:0 5px;font-size:11px}
+.leg{padding:4px 12px 4px 62px;font-size:12px;color:#444;border-bottom:1px dashed #e4e4e4;cursor:pointer;background:#fff}
+.leg:hover{background:#f0f4ff}
+.leg a{color:#1a6fe8;text-decoration:none;margin-left:6px}
+.est{color:#b26a00}
+.ins{height:3px;background:#2563eb;border-radius:2px}
+.empty{font-size:12px;color:#999;padding:8px 12px}
+.pin{border-radius:50%;color:#fff;font-weight:700;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px #0006;width:26px;height:26px;line-height:22px;font-size:13px}
+.emo{font-size:22px;line-height:24px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
 #prev{font-size:13px;border-top:2px solid #2563eb;padding:8px 12px;background:#f8fbff;display:none;max-height:40%;overflow:auto}
-#prev ul{margin:4px 0 6px 18px;padding:0;font-size:13px}
+#prev ul{margin:4px 0 6px 18px;padding:0}
 #prev .w{color:#b45309}
-.pin{border-radius:50%;color:#fff;font-weight:700;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;border:2px solid #fff;box-shadow:0 0 3px #0006}
 #note{position:absolute;bottom:0;left:400px;max-width:calc(100vw - 760px);z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
 #chat{width:340px;max-width:40vw;display:flex;flex-direction:column;border-left:1px solid #ddd;background:#fff}
 #chat.hide{display:none}
@@ -64,18 +71,17 @@ a{color:#2563eb;text-decoration:none}
 .m.u{background:#dbeafe;margin-left:30px}.m.a{background:#f3f4f6;margin-right:20px}.m.e{background:#fee2e2;color:#991b1b}
 #chips{padding:4px 8px;display:flex;gap:4px;flex-wrap:wrap}#chips button{font-size:12px;padding:2px 8px;border-radius:12px}
 #cin{display:flex;gap:6px;padding:8px;border-top:1px solid #ddd}#cin textarea{flex:1;resize:none;font:inherit;font-size:13px;padding:4px 6px}
-@media (max-width:760px){#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
-@media (max-width:760px){#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column}#side{width:auto;max-width:none;height:60%}#map{height:40%}}
+@media (max-width:760px){#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column-reverse}#side{width:auto;max-width:none;height:50%;border-right:0;border-top:1px solid #ddd}#map{height:50%;flex:none}#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
 </style></head><body>
 <div id="app"><div id="side">
-<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="refine" title="给还没查过的路段查真实路线">更新路线</button><button id="undo">撤销</button></header>
+<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button></header>
 <div id="msg"></div>
-<div id="scroll">
-<div class="sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
+<div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
+<div class="editonly sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
 <div id="cal"></div><div id="calinfo"></div>
 <button id="dapply" class="pri" disabled>应用日期</button> <button id="dclear">清除日期</button></div>
-<div class="sec" id="days"></div>
-</div>
+<div id="tabs"></div>
+<div id="scroll"><div id="list"></div></div>
 <div id="prev"><b>预览（还没有改动）</b><ul id="chg"></ul><div id="iss"></div><button id="ok" class="pri">确认</button> <button id="cancel">取消</button></div>
 </div><div id="map" style="position:relative"></div>
 <div id="chat"><div id="chead"><b>助手</b><span id="cstat"></span><button id="cclose" title="收起">×</button></div>
@@ -87,8 +93,11 @@ a{color:#2563eb;text-decoration:none}
 <script>
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
-let S = null, selDay = 0, pending = null, drag = null, picks = [], calMonth = null;
-const map = L.map('map'); let layer = L.layerGroup().addTo(map), tileLayer = null;
+let S = null, selDay = 0, edit = false, pending = null, drag = null, picks = [], calMonth = null;
+const map = L.map('map'); let layer = null, tileLayer = null;
+const pin = (txt, color) => L.divIcon({className:'', html:'<div class="pin" style="background:'+color+'">'+esc(txt)+'</div>', iconSize:[26,26], iconAnchor:[13,13]});
+const emo = e => L.divIcon({className:'', html:'<div class="emo">'+e+'</div>', iconSize:[26,26], iconAnchor:[13,13]});
+const popup = (name, lines) => '<b>'+esc(name)+'</b>'+(lines.length?'<br>':'')+lines.map(esc).join('<br>');
 
 function say(t, err) { const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
 async function api(path, body) {
@@ -101,13 +110,16 @@ async function load() {
   try { S = await api('state'); } catch (e) { say(e.message, true); return; }
   $('title').textContent = S.title; $('rev').textContent = '版本 ' + S.revision; $('undo').disabled = !S.can_undo;
   if (!tileLayer && S.map.tiles) { tileLayer = L.tileLayer(S.map.tiles.url, {subdomains: S.map.tiles.sub, maxZoom: 18, minZoom: 3, attribution: S.map.tiles.attr}).addTo(map); $('note').textContent = S.map.tiles.note; }
-  if (selDay >= S.days.length) selDay = 0;
-  renderDates(); renderDays(); renderMap();
+  if (selDay >= S.map.days.length) selDay = 0;
+  renderAll();
 }
+function renderAll() { renderDates(); renderTabs(); renderList(); }
+$('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (S) renderAll(); };
 // ---- 日期 ----
 const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 function renderDates() {
+  if (!edit) return;
   const cur = S.dates;
   $('dstate').textContent = cur.start ? cur.start + ' 至 ' + cur.end : '还没有设置日期';
   if (!picks.length && cur.start) picks = [cur.start, cur.end];
@@ -134,62 +146,108 @@ function renderDates() {
 }
 $('dapply').onclick = async () => { try { const r = await api('dates', {base_revision: S.revision, start: picks[0], end: picks[1]}); say(r.message); await load(); } catch (e) { say(e.message, true); if (e.status === 409) load(); } };
 $('dclear').onclick = async () => { if (!S.dates.start) return; try { const r = await api('dates', {base_revision: S.revision, start: null, end: null}); picks = []; say(r.message); await load(); } catch (e) { say(e.message, true); } };
-// ---- 每天的卡片 ----
-const link = (u, t) => u ? ' <a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + t + '</a>' : '';
-function renderDays() {
-  const root = $('days'); root.innerHTML = '';
-  if (!S.days.length) { root.innerHTML = '<div class="empty">还没有分天。先对 agent 说“安排行程”（schedule_days）。</div>'; }
-  S.days.forEach(d => {
-    const z = document.createElement('div'); z.className = 'day'; z.dataset.day = d.index;
-    z.innerHTML = '<div class="dh"><span class="dot" style="background:' + d.color + '"></span>' + esc(d.label) + '</div>';
-    z.querySelector('.dh').onclick = () => { selDay = d.index; renderMap(); };
-    const stops = d.rows.filter(r => r.t === 'stop'); let si = 0;
-    d.rows.forEach(r => {
-      if (r.t === 'stop') {
-        const i = si++, c = document.createElement('div'); c.className = 'card'; c.draggable = true; c.dataset.pid = r.place_id;
-        const hours = (r.lines || []).find(x => x.indexOf('营业时间') === 0);
-        c.innerHTML = '<span class="n" style="background:' + d.color + '">' + r.n + '</span><span class="nm">' + esc(r.name) + (r.locked ? ' 🔒' : '') + (hours ? '<small>' + esc(hours) + '</small>' : '') + '</span><span class="tm">' + esc(r.time) + '</span><span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>';
-        c.querySelector('[data-a=up]').onclick = () => move(r.place_id, d.index, Math.max(i-1, 0));
-        c.querySelector('[data-a=dn]').onclick = () => move(r.place_id, d.index, Math.min(i+1, stops.length-1));
-        c.ondragstart = e => { drag = r.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', r.place_id); e.dataTransfer.effectAllowed = 'move'; };
-        c.ondragend = () => { drag = null; document.querySelectorAll('.drag,.over').forEach(x => x.classList.remove('drag', 'over')); document.querySelectorAll('.ins').forEach(x => x.remove()); };
-        z.appendChild(c);
-      } else {
-        const e = document.createElement('div');
-        if (r.t === 'leg') { e.className = 'leg'; e.innerHTML = '↓ ' + r.minutes + ' 分钟 · ' + esc(r.mode) + ' · ' + r.km + ' km · <span class="' + (r.real ? 'real' : 'est') + '">' + (r.real ? '真实路线' : '估算') + '</span>' + link(r.link, '导航') + (r.note ? '<div class="sub">' + esc(r.note) + '</div>' : ''); }
-        else if (r.t === 'meal') { e.className = 'meal'; e.innerHTML = '🍜 <b>' + esc(r.name) + '</b>' + link(r.link, '地图') + '<div class="sub">' + (r.lines || []).map(esc).join(' · ') + '</div>'; }
-        else if (r.t === 'hotel') { e.className = 'info'; e.textContent = '🏨 ' + r.role + ' ' + r.time + ' ' + r.name; }
-        else { e.className = 'info'; e.textContent = r.text; }
-        z.appendChild(e);
+// ---- 标签页（查看模式）----
+function renderTabs() {
+  const tabs = $('tabs'); tabs.innerHTML = '';
+  S.map.days.forEach((d, i) => { const b = document.createElement('button'); b.textContent = d.label; b.className = i === selDay ? 'on' : ''; b.style.background = i === selDay ? d.color : '#fff'; b.onclick = () => { selDay = i; renderAll(); }; tabs.appendChild(b); });
+}
+// ---- 地图：画某一天，返回每个条目对应的标记/线 ----
+function drawMap(di) {
+  if (layer) map.removeLayer(layer); layer = L.featureGroup().addTo(map); const ctx = {m: {}, l: {}};
+  const d = S.map.days[di]; if (!d) { map.setView([35, 105], 4); return ctx; }
+  d.timeline.forEach((e, idx) => {
+    if (e.type === 'leg') {
+      const pts = e.path.length ? e.path : [e.a, e.b];
+      const pl = L.polyline(pts, {color: d.color, weight: e.real ? 5 : 3, opacity: .85, dashArray: e.real ? null : '6 8'}).addTo(layer);
+      pl.bindTooltip(esc(e.mode) + ' 约' + e.minutes + '分钟' + (e.real ? '' : '（估算）'), {sticky: true}); ctx.l[idx] = pl;
+    } else if (e.type !== 'conn' && !(e.type === 'hotel' && e.role === '返回')) {
+      let icon, title;
+      if (e.type === 'hotel') { icon = emo('🏨'); title = e.name; }
+      else if (e.type === 'term') { icon = emo(e.icon); title = e.role + '：' + e.name; }
+      else if (e.type === 'meal') { icon = emo('🍜'); title = '用餐：' + e.name; }
+      else { icon = pin(e.n, d.color); title = e.n + '. ' + e.name; }
+      ctx.m[idx] = L.marker(e.show || e.pos, {icon}).bindPopup(popup(d.label + ' · ' + title, e.type === 'hotel' ? [] : (e.lines || []))).addTo(layer);
+      if (e.route) {
+        e.route.paths.forEach(p => L.polyline(p.path, {color: d.color, weight: 4, opacity: .9, dashArray: p.real ? null : '4 6'}).bindTooltip('步行约' + p.minutes + '分钟' + (p.real ? '' : '（估算）'), {sticky: true}).addTo(layer));
+        e.route.points.forEach((w, k) => L.circleMarker(w.pos, {radius: 6, color: d.color, fillColor: '#fff', fillOpacity: 1, weight: 3}).bindTooltip((k+1) + '. ' + w.name).addTo(layer));
       }
-    });
-    if (!stops.length) z.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');
-    wire(z, () => ({kind: 'day', day: d.index})); root.appendChild(z);
+    }
   });
-  const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排（拖到这里表示移出行程）</div>';
-  S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'card'; c.draggable = true; c.dataset.pid = it.place_id;
-    c.innerHTML = '<span class="nm">' + esc(it.name) + '</span><span class="tm">' + esc(it.reason || '') + '</span>';
-    c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); }; c.ondragend = () => { drag = null; }; u.appendChild(c); });
-  (S.orphan_meals || []).forEach(m => u.insertAdjacentHTML('beforeend', '<div class="meal">🍜 <b>' + esc(m.name) + '</b><div class="sub">原来挂在「' + esc(m.after) + '」之后，该景点现在不在行程里（用餐点没有删除）</div></div>'));
-  wire(u, () => ({kind: 'none'})); root.appendChild(u);
+  try { const b = layer.getBounds(); if (b.isValid()) map.fitBounds(b.pad(0.15)); } catch (e) {}
+  return ctx;
+}
+// ---- 列表：一行 = 酒店/景点/通勤/用餐/航班车次 ----
+function lockedOf(pid) { for (const d of S.days) for (const it of d.items) if (it.place_id === pid) return it.locked; return false; }
+function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
+  const row = document.createElement('div'), mk = ctx && ctx.m[idx], pl = ctx && ctx.l[idx];
+  const sel = () => { if (di !== selDay) { selDay = di; renderAll(); return true; } return false; };
+  if (e.type === 'conn') { row.className = 'leg'; row.style.cursor = 'default'; row.textContent = '⏱ ' + e.text; return row; }
+  if (e.type === 'leg') {
+    row.className = 'leg';
+    row.innerHTML = '↓ ' + esc(e.mode) + ' 约' + e.minutes + '分钟 · ' + e.km + ' km · ' + (e.real ? '真实路线' : '<span class="est">估算</span>') + (e.note ? '<br>' + esc(e.note) : '') + '<a href="' + esc(e.link) + '" target="_blank" rel="noopener noreferrer">导航</a>';
+    row.onclick = ev => { if (ev.target.tagName === 'A' || sel()) return; if (pl) { map.fitBounds(pl.getBounds().pad(0.4)); pl.setStyle({weight: 8}); setTimeout(() => pl.setStyle({weight: e.real ? 5 : 3}), 1500); } };
+    return row;
+  }
+  row.className = 'it';
+  const lines = (e.lines || []).map(esc).join('<br>');
+  if (e.type === 'hotel') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">🏨 ' + esc(e.role) + '：' + esc(e.name) + '</span></div>';
+  else if (e.type === 'term') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">' + e.icon + ' ' + esc(e.role) + '：' + esc(e.name) + '</span></div><div class="sub">' + lines + '</div>';
+  else if (e.type === 'meal') row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 ' + esc(e.name) + '</span></div><div class="sub">' + lines + (e.web ? '<br><a href="' + esc(e.web) + '" target="_blank" rel="noopener noreferrer" style="color:#1a6fe8">地图</a>' : '') + '</div>';
+  else {
+    row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + e.stay + ' 分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
+    if (edit) {
+      row.dataset.pid = e.pid; row.draggable = true;
+      row.querySelector('[data-a=up]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.max(stopIdx - 1, 0)); };
+      row.querySelector('[data-a=dn]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.min(stopIdx + 1, nStops - 1)); };
+      row.ondragstart = ev => { drag = e.pid; row.classList.add('drag'); ev.dataTransfer.setData('text/plain', e.pid); ev.dataTransfer.effectAllowed = 'move'; };
+      row.ondragend = () => { drag = null; document.querySelectorAll('.drag,.over').forEach(x => x.classList.remove('drag', 'over')); document.querySelectorAll('.ins').forEach(x => x.remove()); };
+    }
+  }
+  row.onclick = () => { if (sel()) return; if (mk) { map.setView(mk.getLatLng(), Math.max(map.getZoom(), 15)); mk.openPopup(); } };
+  return row;
+}
+function renderList() {
+  const list = $('list'); list.innerHTML = '';
+  if (!S.map.days.length) { list.innerHTML = '<div class="empty">还没有分天的行程。先对 agent 说“安排行程”，或者在右侧助手里说。</div>'; drawMap(-1); renderUnscheduled(list); return; }
+  const ctx = drawMap(selDay);
+  const days = edit ? S.map.days.map((d, i) => i) : [selDay];
+  days.forEach(di => {
+    const d = S.map.days[di], box = edit ? document.createElement('div') : list; if (edit) { box.className = 'day'; box.dataset.day = d.index; list.appendChild(box); }
+    if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = '<span class="dot" style="background:' + d.color + '"></span>' + esc(d.label); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
+    if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; box.appendChild(w); }
+    const nStops = d.timeline.filter(e => e.type === 'stop').length; let si = 0;
+    d.timeline.forEach((e, idx) => box.appendChild(rowEl(d, e, idx, di, di === selDay ? ctx : null, e.type === 'stop' ? si++ : 0, nStops)));
+    if (edit && !nStops) box.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');
+    if (edit) wire(box, () => ({kind: 'day', day: d.index}));
+  });
+  renderUnscheduled(list);
+}
+function renderUnscheduled(list) {
+  if (!S.unscheduled.length && !(S.orphan_meals || []).length && !edit) return;
+  const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + '</div>';
+  S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'it'; c.dataset.pid = it.place_id; c.style.cursor = edit ? 'grab' : 'default';
+    c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>';
+    if (edit) { c.draggable = true; c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); }; c.ondragend = () => { drag = null; }; } u.appendChild(c); });
+  (S.orphan_meals || []).forEach(m => u.insertAdjacentHTML('beforeend', '<div class="it" style="cursor:default"><div class="h"><span class="nm">🍜 ' + esc(m.name) + '</span></div><div class="sub">原来挂在「' + esc(m.after) + '」之后，该景点现在不在行程里（用餐点没有删除）</div></div>'));
+  if (edit) wire(u, () => ({kind: 'none'}));
+  list.appendChild(u);
 }
 function wire(zone, info) {
   zone.ondragover = e => { if (!drag) return; e.preventDefault(); zone.classList.add('over'); zone.querySelectorAll('.ins').forEach(x => x.remove());
-    const cards = [...zone.querySelectorAll('.card')].filter(c => c.dataset.pid !== drag); let idx = cards.findIndex(c => e.clientY < c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2); if (idx < 0) idx = cards.length;
+    const cards = [...zone.querySelectorAll('.it[data-pid]')].filter(c => c.dataset.pid !== drag); let idx = cards.findIndex(c => e.clientY < c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2); if (idx < 0) idx = cards.length;
     zone.dataset.idx = idx; const bar = document.createElement('div'); bar.className = 'ins'; if (cards[idx]) zone.insertBefore(bar, cards[idx]); else zone.appendChild(bar); };
   zone.ondragleave = e => { if (!zone.contains(e.relatedTarget)) { zone.classList.remove('over'); zone.querySelectorAll('.ins').forEach(x => x.remove()); } };
   zone.ondrop = e => { e.preventDefault(); const pid = drag || e.dataTransfer.getData('text/plain'); const t = info(); zone.classList.remove('over'); zone.querySelectorAll('.ins').forEach(x => x.remove());
     if (t.kind === 'day') move(pid, t.day, Number(zone.dataset.idx || 0)); else if (t.kind === 'none') propose([{kind: 'remove', place_id: pid}]); };
 }
-function findItem(pid) { for (const d of S.days) for (const it of d.items) if (it.place_id === pid) return it; return null; }
 function move(pid, day, pos) {
-  const ops = []; const it = findItem(pid); if (it && it.locked) ops.push({kind: 'lock', place_id: pid, locked: false});
+  const ops = []; if (lockedOf(pid)) ops.push({kind: 'lock', place_id: pid, locked: false});
   ops.push({kind: 'move', place_id: pid, to_day: day, to_position: pos}); propose(ops);
 }
 async function propose(ops) {
   try { pending = await api('preview', {base_revision: S.revision, ops}); } catch (e) { say(e.message, true); if (e.status === 409) load(); return; }
   $('chg').innerHTML = pending.changes.map(x => '<li>' + esc(x) + '</li>').join('');
-  $('iss').innerHTML = pending.new_issues.length ? '<div class="w">改完后新增的问题：</div><ul>' + pending.new_issues.map(i => '<li class="w">' + esc(i) + '</li>').join('') + '</ul>' : '<div style="font-size:13px;color:#15803d">没有新增问题。</div>';
+  $('iss').innerHTML = pending.new_issues.length ? '<div class="w">改完后新增的问题：</div><ul>' + pending.new_issues.map(i => '<li class="w">' + esc(i) + '</li>').join('') + '</ul>' : '<div style="color:#15803d">没有新增问题。</div>';
   $('prev').style.display = 'block'; say('');
 }
 $('ok').onclick = async () => {
@@ -206,17 +264,6 @@ async function refineRoutes(day) {
 $('refine').onclick = () => refineRoutes(null);
 $('cancel').onclick = closePrev; function closePrev() { pending = null; $('prev').style.display = 'none'; }
 $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revision}); say('已撤销。'); } catch (e) { say(e.message, true); } closePrev(); load(); };
-// ---- 地图 ----
-function renderMap() {
-  layer.clearLayers(); const d = S.map.days.find(x => x.index === selDay); if (!d) { map.setView([35, 105], 4); return; }
-  const pts = [];
-  d.timeline.forEach(e => {
-    if (e.type === 'leg') { const p = e.real && e.path.length ? e.path : [e.a, e.b]; L.polyline(p, {color: d.color, weight: 4, opacity: .8, dashArray: e.real ? null : '6 6'}).addTo(layer); pts.push(...p); }
-    else if (e.type === 'stop') { L.marker(e.show || e.pos, {icon: L.divIcon({className: '', html: '<div class="pin" style="background:' + d.color + '">' + e.n + '</div>', iconSize: [26, 26], iconAnchor: [13, 13]})}).bindPopup('<b>' + esc(e.name) + '</b><br>' + esc(e.arrive) + '–' + esc(e.leave)).addTo(layer); pts.push(e.pos); }
-    else if (e.type === 'hotel') { L.marker(e.pos, {icon: L.divIcon({className: '', html: '<div style="font-size:20px">🏨</div>', iconSize: [26, 26], iconAnchor: [13, 13]})}).bindPopup(esc(e.name)).addTo(layer); pts.push(e.pos); }
-  });
-  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.2));
-}
 // ---- 聊天 + 自动刷新 ----
 const msgs = $('cmsgs'); let busy = false;
 function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
@@ -241,7 +288,8 @@ async function send() {
 }
 $('csend').onclick = send; $('ctext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
 document.querySelectorAll('#chips button').forEach(b => b.onclick = () => { $('ctext').value = b.dataset.t; $('ctext').focus(); });
-$('ctoggle').onclick = () => $('chat').classList.toggle('hide'); $('cclose').onclick = () => $('chat').classList.add('hide');
+const fit = () => setTimeout(() => map.invalidateSize(), 50); window.addEventListener('resize', fit);
+$('ctoggle').onclick = () => { $('chat').classList.toggle('hide'); fit(); }; $('cclose').onclick = () => { $('chat').classList.add('hide'); fit(); };
 setInterval(async () => {
   if (document.hidden || !S || drag) return;
   try { const r = await api('rev'); if (r.revision !== S.revision) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
