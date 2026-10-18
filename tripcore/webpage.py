@@ -12,11 +12,16 @@ TEMPLATE = r"""<!doctype html>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#222;background:#fafafa}
 #app{display:flex;height:100%}
-#side{width:400px;max-width:50vw;display:flex;flex-direction:column;border-right:1px solid #ddd;background:#fafafa}
+#side{width:var(--sw,400px);flex:none;display:flex;flex-direction:column;border-right:1px solid #ddd;background:#fafafa}
 #scroll{flex:1;overflow:auto}
-#map{flex:1;height:100%}
+#map{flex:1;min-width:0;height:100%}
+.sp{flex:none;width:6px;margin:0 -3px;z-index:1500;cursor:col-resize;background:transparent;touch-action:none}
+.sp:hover,.sp.on{background:#2563eb55}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing #map{pointer-events:none}
 header{padding:10px 12px;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:8px;background:#fff}
 header b{flex:1;font-size:16px}
+#trip{flex:1;min-width:0;font:inherit;font-size:15px;font-weight:700;padding:3px 4px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#222}
 button{border:1px solid #bbb;border-radius:6px;background:#fff;padding:4px 10px;cursor:pointer;color:#222}
 button:disabled{opacity:.4;cursor:default}
 button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
@@ -62,19 +67,19 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #prev{font-size:13px;border-top:2px solid #2563eb;padding:8px 12px;background:#f8fbff;display:none;max-height:40%;overflow:auto}
 #prev ul{margin:4px 0 6px 18px;padding:0}
 #prev .w{color:#b45309}
-#note{position:absolute;bottom:0;left:400px;max-width:calc(100vw - 760px);z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
-#chat{width:340px;max-width:40vw;display:flex;flex-direction:column;border-left:1px solid #ddd;background:#fff}
+#note{position:absolute;bottom:0;left:calc(var(--sw,400px) + 6px);max-width:calc(100vw - var(--sw,400px) - var(--cw,340px) - 24px);z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
+#chat{width:var(--cw,340px);flex:none;display:flex;flex-direction:column;border-left:1px solid #ddd;background:#fff}
 #chat.hide{display:none}
-#chead{padding:8px 12px;border-bottom:1px solid #ddd;display:flex;gap:8px;align-items:center}#chead b{flex:1}#cstat{font-size:12px;color:#b45309}#chead button{border:0;font-size:18px;padding:0 4px}
+#chead{padding:8px 12px;border-bottom:1px solid #ddd;display:flex;gap:8px;align-items:center}#chead b{flex:1}#cstat{font-size:12px;color:#b45309;white-space:nowrap}#cstat.ok{color:#15803d}#chead button{border:0;font-size:18px;padding:0 4px}
 #cmsgs{flex:1;overflow:auto;padding:8px 10px;font-size:13px}
 .m{margin:6px 0;padding:6px 9px;border-radius:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
 .m.u{background:#dbeafe;margin-left:30px}.m.a{background:#f3f4f6;margin-right:20px}.m.e{background:#fee2e2;color:#991b1b}
 #chips{padding:4px 8px;display:flex;gap:4px;flex-wrap:wrap}#chips button{font-size:12px;padding:2px 8px;border-radius:12px}
 #cin{display:flex;gap:6px;padding:8px;border-top:1px solid #ddd}#cin textarea{flex:1;resize:none;font:inherit;font-size:13px;padding:4px 6px}
-@media (max-width:760px){#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column-reverse}#side{width:auto;max-width:none;height:50%;border-right:0;border-top:1px solid #ddd}#map{height:50%;flex:none}#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
+@media (max-width:760px){.sp{display:none}#side{width:auto}#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column-reverse}#side{height:50%;border-right:0;border-top:1px solid #ddd}#map{height:50%;flex:none}#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
 </style></head><body>
 <div id="app"><div id="side">
-<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button></header>
+<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
 <div class="editonly sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
@@ -83,7 +88,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="tabs"></div>
 <div id="scroll"><div id="list"></div></div>
 <div id="prev"><b>预览（还没有改动）</b><ul id="chg"></ul><div id="iss"></div><button id="ok" class="pri">确认</button> <button id="cancel">取消</button></div>
-</div><div id="map" style="position:relative"></div>
+</div><div class="sp" id="sp1" title="拖动调整宽度，双击恢复"></div><div id="map" style="position:relative"></div><div class="sp" id="sp2" title="拖动调整宽度，双击恢复"></div>
 <div id="chat"><div id="chead"><b>助手</b><span id="cstat"></span><button id="cclose" title="收起">×</button></div>
 <div id="cmsgs"></div>
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
@@ -94,7 +99,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
 let S = null, selDay = 0, edit = false, pending = null, drag = null, picks = [], calMonth = null;
-const map = L.map('map'); let layer = null, tileLayer = null;
+const map = L.map('map'); let layer = null, tileLayer = null, tileUrl = null;
 const pin = (txt, color) => L.divIcon({className:'', html:'<div class="pin" style="background:'+color+'">'+esc(txt)+'</div>', iconSize:[26,26], iconAnchor:[13,13]});
 const emo = e => L.divIcon({className:'', html:'<div class="emo">'+e+'</div>', iconSize:[26,26], iconAnchor:[13,13]});
 const popup = (name, lines) => '<b>'+esc(name)+'</b>'+(lines.length?'<br>':'')+lines.map(esc).join('<br>');
@@ -108,11 +113,25 @@ async function api(path, body) {
 }
 async function load() {
   try { S = await api('state'); } catch (e) { say(e.message, true); return; }
-  $('title').textContent = S.title; $('rev').textContent = '版本 ' + S.revision; $('undo').disabled = !S.can_undo;
-  if (!tileLayer && S.map.tiles) { tileLayer = L.tileLayer(S.map.tiles.url, {subdomains: S.map.tiles.sub, maxZoom: 18, minZoom: 3, attribution: S.map.tiles.attr}).addTo(map); $('note').textContent = S.map.tiles.note; }
+  $('rev').textContent = '版本 ' + S.revision; $('undo').disabled = !S.can_undo;
+  if (S.map.tiles && (!tileLayer || tileUrl !== S.map.tiles.url)) { if (tileLayer) map.removeLayer(tileLayer); tileUrl = S.map.tiles.url; tileLayer = L.tileLayer(tileUrl, {subdomains: S.map.tiles.sub, maxZoom: 18, minZoom: 3, attribution: S.map.tiles.attr}).addTo(map); $('note').textContent = S.map.tiles.note; }
+  await loadTrips();
   if (selDay >= S.map.days.length) selDay = 0;
   renderAll();
 }
+async function loadTrips() {
+  try {
+    const r = await api('trips'), sel = $('trip'); sel.innerHTML = '';
+    r.trips.forEach(t => { const o = document.createElement('option'); o.value = t.slug; o.textContent = t.name + (t.num_days ? '（' + t.num_days + '天）' : ''); o.selected = t.slug === r.current || r.single; sel.appendChild(o); });
+    sel.disabled = r.single || r.trips.length < 2; sel.title = r.single ? '单文件模式不能切换' : (r.trips.length < 2 ? '只有一个行程' : '切换行程');
+  } catch (e) {}
+}
+$('trip').onchange = async () => {
+  const sel = $('trip'), want = sel.value;
+  if (pending && !confirm('有一个还没确认的修改预览，切换行程会放弃它。继续吗？')) { await loadTrips(); return; }
+  try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); }
+  catch (e) { say(e.message, true); await loadTrips(); }
+};
 function renderAll() { renderDates(); renderTabs(); renderList(); }
 $('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (S) renderAll(); };
 // ---- 日期 ----
@@ -267,13 +286,19 @@ $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revi
 // ---- 聊天 + 自动刷新 ----
 const msgs = $('cmsgs'); let busy = false;
 function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
-async function chatStatus() { try { const r = await api('chat_status'); $('cstat').textContent = r.connected ? '' : '未连接'; if (!r.connected && !msgs.children.length) bubble('e', r.message); return r.connected; } catch (e) { $('cstat').textContent = '未连接'; return false; } }
+let chatUp = null;
+function chatMark(up, msg) {
+  const el = $('cstat'); el.textContent = up ? '● 已连接' : '● 未连接'; el.className = up ? 'ok' : '';
+  if (!up && msg && chatUp !== false) bubble('e', msg);
+  chatUp = up;
+}
+async function chatStatus() { try { const r = await api('chat_status'); chatMark(r.connected, r.message); return r.connected; } catch (e) { chatMark(false, '没连上工作台服务。'); return false; } }
 async function send() {
   const text = $('ctext').value.trim(); if (!text || busy) return;
   busy = true; $('csend').disabled = true; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
   try {
     const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text})});
-    if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); if (r.status >= 500) chatMark(false); }
     else {
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
       for (;;) { const {value, done: end} = await rd.read(); if (end) break; buf += dec.decode(value, {stream: true}); let i;
@@ -289,12 +314,30 @@ async function send() {
 $('csend').onclick = send; $('ctext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
 document.querySelectorAll('#chips button').forEach(b => b.onclick = () => { $('ctext').value = b.dataset.t; $('ctext').focus(); });
 const fit = () => setTimeout(() => map.invalidateSize(), 50); window.addEventListener('resize', fit);
-$('ctoggle').onclick = () => { $('chat').classList.toggle('hide'); fit(); }; $('cclose').onclick = () => { $('chat').classList.add('hide'); fit(); };
+$('ctoggle').onclick = () => { $('chat').classList.toggle('hide'); syncSp2(); fit(); }; $('cclose').onclick = () => { $('chat').classList.add('hide'); syncSp2(); fit(); };
 setInterval(async () => {
   if (document.hidden || !S || drag) return;
-  try { const r = await api('rev'); if (r.revision !== S.revision) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
+  try { const r = await api('rev'); if (r.revision !== S.revision || (r.trip || null) !== (S.trip || null)) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
 }, 2000);
-chatStatus();
+chatStatus(); setInterval(() => { if (!document.hidden && !$('chat').classList.contains('hide')) chatStatus(); }, 10000);
+// ---- 三栏宽度可拖动（记住上次的宽度；双击分隔条恢复默认）----
+const WK = {sw: ['--sw', 400, 240, 0.6], cw: ['--cw', 340, 260, 0.5]};
+function wget(k) { try { return Number(localStorage.getItem('tsw_' + k)) || 0; } catch (e) { return 0; } }
+function wset(k, v) { try { v === null ? localStorage.removeItem('tsw_' + k) : localStorage.setItem('tsw_' + k, String(v)); } catch (e) {} }
+function clampW(k, v) { const [, , min, frac] = WK[k]; const other = k === 'sw' ? ($('chat').classList.contains('hide') ? 0 : $('chat').offsetWidth) : $('side').offsetWidth; return Math.max(min, Math.min(v, Math.min(innerWidth * frac, innerWidth - other - 280))); }
+function applyW(k, v) { document.documentElement.style.setProperty(WK[k][0], v === null ? WK[k][1] + 'px' : clampW(k, v) + 'px'); fit(); }
+function splitter(id, k, dir) {
+  const el = $(id);
+  el.onpointerdown = e => { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('on'); document.body.classList.add('resizing'); const x0 = e.clientX, w0 = (k === 'sw' ? $('side') : $('chat')).offsetWidth; let last = null;
+    el.onpointermove = m => { last = clampW(k, w0 + dir * (m.clientX - x0)); applyW(k, last); };
+    el.onpointerup = () => { el.onpointermove = el.onpointerup = null; el.classList.remove('on'); document.body.classList.remove('resizing'); if (last !== null) wset(k, Math.round(last)); fit(); }; };
+  el.ondblclick = () => { wset(k, null); applyW(k, null); };
+}
+splitter('sp1', 'sw', 1); splitter('sp2', 'cw', -1);
+for (const k of ['sw', 'cw']) { const v = wget(k); if (v) applyW(k, v); }
+window.addEventListener('resize', () => { for (const k of ['sw', 'cw']) { const v = wget(k); if (v) applyW(k, v); } });
+function syncSp2() { $('sp2').style.display = $('chat').classList.contains('hide') ? 'none' : ''; }
+syncSp2();
 load();
 </script></body></html>
 """

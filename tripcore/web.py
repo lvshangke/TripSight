@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 from pydantic import TypeAdapter, ValidationError
 
 from . import mcp_server as ms
+from . import workspace as ws
 from .dates import apply_dates
 from .mapview import build_map_data
 from .models import Trip
@@ -108,7 +109,7 @@ def snapshot() -> dict[str, Any]:
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
                     for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
-    return {"title": m.name, "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+    return {"title": m.name, "trip": _slug(), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
             "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},
@@ -217,22 +218,74 @@ def _nanobot() -> tuple[str, int]:
     return u.hostname, u.port or 8900
 
 
+def _slug() -> Optional[str]:
+    if ms._single_file_mode():
+        return None
+    return ws.active_slug(ms._root_dir())
+
+
 def rev() -> dict[str, Any]:
-    return {"revision": ms._load().revision}
+    return {"revision": ms._load().revision, "trip": _slug()}
+
+
+def trips() -> dict[str, Any]:
+    """行程下拉框用：所有行程和当前行程。单文件模式只有一个，不能切换。"""
+    if ms._single_file_mode():
+        t = ms._load()
+        return {"single": True, "current": None, "trips": [{"slug": "", "name": t.meta.name, "num_days": t.meta.num_days, "places": len(t.places)}]}
+    root = ms._root_dir()
+    ws.migrate_legacy(root)
+    return {"single": False, "current": ws.active_slug(root),
+            "trips": [{k: it[k] for k in ("slug", "name", "num_days", "places")} for it in ws.list_trips(root)]}
+
+
+def switch(body: dict) -> dict[str, Any]:
+    """切换当前行程（只改 active.json，不动任何行程文件）。agent 和聊天栏之后也针对这个行程。"""
+    if ms._single_file_mode():
+        raise HttpError(400, "当前是单文件模式，不能切换行程。")
+    name = body.get("slug")
+    if not isinstance(name, str) or not name.strip():
+        raise HttpError(400, "缺少行程。")
+    root = ms._root_dir()
+    try:
+        slug = ws.resolve(root, name)
+    except KeyError:
+        raise HttpError(404, "找不到这个行程。")
+    except ValueError:
+        raise HttpError(400, "匹配到多个行程，请从列表里选。")
+    ws.set_active(root, slug)
+    t = ms._load()
+    return {"trip": slug, "title": t.meta.name, "revision": t.revision}
+
+
+_API_ROUTE_OK = (200, 400, 401, 403, 405, 415, 422)       # 聊天接口存在（只是不接受这种请求）；404 才是没开启
 
 
 def chat_status() -> dict[str, Any]:
+    """两步确认：nanobot 在运行（/health），并且聊天接口已开启（/v1/chat/completions 不是 404）。"""
     try:
         host, port = _nanobot()
-        conn = http.client.HTTPConnection(host, port, timeout=1.5)
-        conn.request("GET", "/health")
-        ok = conn.getresponse().status == 200
-        conn.close()
     except HttpError as e:
         return {"connected": False, "message": e.message}
+    down = "没连上 nanobot。先启动它的接口：nanobot plugins enable api，然后 nanobot serve。"
+    try:
+        conn = http.client.HTTPConnection(host, port, timeout=1.5)
+        conn.request("GET", "/health")
+        r = conn.getresponse()
+        r.read()
+        conn.close()
+        if r.status != 200:
+            return {"connected": False, "message": down}
+        conn = http.client.HTTPConnection(host, port, timeout=1.5)
+        conn.request("GET", "/v1/chat/completions")
+        r = conn.getresponse()
+        r.read()
+        conn.close()
     except Exception:
-        ok = False
-    return {"connected": ok, "message": "" if ok else "没连上 nanobot。先启动它的接口：nanobot plugins enable api，然后 nanobot serve。"}
+        return {"connected": False, "message": down}
+    if r.status not in _API_ROUTE_OK:
+        return {"connected": False, "message": "nanobot 在运行，但聊天接口没有开启。先运行 nanobot plugins enable api，再重启 nanobot serve。"}
+    return {"connected": True, "message": ""}
 
 
 _VERSION_FILES = ("web.py", "webpage.py", "mapview.py", "dates.py", "proposals.py", "state.py", "mcp_server.py")
@@ -252,8 +305,8 @@ def code_version() -> str:
 CODE_VERSION = code_version()
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
-ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
+ROUTES_POST = {"switch": switch, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
 def make_handler(token: str, state: dict):

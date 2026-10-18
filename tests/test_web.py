@@ -304,7 +304,7 @@ class _FakeNano(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        self.send_response(200 if self.path == "/health" else 404)
+        self.send_response({"/health": 200, "/v1/chat/completions": 405}.get(self.path, 404))
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(b'{"ok":true}')
@@ -448,3 +448,60 @@ def test_launch_keeps_current_version(tmp_path, monkeypatch, server):
         assert "已在运行" in out and keep.poll() is None
     finally:
         keep.kill()
+
+
+def test_chat_status_needs_api_route(server, nano, monkeypatch):
+    """nanobot 在运行但没开聊天接口（/v1/chat/completions 是 404）：不能显示已连接。"""
+    monkeypatch.setattr(_FakeNano, "do_GET", lambda self: (self.send_response(200 if self.path == "/health" else 404), self.end_headers()))
+    r = call(server, "/tok/api/chat_status")[1]
+    assert r["connected"] is False and "plugins enable api" in r["message"]
+
+
+def test_chat_status_down(server, monkeypatch):
+    monkeypatch.setenv("NANOBOT_API_URL", "http://127.0.0.1:9")
+    assert call(server, "/tok/api/chat_status")[1]["connected"] is False
+
+
+@pytest.fixture
+def multi(tmp_path, monkeypatch):
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setattr(s.Path, "home", classmethod(lambda cls: tmp_path))
+    s.new_trip("甲行程", 2)
+    s.add_place("景一", 34.2, 108.9)
+    s.new_trip("乙行程", 3)
+    s.add_place("景二", 31.2, 121.4)
+    s.add_place("景三", 31.3, 121.5)
+    state_ = {"last": 0}
+    from http.server import ThreadingHTTPServer
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), web.make_handler("tok", state_))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    httpd.shutdown()
+    httpd.server_close()
+
+
+def test_trips_list_and_switch(multi):
+    r = call(multi, "/tok/api/trips")[1]
+    assert r["single"] is False and [t["name"] for t in r["trips"]] is not None and {t["name"] for t in r["trips"]} == {"甲行程", "乙行程"}
+    assert state(multi)["title"] == "乙行程"
+    other = next(t["slug"] for t in r["trips"] if t["name"] == "甲行程")
+    code, out = call(multi, "/tok/api/switch", {"slug": other})
+    assert code == 200 and out["title"] == "甲行程"
+    st = state(multi)
+    assert st["title"] == "甲行程" and st["trip"] == other
+    assert call(multi, "/tok/api/rev")[1]["trip"] == other
+    assert "甲行程" in s.list_trips() and "▶ 甲行程" in s.list_trips()          # agent 看到的当前行程也变了
+
+
+def test_switch_rejects_bad_input(multi):
+    assert call(multi, "/tok/api/switch", {"slug": "不存在"})[0] == 404
+    assert call(multi, "/tok/api/switch", {})[0] == 400
+    assert call(multi, "/tok/api/switch", {"slug": 5})[0] == 400
+    assert raw_post(multi, "/api/switch", {"slug": "x"})[0] == 404                      # 没有令牌
+    assert state(multi)["title"] == "乙行程"
+
+
+def test_switch_not_available_in_single_file_mode(server):
+    r = call(server, "/tok/api/trips")[1]
+    assert r["single"] is True and len(r["trips"]) == 1
+    assert call(server, "/tok/api/switch", {"slug": "x"})[0] == 400
