@@ -1817,7 +1817,18 @@ def _hours_line(p: Place, d: Optional[date]) -> str:
 
 def _render(trip: Trip) -> str:
     m = trip.meta
-    out = [f"【{m.name}】{m.num_days} 天，节奏 {m.pace.value}，交通偏好 {_MODE_NAMES[m.mode]}，版本 {trip.revision}"]
+    if m.date_mode == DateMode.EXACT and m.start_date and m.end_date:
+        when = f"{m.start_date.isoformat()} 至 {m.end_date.isoformat()}"
+    elif m.date_mode == DateMode.RANGE and m.earliest_start and m.latest_end:
+        when = f"大致 {m.earliest_start.isoformat()} 至 {m.latest_end.isoformat()} 之间"
+    else:
+        when = "日期未定"
+    try:
+        city = _load_context().get("city")
+    except Exception:
+        city = None
+    out = [f"【{m.name}】{m.num_days} 天，{when}，{m.travelers} 人，" + (f"目的地 {city}，" if city else "目的地未填，")
+           + f"节奏 {m.pace.value}，交通偏好 {_MODE_NAMES[m.mode]}，版本 {trip.revision}"]
     if trip.stays:
         names = {l.id: l.name for l in trip.lodgings}
         out.append("住宿（分段）：" + "；".join(f"第{a.from_day + 1}–{a.to_day + 1}晚 {names.get(a.lodging_id, a.lodging_id)}"

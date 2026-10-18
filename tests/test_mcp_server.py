@@ -1156,3 +1156,14 @@ def test_legacy_migration_copies(monkeypatch, tmp_path):
     assert (legacy / "trip.json").exists()                       # 原文件保留
     assert (legacy / "trips" / "西安4日游" / "trip.json").exists()
     assert s._ws.migrate_legacy(legacy) is None                  # 只迁移一次
+
+
+def test_show_trip_header_has_dates_travelers_city():
+    s.new_trip("京都5日", 5, travelers=2, city="京都", start_date="2026-11-03", end_date="2026-11-07")
+    head = s.show_trip().splitlines()[0]
+    assert "2026-11-03 至 2026-11-07" in head and "2 人" in head and "目的地 京都" in head and "日期未定" not in head
+    s.new_trip("没填", 3)
+    head = s.show_trip().splitlines()[0]
+    assert "日期未定" in head and "1 人" in head and "目的地未填" in head
+    s.new_trip("范围", 3, earliest_start="2026-12-01", latest_end="2026-12-20")
+    assert "大致 2026-12-01 至 2026-12-20 之间" in s.show_trip().splitlines()[0]
