@@ -48,6 +48,8 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #ap .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
 #ap .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center}
 .dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
+.is{font-size:12px;margin-top:2px;color:#b45309;line-height:1.45}.is.error{color:#b91c1c;font-weight:600}
+.dayiss{padding:5px 12px;background:#fff8ed;border-bottom:1px solid #f1e3cd}
 .editonly{display:none}
 #app.edit .editonly{display:block}
 #app.edit #tabs{display:none}
@@ -269,6 +271,7 @@ function drawMap(di) {
 }
 // ---- 列表：一行 = 酒店/景点/通勤/用餐/航班车次 ----
 function lockedOf(pid) { for (const d of S.days) for (const it of d.items) if (it.place_id === pid) return it.locked; return false; }
+const issueHtml = arr => arr.map(x => '<div class="is ' + x.sev + '">' + (x.sev === 'error' ? '⛔ ' : '⚠ ') + esc(x.text) + '</div>').join('');
 function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   const row = document.createElement('div'), mk = ctx && ctx.m[idx], pl = ctx && ctx.l[idx];
   const sel = () => { if (di !== selDay) { selDay = di; renderAll(); return true; } return false; };
@@ -286,6 +289,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   else if (e.type === 'meal') row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 ' + esc(e.name) + '</span></div><div class="sub">' + lines + (e.web ? '<br><a href="' + esc(e.web) + '" target="_blank" rel="noopener noreferrer" style="color:#1a6fe8">地图</a>' : '') + '</div>';
   else {
     row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + (edit ? '<input class="dur" type="number" min="10" max="720" step="15" value="' + e.stay + '"> ' : e.stay + ' ') + '分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
+    const pi = S.issues.places[e.pid]; if (pi) row.querySelector('.sub').insertAdjacentHTML('beforeend', issueHtml(pi));
     if (edit) {
       wireDur(row, e.pid, e.stay);
       row.dataset.pid = e.pid; row.draggable = true;
@@ -307,6 +311,7 @@ function renderList() {
     const d = S.map.days[di], box = edit ? document.createElement('div') : list; if (edit) { box.className = 'day'; box.dataset.day = d.index; list.appendChild(box); }
     if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = '<span class="dot" style="background:' + d.color + '"></span>' + esc(d.label); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
     if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; box.appendChild(w); }
+    const dayI = S.issues.days[String(d.index)]; if (dayI) { const w2 = document.createElement('div'); w2.className = 'dayiss'; w2.innerHTML = issueHtml(dayI); box.appendChild(w2); }
     const nStops = d.timeline.filter(e => e.type === 'stop').length; let si = 0;
     d.timeline.forEach((e, idx) => box.appendChild(rowEl(d, e, idx, di, di === selDay ? ctx : null, e.type === 'stop' ? si++ : 0, nStops)));
     if (edit && !nStops) box.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');

@@ -10,7 +10,9 @@ from typing import Literal, Optional
 
 from .connections import arrival_day, day_window, departure_day
 from .metrics import INTERCITY_KM, PACE_LIMITS, day_stats, estimate_cost, intercity_hint
+from .hours import hours_window
 from .models import Trip
+from .timeline import day_visits
 from .stays import hint_text
 from .weather import SOURCE_NAMES, bad_weather, is_outdoor
 
@@ -21,6 +23,38 @@ LODGING_FAR_MIN = 45    # 住宿到当天首/末景点超过这个分钟数，�
 
 _SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 _WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+WAIT_WARN_MIN = 30      # 比开门早到超过这么久，提醒（短的等待只给提示）
+
+
+def _hm(m: int) -> str:
+    m = int(m) % (24 * 60)
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+def _hours_problem(w, arrive: int, leave: int):
+    """把一个景点的到达/离开时间和当天营业窗口对比。返回 (代码, 严重程度, 说明) 或 None（没问题）。"""
+    if w.closed:
+        return "OUTSIDE_HOURS", "error", "当天不开放（闭馆）"
+    if w.all_day:
+        if w.last_entry is not None and arrive > w.last_entry:
+            return "OUTSIDE_HOURS", "error", f"{_hm(arrive)} 到达，已过最晚进入/售票时间 {_hm(w.last_entry)}"
+        return None
+    rs = w.ranges
+    cur = next((r for r in rs if r[0] <= arrive < r[1]), None)
+    span = "、".join(f"{_hm(a)}-{_hm(b)}" for a, b in rs)
+    if cur is None:
+        if arrive >= rs[-1][1]:
+            return "OUTSIDE_HOURS", "error", f"{_hm(arrive)} 到达时已关门（当天 {span} 开放）"
+        if arrive < rs[0][0]:
+            wait = rs[0][0] - arrive
+            return "ARRIVE_BEFORE_OPEN", "warning" if wait >= WAIT_WARN_MIN else "info", f"{_hm(arrive)} 到达，比开门时间 {_hm(rs[0][0])} 早约 {wait} 分钟，需要等待"
+        nxt = next(r for r in rs if r[0] > arrive)
+        return "OUTSIDE_HOURS", "warning", f"{_hm(arrive)} 到达时正在休息，{_hm(nxt[0])} 才重新开放"
+    if w.last_entry is not None and arrive > w.last_entry:
+        return "OUTSIDE_HOURS", "error", f"{_hm(arrive)} 到达，已过最晚进入/售票时间 {_hm(w.last_entry)}（{_hm(cur[1])} 闭馆）"
+    if leave > cur[1]:
+        return "LEAVE_AFTER_CLOSE", "warning", f"计划停留到 {_hm(leave)}，但 {_hm(cur[1])} 闭馆，实际最多停留约 {cur[1] - arrive} 分钟"
+    return None
 
 
 @dataclass(frozen=True)
@@ -38,6 +72,7 @@ def validate(trip: Trip) -> list[Issue]:
         return [Issue("NO_PLAN", "info", "还没有生成行程，请先运行分天。")]
 
     limits = PACE_LIMITS[trip.meta.pace]
+    saw_hours_without_date = False
 
     for day in trip.plan.days:
         st = day_stats(trip, day)
@@ -80,6 +115,24 @@ def validate(trip: Trip) -> list[Issue]:
                     day.index,
                 )
             )
+
+        visits, end_min = day_visits(trip, day)
+        if not w_why and end_min > w_end:
+            issues.append(Issue("DAY_RUNS_LATE", "warning", f"{label}预计{'次日 ' if end_min >= 24 * 60 else ' '}{_hm(end_min)} 才结束，晚于建议的 {_hm(w_end)}。", day.index))
+        for v in visits:
+            if not v.place.opening_hours:
+                continue
+            if d is None:
+                saw_hours_without_date = True
+                continue
+            w = hours_window(v.place.opening_hours, d)
+            if w is None:
+                continue
+            prob = _hours_problem(w, v.arrive, v.leave)
+            if prob is not None:
+                code, sev, text = prob
+                src = f"（来源：{v.place.hours_source}）" if v.place.hours_source else ""
+                issues.append(Issue(code, sev, f"{label}（{d.isoformat()}）「{v.place.name}」{text}{src}。", day.index, v.place.id))
 
         for leg in st.legs:
             if leg.minutes > LONG_LEG_MIN:
@@ -155,6 +208,9 @@ def validate(trip: Trip) -> list[Issue]:
                         p.id,
                     )
                 )
+
+    if saw_hours_without_date:
+        issues.append(Issue("HOURS_NEED_DATE", "info", "还没有确定日期，无法按营业时间检查各景点的到达时间；确定日期后会自动检查。"))
 
     for which, c, idx in (("到达", trip.arrival, arrival_day(trip)), ("离开", trip.departure, departure_day(trip))):
         if c is not None and idx is None:

@@ -653,3 +653,16 @@ def test_snapshot_has_no_lodging_editor_block(server):
     assert "lodging" not in state(server)
     for r in ("lodging_preview", "lodging_apply", "add_lodging"):
         assert call(server, f"/tok/api/{r}", {"base_revision": 1})[0] == 404
+
+
+def test_snapshot_issues_for_places_and_days(server):
+    s.new_trip("检查", 1, travelers=1, start_date="2026-10-14", end_date="2026-10-14")
+    s.add_place("早关馆", 34.2, 108.9, duration_min=120)
+    s.add_place("晚到点", 34.205, 108.905, duration_min=120)
+    pids = [p.id for p in s._load().places]
+    s.update_place(pids[1], opening_hours="周一至周日 09:00-10:00", hours_source="user")
+    s.schedule_days()
+    iss = state(server)["issues"]
+    pi = iss["places"][pids[1]]
+    assert any(x["sev"] == "error" and "已关门" in x["text"] and not x["text"].startswith(("第", "「")) for x in pi)
+    assert all(set(x) == {"sev", "text"} for v in list(iss["places"].values()) + list(iss["days"].values()) for x in v)

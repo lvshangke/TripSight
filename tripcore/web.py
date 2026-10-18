@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import http.client
 import json
 import os
@@ -83,6 +84,30 @@ def _rows(trip: Trip, timeline: list[dict], locked: dict[str, bool]) -> list[dic
     return rows
 
 
+_PREFIX = re.compile(r"^第\d+天(?:（[^）]*）)?")
+
+
+def _issues_block(trip: Trip) -> dict[str, Any]:
+    """页面显示用：每个景点、每天各自的错误/警告（info 不显示）。景点上的提示去掉“第N天（日期）”前缀，因为就显示在它下面。"""
+    days: dict[str, list] = {}
+    places: dict[str, list] = {}
+    for i in validate(trip):
+        if i.severity not in ("error", "warning") or i.day_index is None:
+            continue
+        if i.place_id:
+            text = _PREFIX.sub("", i.message).lstrip("，, ")
+            try:
+                own = f"「{trip.place(i.place_id).name}」"
+            except KeyError:
+                own = ""
+            if own and text.startswith(own):
+                text = text[len(own):]
+            places.setdefault(i.place_id, []).append({"sev": i.severity, "text": text})
+        else:
+            days.setdefault(str(i.day_index), []).append({"sev": i.severity, "text": i.message})
+    return {"days": days, "places": places}
+
+
 def snapshot() -> dict[str, Any]:
     trip = ms._load()
     mp = build_map_data(trip)
@@ -109,7 +134,7 @@ def snapshot() -> dict[str, Any]:
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
                     for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
-    return {"title": m.name, "trip": _slug(), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+    return {"title": m.name, "trip": _slug(), "issues": _issues_block(trip), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
             "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},
