@@ -505,3 +505,54 @@ def test_switch_not_available_in_single_file_mode(server):
     r = call(server, "/tok/api/trips")[1]
     assert r["single"] is True and len(r["trips"]) == 1
     assert call(server, "/tok/api/switch", {"slug": "x"})[0] == 400
+
+
+def test_new_trip_from_web_switches_and_keeps_old(multi):
+    code, out = call(multi, "/tok/api/new_trip", {"name": "东京5日", "city": "东京", "num_days": 5, "travelers": 2,
+                                                  "start": None, "end": None, "pace": "relaxed"})
+    assert code == 200 and out["title"] == "东京5日" and out["trip"]
+    st = state(multi)
+    assert st["title"] == "东京5日" and st["trip"] == out["trip"] and st["dates"]["num_days"] == 5
+    names = {t["name"] for t in call(multi, "/tok/api/trips")[1]["trips"]}
+    assert names == {"甲行程", "乙行程", "东京5日"}                      # 原来的行程都还在
+    call(multi, "/tok/api/new_trip", {"name": "东京5日", "num_days": 2})
+    slugs = [t["slug"] for t in call(multi, "/tok/api/trips")[1]["trips"] if t["name"] == "东京5日"]
+    assert len(slugs) == 2 and len(set(slugs)) == 2                  # 重名自动加后缀，不覆盖
+
+
+def test_new_trip_with_dates_sets_days_and_prefs_applied(multi):
+    code, out = call(multi, "/tok/api/new_trip", {"name": "有日期", "num_days": 1, "start": "2026-11-01", "end": "2026-11-04"})
+    assert code == 200
+    st = state(multi)
+    assert st["dates"]["start"] == "2026-11-01" and st["dates"]["num_days"] == 4
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"name": "  "}, {"name": 5}, {"name": "x" * 41}, {"name": "a", "num_days": 0}, {"name": "a", "num_days": 31},
+    {"name": "a", "num_days": "3"}, {"name": "a", "num_days": True}, {"name": "a", "travelers": 0}, {"name": "a", "travelers": 51},
+    {"name": "a", "pace": "fast"}, {"name": "a", "start": "2026-11-01"}, {"name": "a", "start": "2026-11-01", "end": "bad"},
+    {"name": "a", "start": "2026-11-01", "end": "2026-12-31"}, {"name": "a", "start": "2026-11-05", "end": "2026-11-01"},
+    {"name": "a", "city": 5}, {"name": "a", "start": 20261101, "end": 20261102},
+])
+def test_new_trip_rejects_bad_input_and_changes_nothing(multi, body):
+    before = state(multi)["title"]
+    code, _ = call(multi, "/tok/api/new_trip", body)
+    assert code == 400
+    assert state(multi)["title"] == before and len(call(multi, "/tok/api/trips")[1]["trips"]) == 2
+
+
+def test_new_trip_web_guards(server, multi):
+    assert raw_post(multi, "/api/new_trip", {"name": "x"})[0] == 404                                  # 没有令牌
+    assert raw_post(multi, "/tok/api/new_trip", {"name": "x"}, {"Origin": "https://evil.example.com"})[0] == 403
+    assert len(call(multi, "/tok/api/trips")[1]["trips"]) == 2
+
+
+def test_new_trip_disabled_in_single_file_mode(server):
+    before = state(server)["title"]
+    assert call(server, "/tok/api/new_trip", {"name": "覆盖"})[0] == 400
+    assert state(server)["title"] == before
+
+
+def test_mcp_new_trip_rejects_over_30_days_by_dates():
+    with pytest.raises(s.ToolError):
+        s.new_trip("太长", 3, start_date="2026-11-01", end_date="2026-12-15")

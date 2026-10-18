@@ -239,6 +239,8 @@ def new_trip(
         )
     except (ValidationError, ValueError) as e:
         raise ToolError(f"参数不合法：{e}")
+    if meta.num_days > 30:
+        raise ToolError("行程最多 30 天。")
     tp = {k: saved[k] for k in _prefs.TRANSPORT_KEYS if k in saved}
     if tp:
         meta.transport_prefs = meta.transport_prefs.model_validate({**meta.transport_prefs.model_dump(), **tp})

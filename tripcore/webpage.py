@@ -27,6 +27,15 @@ button:disabled{opacity:.4;cursor:default}
 button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #msg{padding:4px 12px;font-size:13px;color:#555;min-height:6px}
 #msg.err{color:#b91c1c}
+#nt{position:fixed;inset:0;background:#0006;z-index:3000;display:none;align-items:center;justify-content:center}
+#nt.on{display:flex}
+#nt form{background:#fff;border-radius:10px;padding:16px 18px;width:min(380px,92vw);box-shadow:0 8px 30px #0005;font-size:14px}
+#nt h3{margin:0 0 10px;font-size:16px}
+#nt label{display:block;margin:8px 0 2px;color:#444;font-size:13px}
+#nt input,#nt select{width:100%;box-sizing:border-box;font:inherit;padding:5px 6px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#222}
+#nt .row{display:flex;gap:8px}#nt .row>div{flex:1}
+#nt .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#nt .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
 .editonly{display:none}
 #app.edit .editonly{display:block}
 #app.edit #tabs{display:none}
@@ -94,6 +103,14 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
+<div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
+<label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
+<label>目的地城市（选填，之后查坐标会限定在这个城市附近）</label><input id="nt_city" maxlength="40" placeholder="例如：东京">
+<div class="row"><div><label>天数（1–30）</label><input id="nt_days" type="number" min="1" max="30" value="3"></div><div><label>出行人数</label><input id="nt_tv" type="number" min="1" max="50" value="1"></div></div>
+<div class="row"><div><label>出发日（选填）</label><input id="nt_sd" type="date"></div><div><label>结束日（选填）</label><input id="nt_ed" type="date"></div></div>
+<label>节奏</label><select id="nt_pace"><option value="">沿用我的长期偏好</option><option value="relaxed">悠闲</option><option value="normal">正常</option><option value="packed">紧凑</option></select>
+<div class="err" id="nt_err"></div>
+<div class="btns"><button type="button" id="nt_cancel">取消</button><button type="submit" class="pri" id="nt_ok">创建</button></div></form></div>
 <script>__JS__</script>
 <script>
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -123,11 +140,27 @@ async function loadTrips() {
   try {
     const r = await api('trips'), sel = $('trip'); sel.innerHTML = '';
     r.trips.forEach(t => { const o = document.createElement('option'); o.value = t.slug; o.textContent = t.name + (t.num_days ? '（' + t.num_days + '天）' : ''); o.selected = t.slug === r.current || r.single; sel.appendChild(o); });
-    sel.disabled = r.single || r.trips.length < 2; sel.title = r.single ? '单文件模式不能切换' : (r.trips.length < 2 ? '只有一个行程' : '切换行程');
+    if (!r.single) { const o = document.createElement('option'); o.value = '__new__'; o.textContent = '＋ 新建行程…'; sel.appendChild(o); }
+    sel.disabled = r.single; sel.title = r.single ? '单文件模式不能切换或新建' : '切换行程 / 新建行程'; curTrip = r.current;
   } catch (e) {}
 }
+let curTrip = null;
+function ntOpen() { $('nt_err').textContent = ''; $('nt').classList.add('on'); $('nt_name').focus(); }
+function ntClose() { $('nt').classList.remove('on'); }
+$('nt_cancel').onclick = ntClose; $('nt').onclick = e => { if (e.target === $('nt')) ntClose(); };
+$('nt_sd').onchange = () => { const a = $('nt_sd').value, b = $('nt_ed').value; if (a && (!b || b < a)) $('nt_ed').value = a; if (a && $('nt_ed').value) $('nt_days').value = Math.round((parse($('nt_ed').value) - parse(a)) / 864e5) + 1; };
+$('nt_ed').onchange = () => { const a = $('nt_sd').value, b = $('nt_ed').value; if (a && b) $('nt_days').value = Math.round((parse(b) - parse(a)) / 864e5) + 1; };
+$('ntf').onsubmit = async e => {
+  e.preventDefault(); const sd = $('nt_sd').value, ed = $('nt_ed').value;
+  const body = {name: $('nt_name').value, city: $('nt_city').value, num_days: Number($('nt_days').value), travelers: Number($('nt_tv').value), start: sd || null, end: ed || null, pace: $('nt_pace').value || null};
+  $('nt_ok').disabled = true;
+  try { const r = await api('new_trip', body); ntClose(); closePrev(); picks = []; calMonth = null; selDay = 0; $('ntf').reset(); say(r.message + ' 现在可以在右侧助手里说想去哪、想看什么。'); await load(); if ($('chat').classList.contains('hide')) $('chat').classList.remove('hide'), syncSp2(), fit(); $('ctext').focus(); }
+  catch (er) { $('nt_err').textContent = er.message; }
+  $('nt_ok').disabled = false;
+};
 $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
+  if (want === '__new__') { await loadTrips(); ntOpen(); return; }
   if (pending && !confirm('有一个还没确认的修改预览，切换行程会放弃它。继续吗？')) { await loadTrips(); return; }
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); }
   catch (e) { say(e.message, true); await loadTrips(); }

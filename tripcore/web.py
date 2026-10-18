@@ -224,6 +224,39 @@ def _slug() -> Optional[str]:
     return ws.active_slug(ms._root_dir())
 
 
+def new_trip(body: dict) -> dict[str, Any]:
+    """页面上的“新建行程”：走和 agent 一样的 new_trip（长期偏好自动套用，原来的行程不动，创建后切换过去）。"""
+    if ms._single_file_mode():
+        raise HttpError(400, "当前是单文件模式，新建会覆盖现有行程，已禁用。请在 agent 里操作，或取消 TRIPCORE_FILE。")
+    name = body.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise HttpError(400, "请填写行程名称。")
+    name = name.strip()
+    if len(name) > 40:
+        raise HttpError(400, "行程名称最多 40 个字。")
+    city = body.get("city")
+    if city is not None and (not isinstance(city, str) or len(city.strip()) > 40):
+        raise HttpError(400, "目的地城市不合法。")
+    city = (city or "").strip() or None
+    sd, ed = body.get("start") or None, body.get("end") or None
+    if bool(sd) != bool(ed):
+        raise HttpError(400, "日期要同时填出发日和结束日，或者都不填。")
+    for v in (sd, ed):
+        if v is not None and not isinstance(v, str):
+            raise HttpError(400, "日期格式不对。")
+    nd, tv = body.get("num_days", 3), body.get("travelers", 1)
+    if not (isinstance(nd, int) and not isinstance(nd, bool) and 1 <= nd <= 30):
+        raise HttpError(400, "天数要在 1 到 30 之间。")
+    if not (isinstance(tv, int) and not isinstance(tv, bool) and 1 <= tv <= 50):
+        raise HttpError(400, "出行人数要在 1 到 50 之间。")
+    pace = body.get("pace") or None
+    if pace is not None and pace not in ("relaxed", "normal", "packed"):
+        raise HttpError(400, "节奏只能是悠闲、正常或紧凑。")
+    msg = ms.new_trip(name=name, num_days=nd, pace=pace, start_date=sd, end_date=ed, city=city, travelers=tv)
+    t = ms._load()
+    return {"trip": _slug(), "title": t.meta.name, "revision": t.revision, "message": msg.splitlines()[0]}
+
+
 def rev() -> dict[str, Any]:
     return {"revision": ms._load().revision, "trip": _slug()}
 
@@ -306,7 +339,7 @@ CODE_VERSION = code_version()
 
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
-ROUTES_POST = {"switch": switch, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
+ROUTES_POST = {"switch": switch, "new_trip": new_trip, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
 def make_handler(token: str, state: dict):
