@@ -31,7 +31,7 @@ always: true
 
 ## 工具一览
 
-new_trip / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
+new_trip / list_trips / switch_trip / archive_trip / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
 
 ## 长期偏好（跨行程、跨会话）
 - 用户**明确**说出长期偏好时（“我不爱走路”“我一般喜欢地铁”“以后住宿别超过400”“我不吃辣”），调用 `remember_preference`，并用一句话告诉用户记了什么、可以随时让你忘掉。value 只能用工具说明里列出的键，不确定就只写 text。
@@ -154,3 +154,7 @@ new_trip / remember_preference / list_preferences / forget_preference / set_stay
 - 记录后 `check_plan` 会提示第一天/最后一天时间不够，`show_trip` 和地图时间线也会显示到达后几点能开始、几点必须出发。需要调整时用 `propose_change`，由用户确认。
 - 记录错了用 `clear_connection` 删除，或 `undo`。
 
+## 多个行程
+- 用户问“我有哪些行程”→ `list_trips`；说“换到某某行程/继续上次那个”→ `switch_trip`；说“把某行程收起来/归档”→ `archive_trip`（只归档不删除，当前行程不能归档）。这三个都要用户明确要求才调用。
+- 已有进行中的行程时，用户说要规划新行程，先问一句“新建一个，还是继续当前这个？”，确认新建再 `new_trip`；新建不会覆盖旧行程，会自动切换过去。
+- 各行程的提案、候选景点、地图文件互相独立；偏好是所有行程共用的。

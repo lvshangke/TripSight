@@ -35,6 +35,7 @@ from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
+from . import workspace as _ws
 from .textview import build_text as _build_text, guard_text as _guard_text
 from .checklist import build_checklist as _build_checklist, render as _render_checklist
 from .metrics import intercity_hint
@@ -70,9 +71,25 @@ class ToolError(Exception):
 # 存取
 # ---------------------------------------------------------------------------
 
+def _single_file_mode() -> bool:
+    """设了 TRIPCORE_FILE 就是单文件模式（测试、演示用）：只有这一个行程，不做多行程管理。"""
+    return bool(os.environ.get("TRIPCORE_FILE"))
+
+
+def _root_dir() -> Path:
+    """共用文件（偏好、高德调用日志）所在目录；多行程模式下各行程在 <根>/trips/<名字>/。"""
+    p = os.environ.get("TRIPCORE_FILE")
+    return Path(p).expanduser().parent if p else Path.home() / ".tripcore"
+
+
 def trip_path() -> Path:
     p = os.environ.get("TRIPCORE_FILE")
-    return Path(p).expanduser() if p else Path.home() / ".tripcore" / "trip.json"
+    if p:
+        return Path(p).expanduser()
+    root = _root_dir()
+    _ws.migrate_legacy(root)                      # 旧版放在根目录的行程：第一次使用时复制进 trips/
+    slug = _ws.active_slug(root)
+    return _ws.trips_dir(root) / (slug or "_none") / "trip.json"
 
 
 def _proposals_path() -> Path:
@@ -111,7 +128,7 @@ def _context_path() -> Path:
 
 
 def _prefs_path() -> Path:
-    return trip_path().with_name("preferences.json")
+    return _root_dir() / "preferences.json"
 
 
 def _load_context() -> dict:
@@ -127,7 +144,7 @@ def _save_context(data: dict) -> None:
 
 def _amap() -> Optional[AmapClient]:
     """有 AMAP_KEY 才启用高德；测试里会替换这个函数。"""
-    return AmapClient.from_env(log_path=trip_path().with_name("amap_calls.log"))
+    return AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
 
 
 def _next_id(prefix: str, existing: list[str]) -> str:
@@ -163,7 +180,8 @@ def new_trip(
     city: Optional[str] = None,
     travelers: int = 1,
 ) -> str:
-    """创建一个新行程（会覆盖当前行程）。travelers 是出行人数（用户没说就先问）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
+    """创建一个新行程并切换到它（原来的行程不会被覆盖，仍可用 list_trips 查看、switch_trip 切回；
+    单文件模式 TRIPCORE_FILE 下才会覆盖）。创建前如果已有进行中的行程，先问用户是新建还是继续。travelers 是出行人数（用户没说就先问）。city 是目的地城市（如“哈尔滨”），之后查坐标会限定在这个城市附近。
     日期可不填；填 start_date+end_date 为确定日期，填 earliest_start+latest_end 为大致范围。
     pace 不填时，用用户之前说过的长期偏好（没有就是 normal）；用户长期偏好里的步行/地铁/换乘/打车设置也会自动套用到新行程，
     返回文字里会列出套用了什么。用户这次明确说的永远优先。"""
@@ -193,6 +211,14 @@ def new_trip(
     if tp:
         meta.transport_prefs = meta.transport_prefs.model_validate({**meta.transport_prefs.model_dump(), **tp})
         applied += [f"{k}={v}" for k, v in tp.items()]
+    others = 0
+    if not _single_file_mode():
+        root = _root_dir()
+        _ws.migrate_legacy(root)
+        others = len(_ws.list_trips(root))
+        slug = _ws.unique_slug(root, _ws.slugify(name))
+        (_ws.trips_dir(root) / slug).mkdir(parents=True, exist_ok=True)
+        _ws.set_active(root, slug)
     trip = Trip(meta=meta)
     _save(trip)
     _save_proposals({})
@@ -202,6 +228,8 @@ def new_trip(
     except OSError:
         pass
     msg = f"已创建行程「{meta.name}」，共 {meta.num_days} 天，节奏 {meta.pace.value}，交通偏好 {_MODE_NAMES[meta.mode]}。"
+    if others:
+        msg += f"\n已切换到这个新行程；之前的 {others} 个行程都还在（list_trips 查看，switch_trip 切回）。"
     allp = _prefs.load(_prefs_path())
     if applied:
         msg += "\n按你之前的长期偏好套用了：" + "、".join(applied) + "（可随时改）。"
@@ -923,7 +951,7 @@ def _call_amap_mcp(tool: str, arguments: dict[str, Any], key: str) -> str:
 
 def _audit_mcp(line: str) -> None:
     try:
-        p = trip_path().with_name("amap_calls.log")
+        p = _root_dir() / "amap_calls.log"
         with p.open("a", encoding="utf-8") as f:
             from datetime import datetime
             f.write(f"{datetime.now().isoformat(timespec='seconds')} | mcp.amap.com | {line}\n")
@@ -1461,6 +1489,59 @@ def final_check() -> str:
     return _render_checklist(_build_checklist(_load()))
 
 
+def list_trips() -> str:
+    """列出所有行程（名字、天数、景点数、版本，标出当前正在用的）和已归档的数量。用户问“我有哪些行程”时调用。只读。"""
+    if _single_file_mode():
+        p = trip_path()
+        if not p.exists():
+            return "还没有行程。"
+        t = load_trip(p)
+        return f"（单文件模式）当前行程：{t.meta.name}，{t.meta.num_days} 天，{len(t.places)} 个景点。"
+    root = _root_dir()
+    _ws.migrate_legacy(root)
+    items = _ws.list_trips(root)
+    if not items:
+        return "还没有行程，请先 new_trip。"
+    lines = [f"{'▶' if i['active'] else ' '} {i['name']}（{i['slug']}）：{i['num_days']} 天，{i['places']} 个景点，版本 {i['revision']}" for i in items]
+    arch = len(_ws.list_trips(root, archived=True))
+    return "\n".join(lines) + (f"\n（另有 {arch} 个已归档行程，在 trips/_archive/ 里，文件都还在）" if arch else "")
+
+
+def switch_trip(name: str) -> str:
+    """切换到另一个行程（按行程名或目录名，名字相近时需要说得更具体）。切换后所有工具都作用于这个行程；
+    待确认的提案、候选景点、地图文件都是各行程自己的，不会串。需要用户明确要求切换才调用。"""
+    if _single_file_mode():
+        raise ToolError("当前是单文件模式（设置了 TRIPCORE_FILE），不能切换行程。")
+    root = _root_dir()
+    _ws.migrate_legacy(root)
+    try:
+        slug = _ws.resolve(root, name)
+    except KeyError:
+        raise ToolError(f"找不到行程「{name}」。现有行程：" + "、".join(i["name"] for i in _ws.list_trips(root)))
+    except ValueError as e:
+        raise ToolError(f"「{name}」匹配到多个行程：{e}。请说得更具体。")
+    _ws.set_active(root, slug)
+    t = _load()
+    return f"已切换到「{t.meta.name}」（{t.meta.num_days} 天，{len(t.places)} 个景点，版本 {t.revision}）。"
+
+
+def archive_trip(name: str) -> str:
+    """把一个行程归档（移到 trips/_archive/，不删除任何文件，之后可以手动移回）。当前正在用的行程不能归档。
+    需要用户明确要求才调用。"""
+    if _single_file_mode():
+        raise ToolError("当前是单文件模式（设置了 TRIPCORE_FILE），不能归档。")
+    root = _root_dir()
+    _ws.migrate_legacy(root)
+    try:
+        slug = _ws.resolve(root, name)
+        dest = _ws.archive(root, slug)
+    except KeyError:
+        raise ToolError(f"找不到行程「{name}」。")
+    except ValueError as e:
+        raise ToolError(str(e))
+    return f"已归档「{name}」（文件移到了 trips/_archive/{dest.name}，没有删除）。"
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
     trip = _load()
@@ -1861,7 +1942,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    list_trips, switch_trip, archive_trip, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

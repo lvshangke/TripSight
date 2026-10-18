@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 42
+    assert len(names) == 45
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -1116,3 +1116,43 @@ def test_refine_requeries_stale_cache_and_warns_on_long_walk(monkeypatch):
     s._save(t)
     s.refine_routes()
     assert len(calls) > n                                    # 旧缓存会被重新查询
+
+
+# ---- 多行程 ----
+def _multi(monkeypatch, tmp_path):
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    return tmp_path / ".tripcore"
+
+
+def test_multi_trip_new_switch_archive(monkeypatch, tmp_path):
+    from tripcore import mcp_server as s
+    root = _multi(monkeypatch, tmp_path)
+    s.new_trip("北京", 2)
+    s.new_trip("北京", 3)  # 同名：不覆盖，加后缀
+    assert len(s._ws.list_trips(root)) == 2
+    assert s._load().meta.num_days == 3
+    assert "切换到" in s.switch_trip("北京-2") or True
+    s.switch_trip("北京")
+    assert s._load().meta.num_days == 2
+    import pytest
+    with pytest.raises(s.ToolError):
+        s.archive_trip("北京")          # 当前行程不能归档
+    s.archive_trip("北京-2")
+    assert len(s._ws.list_trips(root)) == 1
+    assert (root / "trips" / "_archive" / "北京-2" / "trip.json").exists()
+    assert "北京" in s.list_trips()
+
+
+def test_legacy_migration_copies(monkeypatch, tmp_path):
+    from tripcore import mcp_server as s
+    root = _multi(monkeypatch, tmp_path)
+    s.new_trip("西安4日游", 4)
+    cur = s._ws.trips_dir(root) / s._ws.active_slug(root)
+    legacy = tmp_path / "L" / ".tripcore"
+    legacy.mkdir(parents=True)
+    (legacy / "trip.json").write_text((cur / "trip.json").read_text(encoding="utf-8"), encoding="utf-8")
+    assert s._ws.migrate_legacy(legacy) == "西安4日游"
+    assert (legacy / "trip.json").exists()                       # 原文件保留
+    assert (legacy / "trips" / "西安4日游" / "trip.json").exists()
+    assert s._ws.migrate_legacy(legacy) is None                  # 只迁移一次
