@@ -190,9 +190,11 @@ class AmapClient:
         g_lat, g_lon = wgs84_to_gcj02(lat, lon)
         params: dict[str, Any] = {
             "location": f"{g_lon:.6f},{g_lat:.6f}", "radius": max(100, min(int(radius_m), 5000)),
-            "types": types, "page_size": max(1, min(limit, 25)), "show_fields": "business",
+            "page_size": max(1, min(limit, 25)), "show_fields": "business",
             "sortrule": "distance",
         }
+        if types:
+            params["types"] = types
         if keywords:
             params["keywords"] = keywords
         return self._parse_pois(self._get("/v5/place/around", params))

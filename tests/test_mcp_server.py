@@ -1074,3 +1074,13 @@ def test_show_trip_lists_ids_of_unscheduled_places():
     if "未安排：" in out:
         import re
         assert re.search(r"未安排：.*\(p\d+\)", out)
+
+
+def test_create_amap_map_returns_https_web_links(monkeypatch):
+    _setup_four_days()
+    monkeypatch.setenv("AMAP_KEY", "SECRETKEY123")
+    monkeypatch.setattr(s, "_amap", lambda: PoiAll())
+    monkeypatch.setattr(s, "_call_amap_mcp", lambda t, a, k: "amapuri://workInAmap/createWithToken?polymericId=mcp_x&from=MCP")
+    r = s.create_amap_map()
+    assert r["maps"][0]["web_links"] and all(x["url"].startswith("https://uri.amap.com/marker") for x in r["maps"][0]["web_links"])
+    assert "微信" in r["note"] and "SECRETKEY123" not in str(r)

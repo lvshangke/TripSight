@@ -30,7 +30,7 @@ from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .gpx import build_gpx
-from .mapview import build_map_html
+from .mapview import build_map_html, day_marker_links
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -724,11 +724,46 @@ def export_map() -> str:
 MAX_POI_LOOKUPS = 25
 
 
+_NAME_SUFFIXES = ("风景名胜区", "旅游风景区", "国家森林公园", "风景区", "旅游区", "景区", "名胜区", "博物馆")
+
+
+def _norm_poi_name(s: str) -> str:
+    import re
+    s = re.sub(r"[（(].*?[）)]", "", s)                    # 去掉括号里的分店/备注
+    s = re.sub(r"\s+", "", s)
+    for suf in _NAME_SUFFIXES:
+        if s.endswith(suf) and len(s) > len(suf):
+            s = s[: -len(suf)]
+            break
+    return s
+
+
+def _poi_name_ok(name: str, hit_name: str) -> bool:
+    if name in hit_name or hit_name in name:
+        return True
+    a, b = _norm_poi_name(name), _norm_poi_name(hit_name)
+    return len(a) >= 2 and len(b) >= 2 and (a in b or b in a)
+
+
 def _match_poi(client: Any, name: str, lat: float, lon: float, city: Optional[str], max_km: float = 1.5) -> Optional[str]:
-    """按名称+距离在高德里找对应的 POI ID；名字不相符或太远就返回 None（宁缺毋滥）。"""
-    for h in client.search_places(name, city, limit=5):
-        if h.amap_id and (name in h.name or h.name in name) and haversine_km(lat, lon, h.lat, h.lon) <= max_km:
-            return h.amap_id
+    """按名称+距离在高德里找对应的 POI ID；名字不相符或太远就返回 None（宁缺毋滥）。
+    先在行程城市里搜；找不到再不限城市搜（行程可能跨市，如西安+华阴），最后按坐标周边搜。"""
+    def pick(hits: list) -> Optional[str]:
+        best, best_d = None, 1e9
+        for h in hits:
+            if h.amap_id and _poi_name_ok(name, h.name):
+                d = haversine_km(lat, lon, h.lat, h.lon)
+                if d <= max_km and d < best_d:
+                    best, best_d = h.amap_id, d
+        return best
+
+    for city_arg in ([city, None] if city else [None]):
+        pid = pick(client.search_places(name, city_arg, limit=10))
+        if pid:
+            return pid
+    around = getattr(client, "search_around", None)
+    if around is not None:
+        return pick(around(lat, lon, radius_m=int(max_km * 1000), types="", keywords=_norm_poi_name(name) or name, limit=10))
     return None
 
 
@@ -769,7 +804,7 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
     found: dict[tuple[str, str], str] = {}
     for kind, oid, obj in need[:MAX_POI_LOOKUPS]:
         try:
-            pid = _match_poi(client, obj.name, obj.lat, obj.lon, city, 1.0 if kind == "l" else 1.5)
+            pid = _match_poi(client, obj.name, obj.lat, obj.lon, city, {"l": 1.0, "p": 3.0}.get(kind, 1.5))
         except AmapError:
             pid = None
         if pid:
@@ -900,11 +935,16 @@ def create_amap_map(day: Optional[int] = None, per_day: bool = True) -> dict[str
         _audit_mcp(f"maps_schema_personal_map | 行程{len(args['lineList'])}条 点{pts}个 | OK")
         import re
         m = re.search(r"[a-zA-Z][a-zA-Z0-9+.-]*://\S+", text)
-        out.append({"day": d if d is not None else "全部", "link": m.group(0) if m else text,
-                    "lines": len(args["lineList"]), "points": pts})
+        entry_ = {"day": d if d is not None else "全部", "link": m.group(0) if m else text,
+                  "lines": len(args["lineList"]), "points": pts}
+        if d is not None:
+            entry_["web_links"] = day_marker_links(_load(), d - 1)
+        out.append(entry_)
         skipped += payload["skipped"]
     return {"maps": out, "skipped": skipped,
-            "note": "把链接发到装了高德 App 的手机上打开（电脑浏览器打不开）。链接可能有有效期，尽快打开。"}
+            "note": "link 是高德 App 的专用地址（amapuri://），要在装了高德 App 的手机上打开，电脑浏览器打不开；链接可能有有效期。"
+                    "微信等聊天应用里这种地址通常点不开：把它单独放一行，让用户长按复制后到手机浏览器或高德里打开；"
+                    "同时给出 web_links（https 网页链接，每站一个，微信里可以直接点开）。skipped 里的点要如实告诉用户原因。"}
 
 
 def export_gpx(day: Optional[int] = None) -> str:

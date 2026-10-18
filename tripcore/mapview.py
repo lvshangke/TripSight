@@ -41,6 +41,38 @@ def amap_link(a_name: str, a_lat: float, a_lon: float, b_name: str, b_lat: float
     return "https://uri.amap.com/navigation?" + q
 
 
+def marker_link(name: str, lat: float, lon: float) -> str:
+    """高德单点标注的网页链接（https，微信等聊天应用里可以点开；手机上可调起 App）。坐标是 WGS84，函数内转 GCJ-02。"""
+    g = wgs84_to_gcj02(lat, lon)
+    q = urllib.parse.urlencode({
+        "position": f"{g[1]:.6f},{g[0]:.6f}", "name": name, "coordinate": "gaode", "src": "tripcore", "callnative": 1,
+    }, quote_via=urllib.parse.quote)
+    return "https://uri.amap.com/marker?" + q
+
+
+def day_marker_links(trip: Trip, day_index: int) -> list[dict[str, str]]:
+    """某一天按顺序的各站点（出发酒店、景点、用餐点、回到的酒店）的 https 网页链接。"""
+    if trip.plan is None or not (0 <= day_index < len(trip.plan.days)):
+        return []
+    day = trip.plan.days[day_index]
+    places = [trip.place(it.place_id) for it in day.items]
+    if not places:
+        return []
+    out: list[dict[str, str]] = []
+    morning, night = trip.morning_lodging(day_index), trip.lodging_for_day(day_index)
+    if morning:
+        out.append({"label": "出发酒店", "name": morning.name, "url": marker_link(morning.name, morning.lat, morning.lon)})
+    for i, p in enumerate(places):
+        e = entry(p)
+        out.append({"label": f"第{i + 1}站", "name": p.name, "url": marker_link(p.name, e.lat, e.lon)})
+        for ml in trip.meals:
+            if ml.day == day_index and ml.after_place_id == p.id:
+                out.append({"label": "用餐", "name": ml.name, "url": marker_link(ml.name, ml.lat, ml.lon)})
+    if night:
+        out.append({"label": "返回酒店", "name": night.name, "url": marker_link(night.name, night.lat, night.lon)})
+    return out
+
+
 def _hm(minutes: float) -> str:
     m = int(round(minutes)) % (24 * 60)
     return f"{m // 60:02d}:{m % 60:02d}"
