@@ -1702,12 +1702,12 @@ def set_provider(provider: str) -> str:
 
 def search_links(keyword: str, kind: str = "guide", sites: Optional[list[str]] = None) -> dict[str, Any]:
     """生成“去别的平台看别人攻略/点评”的搜索链接（小红书、大众点评、马蜂窝、百度、Google），由用户自己点开、用自己的账号登录。
-    keyword 是景点名或想查的内容（会自动补上行程的目的地城市）；kind：guide 看攻略/游记，food 看美食点评；
+    keyword 是景点名或想查的内容（会自动补上行程的目的地城市）；kind：guide 看攻略/游记，food 看美食点评，hotel 看酒店价格和口碑（携程、大众点评、小红书；酒店价格和日期、房型有关，链接不带日期，用户要自己选日期）；
     sites 可选，指定平台 id（xiaohongshu / dianping / mafengwo / baidu / google）。
     不抓取、不读取这些平台的内容，也不碰任何账号；用户看到合适的攻略后，把正文复制回聊天，再走 submit_candidates 流程。
     链接格式没有用真实账号逐一验证，打不开或搜不准时如实告诉用户。"""
-    if kind not in (_links.GUIDE, _links.FOOD):
-        raise ToolError("kind 只能是 guide 或 food。")
+    if kind not in (_links.GUIDE, _links.FOOD, _links.HOTEL):
+        raise ToolError("kind 只能是 guide、food 或 hotel。")
     try:
         city = _load_context().get("city")
     except Exception:

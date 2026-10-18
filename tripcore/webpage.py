@@ -274,8 +274,8 @@ function drawMap(di) {
 // ---- 列表：一行 = 酒店/景点/通勤/用餐/航班车次 ----
 function lockedOf(pid) { for (const d of S.days) for (const it of d.items) if (it.place_id === pid) return it.locked; return false; }
 const linkHtml = (kw, kind, label) => {
-  const city = S.city || '', q0 = [city && kw.indexOf(city) < 0 ? city : '', kw].filter(Boolean).join(' '), suf = kind === 'food' ? '美食' : '攻略', q = q0.indexOf(suf) < 0 ? q0 + ' ' + suf : q0;
-  return '<span class="lk">' + label + (S.link_sites || []).filter(x => x.kinds.indexOf(kind) >= 0 && x.id !== 'google').map(x => '<a href="' + esc(x.tpl.replace('{q}', encodeURIComponent(q))) + '" target="_blank" rel="noopener noreferrer">' + esc(x.name) + '</a>').join('') + '</span>';
+  const city = S.city || '', q0 = [city && kw.indexOf(city) < 0 ? city : '', kw].filter(Boolean).join(' '), suf = kind === 'food' ? '美食' : kind === 'hotel' ? '酒店' : '攻略', q = q0.indexOf(suf) < 0 ? q0 + ' ' + suf : q0;
+  return '<span class="lk">' + label + (S.link_sites || []).filter(x => x.kinds.indexOf(kind) >= 0 && x.id !== 'google').map(x => '<a href="' + esc(x.tpl.replace('{q}', encodeURIComponent((q + ' ' + (x.suffix || '')).trim()))) + '" target="_blank" rel="noopener noreferrer">' + esc(x.name) + '</a>').join('') + '</span>';
 };
 const issueHtml = arr => arr.map(x => '<div class="is ' + x.sev + '">' + (x.sev === 'error' ? '⛔ ' : '⚠ ') + esc(x.text) + '</div>').join('');
 function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
@@ -290,7 +290,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   }
   row.className = 'it';
   const lines = (e.lines || []).map(esc).join('<br>');
-  if (e.type === 'hotel') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">🏨 ' + esc(e.role) + '：' + esc(e.name) + '</span></div>';
+  if (e.type === 'hotel') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">🏨 ' + esc(e.role) + '：' + esc(e.name) + '</span></div>' + (e.role === '返回' ? '' : '<div class="sub">' + linkHtml(e.name, 'hotel', '看酒店价格：') + '</div>');
   else if (e.type === 'term') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">' + e.icon + ' ' + esc(e.role) + '：' + esc(e.name) + '</span></div><div class="sub">' + lines + '</div>';
   else if (e.type === 'meal') row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 ' + esc(e.name) + '</span></div><div class="sub">' + lines + (e.web ? '<br><a href="' + esc(e.web) + '" target="_blank" rel="noopener noreferrer" style="color:#1a6fe8">地图</a>' : '') + '</div>';
   else {
@@ -317,7 +317,7 @@ function renderList() {
   days.forEach(di => {
     const d = S.map.days[di], box = edit ? document.createElement('div') : list; if (edit) { box.className = 'day'; box.dataset.day = d.index; list.appendChild(box); }
     if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = '<span class="dot" style="background:' + d.color + '"></span>' + esc(d.label); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
-    if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; box.appendChild(w); }
+    if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; const fs = d.timeline.find(e => e.type === 'stop'); if (fs && !S.map.has_lodging) w.insertAdjacentHTML('beforeend', '<div>' + linkHtml(fs.name + ' 附近', 'hotel', '看酒店价格：') + '</div>'); box.appendChild(w); }
     const dayI = S.issues.days[String(d.index)]; if (dayI) { const w2 = document.createElement('div'); w2.className = 'dayiss'; w2.innerHTML = issueHtml(dayI); box.appendChild(w2); }
     const mg = (S.meal_gaps || {})[String(d.index)]; if (mg) { const w3 = document.createElement('div'); w3.className = 'mealgap'; w3.innerHTML = '🍜 还没安排' + mg.join('、') + ' ' + mg.map(m => '<button data-m="' + m + '">找' + m + '</button>').join('') + linkHtml('', 'food', ' 看点评：'); w3.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); $('chat').classList.remove('hide'); syncSp2(); fit(); $('ctext').value = '帮我在第' + (d.index + 1) + '天的景点附近找' + b.dataset.m + '，给我几家对比；我选定后请直接加进行程。'; $('ctext').focus(); }); box.appendChild(w3); }
     const nStops = d.timeline.filter(e => e.type === 'stop').length; let si = 0;
