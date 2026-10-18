@@ -36,6 +36,8 @@ from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
 from .textview import build_text as _build_text, guard_text as _guard_text
+from .checklist import build_checklist as _build_checklist, render as _render_checklist
+from .metrics import intercity_hint
 from .stays import hint_text as _stay_hint
 from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
@@ -520,7 +522,7 @@ def refine_routes(day: Optional[int] = None) -> str:
         new_legs[key] = Leg(from_id=a.id, to_id=b.id, mode=r.mode, distance_km=r.distance_km,  # type: ignore[arg-type]
                             minutes=r.minutes, detail_level="route", path=[list(pt) for pt in r.path],
                             path_checked=True, depart_at=stamp, route_ver=ROUTE_VERSION,
-                            note="；".join(x for x in (_route_note(r, pr), night_note) if x))
+                            note="；".join(x for x in (_route_note(r, pr), night_note, intercity_hint(r.distance_km, r.mode)) if x))
 
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
@@ -1451,6 +1453,14 @@ def forget_preference(pref_id: str) -> str:
     return f"已删除偏好 {pref_id}。"
 
 
+def final_check() -> str:
+    """定稿前清单：把“现在还有什么没弄清楚/没处理”一次列清，分为必须处理（✗）、建议处理（!）、提示（·）。
+    包含 check_plan 的所有问题，另外补：住宿是否每晚都有、到达/离开大交通是否订了、天气是否查过或已过期、待核实的资料、
+    没匹配到高德的点、仍是估算的交通。只读，不改行程。用户说“检查一下/可以定稿了吗/出发前还要做什么”时调用，
+    把清单按类别简要转述，并逐条问用户要不要处理。"""
+    return _render_checklist(_build_checklist(_load()))
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
     trip = _load()
@@ -1851,7 +1861,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

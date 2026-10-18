@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 
 from .connections import arrival_day, day_window, departure_day
-from .metrics import PACE_LIMITS, day_stats, estimate_cost
+from .metrics import INTERCITY_KM, PACE_LIMITS, day_stats, estimate_cost, intercity_hint
 from .models import Trip
 from .stays import hint_text
 from .weather import SOURCE_NAMES, bad_weather, is_outdoor
@@ -107,6 +107,13 @@ def validate(trip: Trip) -> list[Issue]:
                 )
                 break  # 同一天只提醒一次
 
+        names = {**{p.id: p.name for p in trip.places}, **{l.id: l.name for l in trip.lodgings}}
+        for leg in [*st.legs, st.lodging_out, st.lodging_back]:
+            if leg is not None and leg.distance_km > INTERCITY_KM and leg.mode != "drive":
+                issues.append(Issue(
+                    "INTERCITY_LEG", "info",
+                    f"{label}「{names.get(leg.from_id, leg.from_id)}」→「{names.get(leg.to_id, leg.to_id)}」" + intercity_hint(leg.distance_km, leg.mode),
+                    day.index))
         for p in st.places:
             if d is not None and d.weekday() in p.closed_weekdays:
                 issues.append(

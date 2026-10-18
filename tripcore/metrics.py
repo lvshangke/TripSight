@@ -31,6 +31,17 @@ PACE_LIMITS: dict[Pace, PaceLimits] = {
 }
 
 
+INTERCITY_KM = 80      # 单段超过这个距离，按“跨城路段”处理（高德公交方案可能是普速慢车，应改看高铁或驾车）
+
+
+def intercity_hint(distance_km: float, mode: str = "") -> str:
+    """跨城路段的提示文字；不是跨城返回空串。"""
+    if distance_km <= INTERCITY_KM or mode == "drive":      # 已经是驾车的不用提示
+        return ""
+    return (f"跨城路段（约 {distance_km:g} km）：高德的公交方案可能是普速慢车，不一定是最合适的；"
+            "建议用 flyai 的 search-train 查高铁车次，或改成驾车/打车（set_leg_mode），请和用户确认")
+
+
 def day_places(trip: Trip, day: DayPlan) -> list[Place]:
     """某一天里按顺序排好的景点对象。"""
     return [trip.place(it.place_id) for it in day.items]
