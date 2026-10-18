@@ -168,6 +168,12 @@ def _cmd_web(args: argparse.Namespace) -> int:
     return serve(port=args.port, url_file=args.url_file, open_browser=args.open, idle_seconds=args.idle_minutes * 60)
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    from .doctor import main as doctor_main
+
+    return doctor_main()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tripcore", description="旅行规划核心（里程碑 1：无 AI、无界面）")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -202,6 +208,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--open", action="store_true", help="启动后自动用浏览器打开")
     p.add_argument("--idle-minutes", type=float, default=120, help="空闲多久自动退出")
     p.set_defaults(func=_cmd_web)
+
+    p = sub.add_parser("doctor", help="自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）")
+    p.set_defaults(func=_cmd_doctor)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -1,16 +1,40 @@
-# tripcore —— 旅行规划核心（里程碑 1）
+# TripSight（tripcore）—— 可靠的旅行行程规划 Agent
 
-一个**没有界面、没有 AI** 的旅行规划小程序，只用规则完成这些事：
+[English](README.en.md) · 许可证：[Apache-2.0](LICENSE)
 
-1. 你给出一批想去的景点（带经纬度）、天数、节奏；
-2. 程序自动把景点分到每一天，并排好每天的游览顺序；
-3. 估算相邻景点之间的交通时间；
-4. 推荐住在哪一带，并给候选酒店按通勤排序；
-5. 检查问题：太赶、闭馆、没预约、路上太久、超预算……
-6. 所有修改都可以先写成“提案”，确认后才生效，并且**可以撤销**。
+让大模型**只负责听懂你的意思、提出修改**，由确定性的代码来**排程、检查、记版本、撤销**；地点、时间、路线等事实只来自地图服务、工具或你本人，不靠模型编。
 
-> 为什么先不做 AI、不做界面？因为要先确认“数据怎么表示、规则对不对”。
-> 这一层稳定了，后面接大模型、接地图、做网页，都只是在它上面加东西。
+![工作台行程列表（示例数据）](docs/images/workbench-list.png)
+
+*本机网页工作台的行程列表（编辑模式，示例数据）：每个景点可直接改停留时长、上下移动，景点之间显示通勤，需预约等问题直接标在景点下面。右侧还有地图和聊天助手，截图里没放。*
+
+## 能做什么
+
+- 把一批想去的景点按地理位置和**营业时间**自动分到每一天，并排好游览顺序；
+- 估算或（配置高德/Google 后）查询真实路线与通勤时间；
+- 检查问题：太赶、闭馆、到达时已关门、没预约、路上太久、天气不适合户外……
+- 所有修改先成为“提案”，确认后才生效，可撤销；已确认的安排会锁定，不会被自动重排打乱；
+- 本机网页工作台：切换/新建行程、拖动调整、加景点、改停留时长、地图和聊天助手；
+- 通过 MCP 接入聊天 Agent（nanobot）：用对话加景点、选酒店、查车票机票（只读，不预订不支付）。
+
+## 快速开始
+
+需要 Python 3.10 或更新版本。
+
+```bash
+git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+python -m tripcore doctor     # 自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）
+python -m tripcore demo       # 用示例数据完整演示一遍
+python -m tripcore web --open # 打开本机网页工作台
+python -m pytest -q           # 运行测试
+```
+
+要在聊天里使用，请按 [docs/SETUP.md](docs/SETUP.md) 接入 nanobot。高德/Google key 只放在你自己本机的配置里，不要提交到仓库。
+
+> 下面的“第一次运行”等章节是更详细的参考文档，部分描述写于早期里程碑，具体以 `DESIGN.md` 和各 MCP 工具的说明为准。
 
 ---
 
@@ -115,7 +139,7 @@ tripcore/
 ├── storage.py     读写 JSON 文件
 ├── geocode.py     地名 → 经纬度（OpenStreetMap）
 └── cli.py         命令行
-tests/             97 个测试（先看 test_scheduler.py，最容易读懂）
+tests/             349 个测试（先看 test_scheduler.py，最容易读懂）
 examples/          示例数据
 DESIGN.md          设计原则、算法说明、已知局限、后续计划
 ```
