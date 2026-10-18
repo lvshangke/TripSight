@@ -2,9 +2,10 @@
 
 # 🧭 TripSight
 
-**Let the AI understand where you want to go — let code make sure the plan holds up.**
+**Turn other people's guides into a trip that is yours — and checkable at every step.**
 
-An open-source travel-itinerary agent. The LLM only understands intent and proposes changes; scheduling, opening-hours checks, routes, versioning and undo are done by deterministic code — facts come only from map services, tools or you.
+Real Amap routes, one click to research on Xiaohongshu / Dianping, paste any guide and edit it stop by stop, and chain every route of the whole journey in one go so you never look up directions again on the road.
+The LLM only understands you and proposes changes; scheduling, opening hours, routes, versioning and undo are deterministic code.
 
 [中文](README.md) · [Setup](docs/SETUP.md) (Chinese) · [Design notes](DESIGN.md) (Chinese)
 
@@ -40,6 +41,25 @@ TripSight separates the two concerns:
 - **Every step is confirmable and undoable.** Changes are proposals applied only after you reply with a confirmation code; confirmed items are locked so re-planning never shuffles them; `undo` works repeatedly.
 - **Not tied to one model or platform.** It is an MCP server, so any MCP-capable chat agent can use it; the repo ships setup for [nanobot](https://github.com/HKUDS/nanobot).
 - **Your data stays on your machine.** Trips are local JSON files, the workbench listens on `127.0.0.1` only, keys live in your own config, and `tripcore doctor` only prints "configured / not configured".
+
+## 🌟 Full-configuration experience
+
+Connect an Amap key, the nanobot chat agent and the read-only price skills (`python -m tripcore doctor` tells you what is missing) and you get this way of working:
+
+- **Real routes, not simulations.** With Amap configured, `refine_routes` replaces every estimate with the route Amap returns — walk/transit/drive time, transfers, walking distance, fares, and the real route shape on the map. Without a key it falls back to straight-line estimates and labels them "estimated".
+- **Every stop corresponds to a real place.** Coordinates come from map search results (the workbench never accepts typed coordinates); a place is added only if the name matches and is unambiguous; opening hours are verified through `fill_hours`; every stop's arrival is checked against them. Unknown means "unverified", never an invented number.
+- **Research any time.** One sentence gives you search links on Xiaohongshu, Dianping and Mafengwo, opened in your own browser with your own account; flight/train/hotel reference prices come from read-only skills that never book or pay.
+- **Turn others' guides into your trip.** Paste any guide: code verifies each item against the source and you pick what to add. Afterwards every stop can be **edited individually** — move to another day, remove, lock, change the stay time or order — without starting over, and the plan is re-checked after each change.
+- **As rigorous as possible.** Closed days, arriving after closing, past last entry, overloaded days, long legs, missing reservations, lodging too far, weather vs outdoor sights, transport connections — all checked by code and shown under the stop. Every change is a proposal you confirm, and it can be undone.
+- **Unique and workable.** Your pace, walking limit, subway preference, lodging budget and food preferences are remembered and applied; lodging is suggested per night and meals are placed nearby — the result is tailored to you and actually feasible, not a generic template.
+- **One click to chain every route of the journey.** Once the plan is settled:
+  - `refine_routes` (the "update routes" button in the workbench) fills in real routes for every leg of every day;
+  - `create_amap_map` turns each day's loop (hotel → sights → meals → hotel) into an Amap app personal-map link (or one merged map);
+  - `export_map` / `export_gpx` / `export_text` produce a mobile map page, track files and WeChat-ready text.
+
+  On the road you just open the link and follow it — no more looking up each leg again.
+
+> "Full configuration" means all keys and read-only skills are set up. The project is early-stage; real-service testing of Amap / Google / nanobot is still limited (the automated tests mostly use fake services). Always verify key details with official sources before you go.
 
 ## 🧩 Capabilities
 
