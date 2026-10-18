@@ -661,7 +661,10 @@ def test_snapshot_issues_for_places_and_days(server):
     s.add_place("晚到点", 34.205, 108.905, duration_min=120)
     pids = [p.id for p in s._load().places]
     s.update_place(pids[1], opening_hours="周一至周日 09:00-10:00", hours_source="user")
-    s.schedule_days()
+    s.schedule_days()                                            # 排程会把早关门的放前面，所以这里手动拖到第二位，制造“到达时已关门”
+    rv = state(server)["revision"]
+    pv = call(server, "/tok/api/preview", {"base_revision": rv, "ops": [{"kind": "move", "place_id": pids[1], "to_day": 0, "to_position": 1}]})[1]
+    assert call(server, "/tok/api/apply", {"base_revision": rv, "proposal_id": pv["proposal_id"]})[0] == 200
     iss = state(server)["issues"]
     pi = iss["places"][pids[1]]
     assert any(x["sev"] == "error" and "已关门" in x["text"] and not x["text"].startswith(("第", "「")) for x in pi)

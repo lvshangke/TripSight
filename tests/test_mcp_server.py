@@ -375,13 +375,18 @@ def test_explicit_leg_mode_is_not_downgraded_to_walk(monkeypatch):
 
 
 def test_show_trip_includes_hours_and_closed_warning():
-    s.new_trip(start_date="2026-10-19", end_date="2026-10-19", city="西安")   # 周一
+    s.new_trip(start_date="2026-10-20", end_date="2026-10-20", city="西安")   # 周二
     s.add_place("博物馆", 39.9, 116.4, opening_hours="周二至周日 09:00-17:00 周一闭馆", hours_source="amap",
                 reservation_required=True)
     s.add_place("无数据", 39.901, 116.401)
     s.schedule_days()
     out = s.show_trip()
-    assert "来源：amap" in out and "闭馆" in out and "待核实" in out and "需预约" in out
+    assert "来源：amap" in out and "待核实" in out and "需预约" in out
+    # 同样的景点，行程只有周一这一天：排程会直接拒绝把它排进去（而不是排进去再报闭馆），并说明原因
+    s.new_trip(start_date="2026-10-19", end_date="2026-10-19", city="西安")
+    s.add_place("博物馆", 39.9, 116.4, opening_hours="周二至周日 09:00-17:00 周一闭馆", hours_source="amap")
+    s.schedule_days()
+    assert "未安排：博物馆" in s.show_trip() and "闭馆" in s.show_trip()
 
 
 def test_hours_parser():

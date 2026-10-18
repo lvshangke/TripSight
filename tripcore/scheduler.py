@@ -8,6 +8,9 @@
 4. 用每天的景点位置重新计算中心点，重复几轮直到稳定（类似 k-means）。
 5. 每天内部排顺序：景点少时穷举找最省交通时间的顺序，多了就用“最近邻 + 2-opt”。
    如果当天有锁定条目，则保持它们的相对顺序，只把新景点插到最合适的位置。
+6. 营业时间（日期确定、且景点有能解析的营业时间时）：整天不开、或打烊/最晚进入早于一天的开始的景点，不分到那天；
+   天内顺序和跨天微调都把“到达时已关门、过了最晚进入、停留超过闭馆”折算成额外代价（早关门的先去、晚开门的后去，等待也计入）。
+   没有日期、或没有营业时间的景点，行为和以前完全一样。
 
 这是“够用的启发式”，不是数学上最优解。真正的好坏由 validator 来检查。
 """
@@ -18,7 +21,11 @@ import itertools
 from datetime import date
 from typing import Optional
 
+from dataclasses import dataclass, field
+from functools import lru_cache
+
 from .geo import estimate_leg, haversine_km
+from .hours import Window, hours_window
 from .connections import DAY_END_MIN, DAY_START_MIN, day_window
 from .metrics import PACE_LIMITS, PaceLimits
 from .models import (
@@ -58,6 +65,92 @@ def _mean(points: list[Point]) -> Point:
 
 def _closed_on(place: Place, day_date: Optional[date]) -> bool:
     return day_date is not None and day_date.weekday() in place.closed_weekdays
+
+
+HOURS_PENALTY = 10        # 到达/停留违反营业时间 1 分钟，折算成多少分钟的交通代价
+
+
+@lru_cache(maxsize=4096)
+def _win(text: str, d: date) -> Optional[Window]:
+    return hours_window(text, d)
+
+
+def _window_of(place: Place, d: Optional[date]) -> Optional[Window]:
+    if d is None or not place.opening_hours:
+        return None
+    return _win(place.opening_hours, d)
+
+
+def _blocked(trip: Trip, place: Place, day_index: int) -> bool:
+    """这个景点在这一天去不了：周几闭馆、营业时间写明当天不开，或打烊/最晚进入早于这一天的开始时间。"""
+    d = trip.day_date(day_index)
+    if _closed_on(place, d):
+        return True
+    w = _window_of(place, d)
+    if w is None:
+        return False
+    if w.closed:
+        return True
+    start = day_window(trip, day_index)[0]
+    latest = max(r[1] for r in w.ranges) if w.ranges else None
+    if w.last_entry is not None:
+        latest = w.last_entry if latest is None else min(latest, w.last_entry)
+    return latest is not None and latest <= start
+
+
+@dataclass
+class _Ctx:
+    """某一天排序时用的时间信息：一天的开始分钟，以及各景点当天的营业窗口。"""
+    start: int = DAY_START_MIN
+    wins: dict = field(default_factory=dict)
+
+
+def _ctx(trip: Trip, day_index: int, places: list[Place]) -> Optional[_Ctx]:
+    d = trip.day_date(day_index)
+    wins = {p.id: w for p in places if (w := _window_of(p, d)) is not None and not w.closed}
+    return _Ctx(day_window(trip, day_index)[0], wins) if wins else None
+
+
+def _violation(seq: list[Place], anchor: Optional[Point], mode: str, ctx: _Ctx) -> tuple[int, int]:
+    """按这个顺序走一天，返回 (违反营业时间的分钟数, 等待开门的分钟数)。"""
+    t = ctx.start
+    if anchor and seq:
+        f = seq[0]
+        t += estimate_leg("A", anchor[0], anchor[1], f.id, f.lat, f.lon, mode).minutes  # type: ignore[arg-type]
+    viol = wait = 0
+    for i, p in enumerate(seq):
+        w = ctx.wins.get(p.id)
+        cur_end = None
+        if w is not None and not w.all_day and w.ranges:
+            rs = w.ranges
+            cur = next((r for r in rs if r[0] <= t < r[1]), None)
+            if cur is None:
+                if t >= rs[-1][1]:
+                    viol += t - rs[-1][1] + 60            # 到达时已关门
+                else:
+                    nxt = next(r for r in rs if r[0] > t)  # 开门前/休息时段：等到开门
+                    wait += nxt[0] - t
+                    t = nxt[0]
+                    cur = nxt
+            cur_end = cur[1] if cur else None
+        if w is not None and w.last_entry is not None and t > w.last_entry:
+            viol += t - w.last_entry
+        if cur_end is not None and t + p.duration_min > cur_end:
+            viol += t + p.duration_min - cur_end
+        t += p.duration_min
+        if i + 1 < len(seq):
+            n = seq[i + 1]
+            t += estimate_leg(p.id, p.lat, p.lon, n.id, n.lat, n.lon, mode).minutes  # type: ignore[arg-type]
+    return viol, wait
+
+
+def _seq_cost(seq: list[Place], anchor: Optional[Point], mode: str, ctx: Optional[_Ctx]) -> int:
+    """顺序的总代价 = 交通分钟（没有营业时间信息时就只有它，和以前一样）+ 违反营业时间的惩罚 + 等待分钟。"""
+    base = _route_minutes(seq, anchor, mode)
+    if ctx is None or not seq:
+        return base
+    viol, wait = _violation(seq, anchor, mode, ctx)
+    return base + HOURS_PENALTY * viol + wait
 
 
 MIN_USABLE_MIN = 120      # 某天可用时间窗口不足这么多分钟，就不往里排景点
@@ -190,9 +283,9 @@ def _assign(
             (i for i in range(n_days) if centers[i] is not None),
             key=lambda i: (_dist(_pt(p), centers[i]), i),  # type: ignore[arg-type]
         )
-        open_days = [i for i in ranked if not _closed_on(p, trip.day_date(i))]
+        open_days = [i for i in ranked if not _blocked(trip, p, i)]
         if not open_days:
-            unscheduled.append(Unscheduled(place_id=p.id, reason="安排期内每一天都闭馆"))
+            unscheduled.append(Unscheduled(place_id=p.id, reason="安排期内每一天都闭馆（或营业时间不允许）"))
             continue
 
         target = next((i for i in open_days if _fits(members[i], p, limits[i])), None)
@@ -225,16 +318,16 @@ def _route_minutes(seq: list[Place], anchor: Optional[Point], mode: str) -> int:
     return total
 
 
-def _two_opt(seq: list[Place], anchor: Optional[Point], mode: str) -> list[Place]:
+def _two_opt(seq: list[Place], anchor: Optional[Point], mode: str, ctx: Optional[_Ctx] = None) -> list[Place]:
     best = seq[:]
-    best_cost = _route_minutes(best, anchor, mode)
+    best_cost = _seq_cost(best, anchor, mode, ctx)
     improved = True
     while improved:
         improved = False
         for i in range(len(best) - 1):
             for j in range(i + 1, len(best)):
                 cand = best[:i] + best[i : j + 1][::-1] + best[j + 1 :]
-                cost = _route_minutes(cand, anchor, mode)
+                cost = _seq_cost(cand, anchor, mode, ctx)
                 if cost < best_cost:
                     best, best_cost, improved = cand, cost, True
     return best
@@ -245,10 +338,12 @@ def order_day(
     new: list[Place],
     anchor: Optional[Point],
     mode: str,
+    ctx: Optional[_Ctx] = None,
 ) -> list[Place]:
     """给一天排顺序。
 
     fixed：锁定的条目（保持它们的相对顺序）；new：待安排的新景点。
+    ctx：这一天的开始时间和各景点的营业窗口（None = 不考虑营业时间，只求交通最省）。
     """
     if not fixed:
         items = sorted(new, key=lambda p: p.id)  # 先排序，保证结果可重复
@@ -257,7 +352,7 @@ def order_day(
         if len(items) <= BRUTE_FORCE_LIMIT:
             best, best_cost = None, None
             for perm in itertools.permutations(items):
-                cost = _route_minutes(list(perm), anchor, mode)
+                cost = _seq_cost(list(perm), anchor, mode, ctx)
                 if best_cost is None or cost < best_cost:
                     best, best_cost = list(perm), cost
             return best  # type: ignore[return-value]
@@ -271,7 +366,7 @@ def order_day(
             cur = min(left, key=lambda p: (_dist(_pt(p), _pt(cur)), p.id))
             seq.append(cur)
             left.remove(cur)
-        return _two_opt(seq, anchor, mode)
+        return _two_opt(seq, anchor, mode, ctx)
 
     # 有锁定条目：保持相对顺序，把新景点逐个插到“交通增加最少”的位置
     seq = fixed[:]
@@ -279,7 +374,7 @@ def order_day(
         best_pos, best_cost = 0, None
         for pos in range(len(seq) + 1):
             cand = seq[:pos] + [p] + seq[pos:]
-            cost = _route_minutes(cand, anchor, mode)
+            cost = _seq_cost(cand, anchor, mode, ctx)
             if best_cost is None or cost < best_cost:
                 best_pos, best_cost = pos, cost
         seq.insert(best_pos, p)
@@ -316,12 +411,12 @@ def _improve(
             fixed = locked_members[i]
             fixed_ids = {p.id for p in fixed}
             new = [p for p in mem if p.id not in fixed_ids]
-            cache[key] = _route_minutes(order_day(fixed, new, anchor, mode), anchor, mode)
+            c = _ctx(trip, i, mem)
+            cache[key] = _seq_cost(order_day(fixed, new, anchor, mode, c), anchor, mode, c)
         return cache[key]
 
     def ok(i: int, mem: list[Place]) -> bool:
-        d = trip.day_date(i)
-        if any(_closed_on(p, d) for p in mem):
+        if any(_blocked(trip, p, i) for p in mem):
             return False
         if mem and limits[i].max_places == 0:
             return False
@@ -437,7 +532,7 @@ def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
         fixed_here = locked_members[i]
         fixed_ids = {p.id for p in fixed_here}
         new_here = [p for p in members[i] if p.id not in fixed_ids]
-        seq = order_day(fixed_here, new_here, anchor, mode)
+        seq = order_day(fixed_here, new_here, anchor, mode, _ctx(trip, i, members[i]))
         items = [DayItem(place_id=p.id, locked=p.id in fixed_ids) for p in seq]
         days.append(DayPlan(index=i, items=items))
 

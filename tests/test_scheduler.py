@@ -161,3 +161,79 @@ def test_order_day_keeps_locked_relative_order():
     ids = [p.id for p in seq]
     assert ids.index("x") < ids.index("y")
     assert set(ids) == {"x", "y", "n"}
+
+
+# ---- 营业时间参与排程 ----
+from datetime import date as _date
+
+from tripcore.models import DateMode as _DM, DayItem, DayPlan, Lodging as _Lodging, Plan
+from tripcore.validator import validate as _validate
+
+
+def _day_trip(places, days=1, lodging=True, start=_date(2026, 10, 14)):
+    t = make_trip(places, num_days=days, date_mode=_DM.EXACT, start_date=start, end_date=start + __import__("datetime").timedelta(days=days - 1),
+                  pace=Pace.PACKED)
+    if lodging:
+        t.lodgings = [_Lodging(id="l1", name="酒店", lat=39.9, lon=116.4)]
+        t.chosen_lodging_id = "l1"
+    return t
+
+
+def _order(t):
+    return [[it.place_id for it in d.items] for d in schedule(t).plan.days]
+
+
+def test_early_closing_place_goes_first_even_if_farther():
+    near = make_place("a", lat=39.9005, lon=116.4005, duration_min=90)
+    far = make_place("b", lat=39.93, lon=116.43, duration_min=90, opening_hours="周一至周日 09:00-11:00")
+    no_hours = make_place("b", lat=39.93, lon=116.43, duration_min=90)
+    assert _order(_day_trip([near, no_hours])) == [["a", "b"]]                  # 没有营业时间：往返路程一样，按编号先后
+    assert _order(_day_trip([near, far])) == [["b", "a"]]                       # 有营业时间：远的 11:00 前要到，所以先去（交通代价相同，只有营业时间让顺序变化）
+
+
+def test_late_opening_place_goes_after():
+    a = make_place("a", lat=39.9005, lon=116.4005, duration_min=90)
+    b = make_place("b", lat=39.9002, lon=116.4002, duration_min=90, opening_hours="周一至周日 14:00-18:00")
+    assert _order(_day_trip([a, b])) == [["a", "b"]]
+
+
+def test_scheduled_plan_has_no_hours_errors_when_feasible():
+    ps = [
+        make_place("m", lat=39.91, lon=116.41, duration_min=120, opening_hours="周一至周日 09:00-12:00"),
+        make_place("n", lat=39.905, lon=116.405, duration_min=120, opening_hours="周一至周日 13:00-18:00"),
+        make_place("o", lat=39.9, lon=116.4, duration_min=60),
+    ]
+    t = schedule(_day_trip(ps))
+    assert not [i for i in _validate(t) if i.code in ("OUTSIDE_HOURS", "LEAVE_AFTER_CLOSE")]
+
+
+def test_place_closed_on_one_day_goes_to_the_other_day():
+    p = make_place("p", lat=39.9, lon=116.4, opening_hours="周一至周日 09:00-17:00；周三 闭馆", duration_min=120)
+    q = make_place("q", lat=39.901, lon=116.401, duration_min=120)
+    t = _day_trip([p, q], days=2, start=_date(2026, 10, 14))             # 第 1 天是周三
+    assert "p" not in _order(t)[0] and "p" in _order(t)[1]
+
+
+def test_never_possible_place_is_unscheduled_with_reason():
+    p = make_place("p", lat=39.9, lon=116.4, opening_hours="周一至周日 06:00-08:30")      # 打烊早于一天的开始
+    t = schedule(_day_trip([p, make_place("q", lat=39.901, lon=116.401)]))
+    assert [u.place_id for u in t.plan.unscheduled] == ["p"] and "营业时间" in t.plan.unscheduled[0].reason
+
+
+def test_locked_items_are_never_moved_by_hours():
+    a = make_place("a", lat=39.9005, lon=116.4005, duration_min=90)
+    b = make_place("b", lat=39.93, lon=116.43, duration_min=90, opening_hours="周一至周日 09:00-10:00")
+    t = _day_trip([a, b])
+    t.plan = Plan(days=[DayPlan(index=0, items=[DayItem(place_id="a", locked=True), DayItem(place_id="b", locked=True)])])
+    assert _order_keep(t) == [["a", "b"]]                                  # 锁定的保持原样（问题交给校验器提示）
+
+
+def _order_keep(t):
+    return [[it.place_id for it in d.items] for d in schedule(t, keep_locked=True).plan.days]
+
+
+def test_scheduling_is_deterministic_with_hours():
+    ps = [make_place(f"p{i}", lat=39.9 + i * 0.004, lon=116.4 + i * 0.003, duration_min=60,
+                     opening_hours="周一至周日 09:00-12:00" if i % 2 else "周一至周日 13:00-18:00") for i in range(6)]
+    t = _day_trip(ps, days=2)
+    assert _order(t) == _order(t)
