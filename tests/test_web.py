@@ -639,3 +639,79 @@ def test_set_duration_via_agent_proposal_tool():
     pid = s._load().places[0].id
     r = s.propose_change("改时长", [{"kind": "set_duration", "place_id": pid, "minutes": 150}])
     assert "90 → 150 分钟" in r["changes"][0]
+
+
+# ---- 住宿 ----
+def _lodgings(server):
+    s.add_lodging("近店", 34.201, 108.901, 300, 400)
+    s.add_lodging("远店", 34.3, 109.0, 0, 0)
+    return [l.id for l in s._load().lodgings]
+
+
+def test_snapshot_lodging_block_ranked(server):
+    a, b = _lodgings(server)
+    lo = state(server)["lodging"]
+    assert [i["id"] for i in lo["items"]] == [a, b] and lo["items"][0]["avg_commute_min"] < lo["items"][1]["avg_commute_min"]
+    assert lo["chosen"] is None and lo["stays"] == [] and lo["nights"] == 1
+
+
+def test_lodging_preview_apply_undo(server):
+    a, b = _lodgings(server)
+    rev_ = state(server)["revision"]
+    code, pv = call(server, "/tok/api/lodging_preview", {"base_revision": rev_, "chosen": a, "stays": []})
+    assert code == 200 and any("近店" in c for c in pv["changes"])
+    assert s._load().chosen_lodging_id is None                                          # 预览不改动
+    assert call(server, "/tok/api/lodging_apply", {"base_revision": rev_, "proposal_id": pv["proposal_id"]})[0] == 200
+    assert s._load().chosen_lodging_id == a and state(server)["lodging"]["chosen"] == a
+    assert call(server, "/tok/api/lodging_apply", {"base_revision": state(server)["revision"], "proposal_id": pv["proposal_id"]})[0] == 404   # 一次性
+    call(server, "/tok/api/undo", {"base_revision": state(server)["revision"]})
+    assert s._load().chosen_lodging_id is None
+
+
+def test_lodging_stays_valid_and_invalid(server):
+    a, b = _lodgings(server)
+    r0 = state(server)["revision"]
+    ok = {"base_revision": r0, "chosen": a, "stays": [{"lodging_id": a, "from_day": 1, "to_day": 1}]}
+    code, pv = call(server, "/tok/api/lodging_preview", ok)
+    assert code == 200
+    call(server, "/tok/api/lodging_apply", {"base_revision": r0, "proposal_id": pv["proposal_id"]})
+    assert [(x.lodging_id, x.from_day, x.to_day) for x in s._load().stays] == [(a, 0, 0)]
+    bad = [
+        {"stays": [{"lodging_id": a, "from_day": 1, "to_day": 3}]},                                  # 超出天数
+        {"stays": [{"lodging_id": "不存在", "from_day": 1, "to_day": 1}]},
+        {"stays": [{"lodging_id": a, "from_day": 1, "to_day": 2}, {"lodging_id": b, "from_day": 2, "to_day": 2}]},   # 重叠
+        {"stays": [{"lodging_id": a, "from_day": "1", "to_day": 1}]}, {"stays": [{"lodging_id": a}]}, {"stays": "x"},
+        {"chosen": "不存在"}, {},
+        {"chosen": a, "stays": [{"lodging_id": a, "from_day": 1, "to_day": 1}]},                      # 没有变化
+    ]
+    for body in bad:
+        assert call(server, "/tok/api/lodging_preview", {"base_revision": state(server)["revision"], **body})[0] == 400, body
+    assert call(server, "/tok/api/lodging_preview", {"base_revision": 999, "chosen": b})[0] == 409
+    assert raw_post(server, "/api/lodging_preview", {"chosen": a})[0] == 404
+
+
+def test_lodging_apply_stale_preview_rejected(server):
+    a, b = _lodgings(server)
+    r0 = state(server)["revision"]
+    pv = call(server, "/tok/api/lodging_preview", {"base_revision": r0, "chosen": a})[1]
+    s.set_travelers(3)                                                                    # 别处改了行程
+    assert call(server, "/tok/api/lodging_apply", {"base_revision": state(server)["revision"], "proposal_id": pv["proposal_id"]})[0] == 404
+    assert s._load().chosen_lodging_id is None
+
+
+def test_add_lodging_from_candidate_with_manual_price(server, monkeypatch):
+    _fake_lookup(monkeypatch)
+    cid = call(server, "/tok/api/lookup", {"query": "酒店"})[1]["candidates"][0]["cid"]
+    rv = state(server)["revision"]
+    assert call(server, "/tok/api/add_lodging", {"base_revision": rv, "cid": "nope"})[0] == 400
+    assert call(server, "/tok/api/add_lodging", {"base_revision": rv, "name": "编的", "lat": 1, "lon": 2})[0] == 400
+    for bad in ({"price_min": -1}, {"price_max": "abc"}, {"price_max": True}, {"price_min": 500, "price_max": 300}, {"price_max": 100001}):
+        assert call(server, "/tok/api/add_lodging", {"base_revision": rv, "cid": cid, **bad})[0] == 400, bad
+    code, out = call(server, "/tok/api/add_lodging", {"base_revision": rv, "cid": cid, "price_min": 300, "price_max": 450})
+    assert code == 200
+    l = s._load().lodgings[-1]
+    assert (l.lat, l.lon, l.price_min, l.price_max) == (34.2186, 108.9647, 300, 450) and "manual" in l.notes
+    assert call(server, "/tok/api/add_lodging", {"base_revision": state(server)["revision"], "cid": cid})[0] == 400           # 重复
+    cid2 = call(server, "/tok/api/lookup", {"query": "酒店"})[1]["candidates"][1]["cid"]
+    assert call(server, "/tok/api/add_lodging", {"base_revision": state(server)["revision"], "cid": cid2})[0] == 200
+    assert s._load().lodgings[-1].price_max == 0 and "price_source" not in s._load().lodgings[-1].notes                       # 没填价格就不估价

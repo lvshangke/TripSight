@@ -47,6 +47,9 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #ap .w{color:#b45309;font-size:12px;margin:6px 0}
 #ap .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
 #ap .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center}
+.lrow{display:flex;gap:6px;align-items:baseline;padding:4px 0;font-size:13px;border-bottom:1px dashed #eee}
+.lrow .n{flex:1}.lrow .m{color:#666;font-size:12px}
+.srow{display:flex;gap:4px;align-items:center;margin:4px 0;font-size:13px}.srow select{font:inherit;font-size:12px;max-width:42%}
 .dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
 .editonly{display:none}
 #app.edit .editonly{display:block}
@@ -106,6 +109,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="editonly sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
 <div id="cal"></div><div id="calinfo"></div>
 <button id="dapply" class="pri" disabled>应用日期</button> <button id="dclear">清除日期</button></div>
+<div class="editonly sec" id="lodg"><h3>住宿 <button id="addl">＋ 加酒店</button></h3><div id="lbody"></div></div>
 <div id="tabs"></div>
 <div id="scroll"><div id="list"></div></div>
 <div id="prev"><b>预览（还没有改动）</b><ul id="chg"></ul><div id="iss"></div><button id="ok" class="pri">确认</button> <button id="cancel">取消</button></div>
@@ -115,10 +119,11 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
-<div id="ap"><div class="box"><h3>加景点</h3>
+<div id="ap"><div class="box"><h3 id="ap_title">加景点</h3>
 <div class="q"><input id="ap_q" maxlength="60" placeholder="景点名称，例如：大雁塔"><button id="ap_go" class="pri">查找</button></div>
 <div id="ap_list"></div><div class="w" id="ap_warn"></div>
-<div class="btns"><span style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
+<div class="btns"><span id="ap_durw" style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
+<span id="ap_pw" style="flex:1;font-size:13px;color:#555;display:none">每晚 <input id="ap_pmin" class="dur" type="number" min="0" placeholder="最低"> – <input id="ap_pmax" class="dur" type="number" min="0" placeholder="最高"> 元（选填，只填你知道的）</span>
 <button id="ap_cancel">取消</button><button id="ap_ok" class="pri" disabled>加入行程</button></div><div class="err" id="ap_err"></div></div></div>
 <div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
 <label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
@@ -162,7 +167,8 @@ async function loadTrips() {
   } catch (e) {}
 }
 let curTrip = null, apPicked = null;
-function apOpen() { $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
+let apMode = 'place';
+function apOpen(mode) { apMode = mode === 'lodging' ? 'lodging' : 'place'; $('ap_title').textContent = apMode === 'lodging' ? '加酒店（候选）' : '加景点'; $('ap_durw').style.display = apMode === 'lodging' ? 'none' : ''; $('ap_pw').style.display = apMode === 'lodging' ? '' : 'none'; $('ap_pmin').value = ''; $('ap_pmax').value = ''; $('ap_q').placeholder = apMode === 'lodging' ? '酒店名称，例如：西安钟楼亚朵酒店' : '景点名称，例如：大雁塔'; $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
 function apClose() { $('ap').classList.remove('on'); }
 $('ap_cancel').onclick = apClose; $('ap').onclick = e => { if (e.target === $('ap')) apClose(); };
 async function apSearch() {
@@ -178,7 +184,11 @@ async function apSearch() {
 $('ap_go').onclick = apSearch; $('ap_q').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); apSearch(); } };
 $('ap_ok').onclick = async () => {
   if (!apPicked) return; $('ap_ok').disabled = true;
-  try { const r = await api('add_place', {base_revision: S.revision, cid: apPicked, duration_min: Number($('ap_dur').value)}); apClose(); say(r.message); await load(); }
+  try {
+    const pv = v => v === '' ? null : Number(v);
+    const r = apMode === 'lodging' ? await api('add_lodging', {base_revision: S.revision, cid: apPicked, price_min: pv($('ap_pmin').value), price_max: pv($('ap_pmax').value)})
+                                   : await api('add_place', {base_revision: S.revision, cid: apPicked, duration_min: Number($('ap_dur').value)});
+    apClose(); say(r.message); await load(); }
   catch (e) { $('ap_err').textContent = e.message; $('ap_ok').disabled = false; if (e.status === 409) { apClose(); load(); } }
 };
 function ntOpen() { $('nt_err').textContent = ''; $('nt').classList.add('on'); $('nt_name').focus(); }
@@ -201,7 +211,7 @@ $('trip').onchange = async () => {
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); }
   catch (e) { say(e.message, true); await loadTrips(); }
 };
-function renderAll() { renderDates(); renderTabs(); renderList(); }
+function renderAll() { renderDates(); renderLodging(); renderTabs(); renderList(); }
 $('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (S) renderAll(); };
 // ---- 日期 ----
 const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -234,6 +244,32 @@ function renderDates() {
 }
 $('dapply').onclick = async () => { try { const r = await api('dates', {base_revision: S.revision, start: picks[0], end: picks[1]}); say(r.message); await load(); } catch (e) { say(e.message, true); if (e.status === 409) load(); } };
 $('dclear').onclick = async () => { if (!S.dates.start) return; try { const r = await api('dates', {base_revision: S.revision, start: null, end: null}); picks = []; say(r.message); await load(); } catch (e) { say(e.message, true); } };
+// ---- 住宿（编辑模式）：全程住哪家 + 可选的分段（长途换酒店）；点“预览”后看改动再确认 ----
+let lf = null;
+function renderLodging() {
+  if (!edit) return; const L0 = S.lodging, box = $('lbody');
+  if (!lf || lf.rev !== S.revision) lf = {rev: S.revision, chosen: L0.chosen, stays: L0.stays.map(x => ({...x}))};
+  if (!L0.items.length) { box.innerHTML = '<div class="empty" style="padding:4px 0">还没有候选酒店。点“＋ 加酒店”，查询后从结果里选。</div>'; return; }
+  const price = it => it.price_max ? '¥' + (it.price_min && it.price_min !== it.price_max ? it.price_min + '–' : '') + it.price_max + '/晚' : '价格未填';
+  let h = '<div style="font-size:12px;color:#666;margin-bottom:4px">按到各景点的平均通勤（估算）排序；选一家作为全程住宿：</div>';
+  h += '<label class="lrow"><input type="radio" name="lc" value=""' + (!lf.chosen ? ' checked' : '') + '><span class="n">不指定</span></label>';
+  L0.items.forEach(it => { h += '<label class="lrow"><input type="radio" name="lc" value="' + esc(it.id) + '"' + (lf.chosen === it.id ? ' checked' : '') + '><span class="n">' + esc(it.name) + '</span><span class="m">' + price(it) + (it.avg_commute_min != null ? ' · 通勤约' + it.avg_commute_min + '分' : '') + '</span></label>'; });
+  h += '<div style="font-size:12px;color:#666;margin:8px 0 2px">分段住宿（可选，长途换酒店；第几晚到第几晚）：</div>';
+  const opts = id => L0.items.map(i => '<option value="' + esc(i.id) + '"' + (i.id === id ? ' selected' : '') + '>' + esc(i.name) + '</option>').join('');
+  const nopts = v => Array.from({length: L0.nights}, (_, k) => '<option' + (k + 1 === v ? ' selected' : '') + '>' + (k + 1) + '</option>').join('');
+  lf.stays.forEach((st, i) => { h += '<div class="srow" data-i="' + i + '"><select data-f="lodging_id">' + opts(st.lodging_id) + '</select>第<select data-f="from_day">' + nopts(st.from_day) + '</select>到<select data-f="to_day">' + nopts(st.to_day) + '</select>晚<button data-del="' + i + '">×</button></div>'; });
+  h += '<div style="margin-top:6px"><button id="adds">＋ 加一段</button> <button id="lprev" class="pri">预览住宿改动</button></div>';
+  box.innerHTML = h;
+  box.querySelectorAll('input[name=lc]').forEach(r => r.onchange = () => { lf.chosen = r.value || null; });
+  box.querySelectorAll('.srow select').forEach(sel => sel.onchange = () => { const row = sel.closest('.srow'), st = lf.stays[Number(row.dataset.i)]; st[sel.dataset.f] = sel.dataset.f === 'lodging_id' ? sel.value : Number(sel.value); });
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { lf.stays.splice(Number(b.dataset.del), 1); renderLodging(); });
+  $('adds').onclick = () => { lf.stays.push({lodging_id: L0.items[0].id, from_day: 1, to_day: L0.nights}); renderLodging(); };
+  $('lprev').onclick = async () => {
+    try { const r = await api('lodging_preview', {base_revision: S.revision, chosen: lf.chosen, stays: lf.stays}); showPrev({...r, kind: 'lodging'}); }
+    catch (e) { say(e.message, true); if (e.status === 409) load(); }
+  };
+}
+$('addl').onclick = () => apOpen('lodging');
 // ---- 标签页（查看模式）----
 function renderTabs() {
   const tabs = $('tabs'); tabs.innerHTML = '';
@@ -321,7 +357,7 @@ function wireDur(el, pid, cur) {
 function renderUnscheduled(list) {
   if (!S.unscheduled.length && !(S.orphan_meals || []).length && !edit) return;
   const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + (edit ? '<button id="addp" style="margin-left:auto">＋ 加景点</button>' : '') + '</div>';
-  if (edit) u.querySelector('#addp').onclick = apOpen;
+  if (edit) u.querySelector('#addp').onclick = () => apOpen('place');
   S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'it'; c.dataset.pid = it.place_id; c.style.cursor = edit ? 'grab' : 'default';
     c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>' + (edit ? '<div class="sub">停留 <input class="dur" type="number" min="10" max="720" step="15" value="' + it.duration_min + '"> 分钟</div>' : '');
     if (edit) wireDur(c, it.place_id, it.duration_min);
@@ -343,15 +379,21 @@ function move(pid, day, pos) {
   ops.push({kind: 'move', place_id: pid, to_day: day, to_position: pos}); propose(ops);
 }
 async function propose(ops) {
-  try { pending = await api('preview', {base_revision: S.revision, ops}); } catch (e) { say(e.message, true); if (e.status === 409) load(); return; }
+  let r; try { r = await api('preview', {base_revision: S.revision, ops}); } catch (e) { say(e.message, true); if (e.status === 409) load(); return; }
+  showPrev(r);
+}
+function showPrev(r) {
+  pending = r;
   $('chg').innerHTML = pending.changes.map(x => '<li>' + esc(x) + '</li>').join('');
   $('iss').innerHTML = pending.new_issues.length ? '<div class="w">改完后新增的问题：</div><ul>' + pending.new_issues.map(i => '<li class="w">' + esc(i) + '</li>').join('') + '</ul>' : '<div style="color:#15803d">没有新增问题。</div>';
   $('prev').style.display = 'block'; say('');
 }
 $('ok').onclick = async () => {
   if (!pending) return; const days = pending.affected_days || [];
-  try { await api('apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say('已套用。'); } catch (e) { say(e.message, true); closePrev(); load(); return; }
+  const isL = pending.kind === 'lodging';
+  try { const r = await api(isL ? 'lodging_apply' : 'apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say(isL ? r.message : '已套用。'); } catch (e) { say(e.message, true); closePrev(); load(); return; }
   closePrev(); await load();
+  if (isL) { await refineRoutes(null); return; }
   for (const dn of days) await refineRoutes(dn);
 };
 async function refineRoutes(day) {

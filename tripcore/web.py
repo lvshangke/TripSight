@@ -30,12 +30,13 @@ from pydantic import TypeAdapter, ValidationError
 from . import mcp_server as ms
 from . import workspace as ws
 from .dates import apply_dates
+from .lodging import rank_lodgings
 from .mapview import build_map_data
-from .models import Trip
+from .models import Stay, Trip
 from .proposals import (InvalidOperationError, LockedItemError, Op, StaleProposalError, apply_proposal,
                         describe_ops, make_proposal)
 from .proposals import Proposal
-from .state import NothingToUndo, undo as state_undo
+from .state import NothingToUndo, commit, undo as state_undo
 from .validator import validate
 from .webpage import page_html
 
@@ -109,7 +110,17 @@ def snapshot() -> dict[str, Any]:
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
                     for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
-    return {"title": m.name, "trip": _slug(), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+    try:
+        ranked = {r.lodging.id: r for r in rank_lodgings(trip)}
+        order = [r.lodging.id for r in ranked.values()] + [l.id for l in trip.lodgings if l.id not in ranked]
+    except Exception:
+        ranked, order = {}, [l.id for l in trip.lodgings]
+    byid = {l.id: l for l in trip.lodgings}
+    lodging = {"nights": max(m.num_days - 1, 1), "chosen": trip.chosen_lodging_id,
+               "stays": [{"lodging_id": a.lodging_id, "from_day": a.from_day + 1, "to_day": a.to_day + 1} for a in sorted(trip.stays, key=lambda z: z.from_day)],
+               "items": [{"id": i, "name": byid[i].name, "price_min": byid[i].price_min, "price_max": byid[i].price_max,
+                          "avg_commute_min": ranked[i].avg_commute_min if i in ranked else None} for i in order]}
+    return {"title": m.name, "trip": _slug(), "lodging": lodging, "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
             "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},
@@ -304,6 +315,115 @@ def add_place_web(body: dict) -> dict[str, Any]:
     return {"revision": ms._load().revision, "message": f"已添加「{cand['name']}」，放在“未安排”里，拖到某一天即可。"}
 
 
+# ---- 住宿：预览 → 确认（和拖拽一样可撤销）；新增酒店只能从查询结果里选 ----
+_LPEND: "dict[str, dict]" = {}
+
+
+def _lodging_change(trip: Trip, body: dict) -> tuple[Trip, list[str]]:
+    """按页面提交的“全程住宿 + 分段住宿”算出新版本和“改前→改后”说明（不保存）。"""
+    names = {l.id: l.name for l in trip.lodgings}
+    sets_chosen = "chosen" in body
+    chosen = body.get("chosen")
+    if sets_chosen and chosen is not None and chosen not in names:
+        raise HttpError(400, "找不到这家住宿。")
+    stays: Optional[list[Stay]] = None
+    if "stays" in body:
+        raw = body.get("stays")
+        if not isinstance(raw, list) or len(raw) > 20:
+            raise HttpError(400, "分段住宿格式不对。")
+        stays = []
+        n = trip.meta.num_days
+        for x in raw:
+            try:
+                fd, td, lid = x["from_day"], x["to_day"], x["lodging_id"]
+                if isinstance(fd, bool) or isinstance(td, bool) or not isinstance(fd, int) or not isinstance(td, int) or not isinstance(lid, str):
+                    raise TypeError
+            except (KeyError, TypeError):
+                raise HttpError(400, "分段住宿格式不对。")
+            if lid not in names:
+                raise HttpError(400, "分段住宿里有不存在的酒店。")
+            if not 1 <= fd <= td <= n:
+                raise HttpError(400, f"天数超出范围：第 {fd}–{td} 晚（行程共 {n} 天）。")
+            stays.append(Stay(lodging_id=lid, from_day=fd - 1, to_day=td - 1))
+    if not sets_chosen and stays is None:
+        raise HttpError(400, "没有要修改的住宿。")
+
+    def mutate(t: Trip) -> None:
+        if sets_chosen:
+            t.chosen_lodging_id = chosen
+        if stays is not None:
+            t.stays = stays
+
+    try:
+        new = commit(trip, mutate)
+        Trip.model_validate(new.model_dump())              # 校验：各段不重叠等
+    except (ValidationError, ValueError):
+        raise HttpError(400, "住宿设置不合法（分段之间不能重叠）。")
+    lines: list[str] = []
+    if sets_chosen and chosen != trip.chosen_lodging_id:
+        lines.append(f"全程住宿：{names.get(trip.chosen_lodging_id, '未选')} → {names.get(chosen, '未选')}")
+    if stays is not None:
+        def fmt(ss):
+            return "；".join(f"第{a.from_day + 1}–{a.to_day + 1}晚 {names[a.lodging_id]}" for a in sorted(ss, key=lambda z: z.from_day)) or "无"
+        if fmt(trip.stays) != fmt(stays):
+            lines.append(f"分段住宿：{fmt(trip.stays)} → {fmt(stays)}")
+    if not lines:
+        raise HttpError(400, "住宿没有变化。")
+    return new, lines
+
+
+def lodging_preview(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    new, lines = _lodging_change(trip, body)
+    before, after = _issue_keys(trip), _issue_keys(new)
+    pid = secrets.token_hex(6)
+    _LPEND[pid] = {"rev": trip.revision, "body": {k: body[k] for k in ("chosen", "stays") if k in body}}
+    while len(_LPEND) > 20:
+        _LPEND.pop(next(iter(_LPEND)))
+    return {"proposal_id": pid, "changes": lines, "new_issues": [m for k, m in after.items() if k not in before],
+            "affected_days": []}
+
+
+def lodging_apply(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    entry = _LPEND.pop(body.get("proposal_id"), None) if isinstance(body.get("proposal_id"), str) else None
+    if not entry or entry["rev"] != trip.revision:
+        raise HttpError(404, "找不到这条预览（可能已过期），请重新操作。")
+    new, _ = _lodging_change(trip, entry["body"])
+    ms._save(new)
+    ms._save_proposals({})
+    return {"revision": new.revision, "message": "已套用住宿设置，往返路线按各天酒店重算。"}
+
+
+def add_lodging_web(body: dict) -> dict[str, Any]:
+    cand = _CANDS.get(body.get("cid")) if isinstance(body.get("cid"), str) else None
+    if cand is None:
+        raise HttpError(400, "请先查找并从结果里选一家（坐标只能来自查询结果）。")
+    prices = []
+    for k in ("price_min", "price_max"):
+        v = body.get(k)
+        if v in (None, ""):
+            prices.append(0.0)
+        elif isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100000:
+            prices.append(float(v))
+        else:
+            raise HttpError(400, "价格要填 0 到 100000 之间的数字，不知道就留空。")
+    if prices[1] and prices[0] > prices[1]:
+        raise HttpError(400, "最低价不能高于最高价。")
+    if prices[0] and not prices[1]:
+        prices[1] = prices[0]
+    trip = ms._load()
+    _check_rev(body, trip)
+    for l in trip.lodgings:
+        if l.name == cand["name"] and abs(l.lat - cand["lat"]) < 0.001 and abs(l.lon - cand["lon"]) < 0.001:
+            raise HttpError(400, f"「{l.name}」已经在候选里了。")
+    ms.add_lodging(cand["name"], cand["lat"], cand["lon"], price_min=prices[0], price_max=prices[1], price_source="manual")
+    ms._save_proposals({})
+    return {"revision": ms._load().revision, "message": f"已添加候选酒店「{cand['name']}」" + ("" if prices[1] else "（价格未填，不会自动估价）") + "。"}
+
+
 def rev() -> dict[str, Any]:
     return {"revision": ms._load().revision, "trip": _slug()}
 
@@ -386,7 +506,7 @@ CODE_VERSION = code_version()
 
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
-ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
+ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup, "lodging_preview": lodging_preview, "lodging_apply": lodging_apply, "add_lodging": add_lodging_web, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
 def make_handler(token: str, state: dict):
