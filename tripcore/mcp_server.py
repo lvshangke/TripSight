@@ -35,6 +35,7 @@ from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
+from .textview import build_text as _build_text, guard_text as _guard_text
 from .stays import hint_text as _stay_hint
 from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
@@ -947,6 +948,27 @@ def create_amap_map(day: Optional[int] = None, per_day: bool = True) -> dict[str
                     "同时给出 web_links（https 网页链接，每站一个，微信里可以直接点开）。skipped 里的点要如实告诉用户原因。"}
 
 
+def export_text(day: Optional[int] = None, links: bool = True) -> str:
+    """生成适合手机/聊天（微信）发送的纯文字行程：每天的出发时间、各站停留和营业时间、交通方式和时长、预约、用餐、天气，
+    每站可附一个 https 地图链接（links=False 则不附）。day 从 1 开始，不填则全程（每天之间有分隔线，发到聊天里请按天分条发）。
+    内容由代码按当前行程生成，和地图页一致；发出的文字留在手机聊天记录里，不依赖电脑开着。
+    行程改动后要重新生成。内含外发检查：如果文字里带有 key、本机路径，会直接报错，不会输出。"""
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    n = len(trip.plan.days)
+    if day is not None and not (1 <= day <= n):
+        raise ToolError(f"没有第 {day} 天（共 {n} 天）")
+    try:
+        text = _build_text(trip, day, links)
+    except ValueError as e:
+        raise ToolError(str(e))
+    bad = _guard_text(text)
+    if bad:
+        raise ToolError("外发检查没通过，没有输出：" + "；".join(bad) + "。请检查景点备注/名称里是否混入了不该外发的内容。")
+    return text
+
+
 def export_gpx(day: Optional[int] = None) -> str:
     """把某一天（day 从 1 开始，不填则每一天）的闭环路线导出成 GPX 文件，可导入其他地图或运动类 App。
     有高德真实路线形状的段用真实形状，没有的用直线（文件里会标“估算”）；建议先 refine_routes。"""
@@ -1802,7 +1824,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
