@@ -14,9 +14,9 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 ![Tests](https://img.shields.io/badge/tests-370%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
-<img src="docs/images/workbench-list.png" alt="TripSight workbench itinerary list (sample data)" width="360">
+<img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
 
-<sub>Itinerary list of the local web workbench in edit mode (sample data). The workbench also has a map and a chat panel, not shown here.</sub>
+<sub>The web workbench: day-by-day itinerary with real Amap routes, opening hours, problem hints and research links (left), map (middle), chat assistant (right).</sub>
 
 </div>
 

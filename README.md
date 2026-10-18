@@ -15,9 +15,9 @@
 ![Tests](https://img.shields.io/badge/tests-370%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
-<img src="docs/images/workbench-list.png" alt="TripSight 工作台行程列表（示例数据）" width="360">
+<img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
 
-<sub>本机网页工作台的行程列表（编辑模式，示例数据）。右侧还有地图和聊天助手，截图里没放。</sub>
+<sub>网页工作台：左侧按天的行程（高德真实路线、营业时间、问题提示、看攻略/看点评/看酒店价格链接），中间地图，右侧聊天助手。</sub>
 
 </div>
 
