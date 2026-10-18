@@ -1,4 +1,4 @@
-"""保存与读取：把一次旅行存成一个 JSON 文件（里程碑 2 会换成 SQLite 数据库）。"""
+"""保存与读取：把一次旅行存成一个 JSON 文件。"""
 
 from __future__ import annotations
 

@@ -20,7 +20,7 @@
 | `Place` | 景点（带状态、重要程度、必去、闭馆日、预约信息等） |
 | `PlaceStatus` | idea → shortlist → planned → confirmed；或 excluded |
 | `Plan` / `DayPlan` / `DayItem` | 行程：每天一个有序列表；条目可 `locked` |
-| `Leg` | 相邻两点间的交通；`detail_level` = estimate / route / steps（目前只有 estimate） |
+| `Leg` | 相邻两点间的交通；`detail_level` = estimate（直线估算）/ route（地图服务的真实路线）/ steps（含换乘步骤） |
 | `Proposal` | 一组可逆操作 + `base_revision` |
 | `Issue` | 校验器输出的一条问题（error / warning / info） |
 
@@ -29,11 +29,13 @@
 1. 保留被锁定的条目（留在原来的那天，相对顺序不变）。
 2. **核心集合**：按“必去 > 重要程度”在总容量内挑出有机会入选的景点（避免偏远的低优先级景点占掉一天的中心）。
 3. 用“最远点优先”在核心集合里为每一天挑一个中心点，并按最近邻路径排序（相邻天地理上也相邻）。
-4. 按“必去 > 重要程度”依次把景点分给：离它最近、还放得下（数量和游览时长）、当天不闭馆的那一天。
+4. 按“必去 > 重要程度”依次把景点分给：离它最近、还放得下（数量和游览时长）、当天不闭馆且营业时间允许的那一天。
    必去但放不下 → 放进游览时间最少的那天（由校验器提醒）；非必去放不下 → 记入“未安排”并写明原因。
 5. 重新计算中心点，重复至稳定（最多 10 轮）。
 6. **局部优化**：尝试跨天移动/交换景点，只要总交通时间明显减少且不违反规则就采纳（不会掏空某一天）。
 7. 天内排序：≤7 个景点穷举最省交通的顺序；更多则最近邻 + 2-opt；有锁定条目时用“最便宜插入”。
+8. **营业时间**：日期已知时，排序和跨天移动的代价里加入“预计到达时间与营业时间冲突”的惩罚（`HOURS_PENALTY`），分配时跳过闭馆的日子；每天所有日子都去不了的景点进“未安排”并写明原因。锁定条目永远不动，只由校验器提示。
+9. 到达日/离开日按大交通算出的可用时间窗缩小容量，窗口不足 2 小时的那天不排景点。
 
 ## 容量规则
 
@@ -49,6 +51,9 @@
 
 `EMPTY_DAY` `DAY_TOO_MANY_PLACES` `DAY_TOO_FULL` `LONG_LEG`（>60 分钟）`LODGING_FAR`（>45 分钟）
 `CLOSED_ON_DAY`（error）`RESERVATION_NOT_BOOKED` `UNSCHEDULED` `OVER_BUDGET`
+营业时间：`OUTSIDE_HOURS`（到达时已关门/过了最晚进入）`LEAVE_AFTER_CLOSE` `ARRIVE_BEFORE_OPEN` `DAY_RUNS_LATE` `HOURS_NEED_DATE`
+其他：`INTERCITY_LEG` `CONNECTION_WINDOW_TOO_SMALL` `CONNECTION_DATE_MISMATCH` `WEATHER_OUTDOOR` 等。
+`timeline.day_visits` 与地图时间线用同一套算法，保证页面和检查看到的时间一致。
 
 ## 测试策略
 
@@ -56,13 +61,12 @@
 - 随机压力测试：40 组固定种子的随机景点分布，检查“不重复、不遗漏、不超容量、可重复”。
 - 改算法时：先让测试描述期望，再改实现。
 
-## 后续计划
+## 现状与后续计划
 
-- 里程碑 2：Streamlit 界面（地图 + 手动调整）；SQLite 存储；候选池视图。
-- 里程碑 3：LLM 工具调用 → 产出 Proposal；路线服务（`route(origin, dest, mode)` 接口，实现可替换：
-  自建 OSRM / 高德 / Google）；交通从 estimate 升级到 route / steps。
-- 之后：住宿区域推荐的聚类版本、文本/链接导入景点、偏好记忆、多人协作、评测脚本。
+已经做到：LLM 工具调用（MCP，52 个工具）只产出 Proposal；高德 / Google / OSM 路线服务；本机网页工作台；
+营业时间参与排程与校验；住宿区域推荐、用餐提示、游记候选核对、跳转链接、偏好记忆。
+后续：一键安装脚本、住宿区域地图显示、更完整的预算、助手遵守规则的评测。
 
 ## 已知局限
 
-见 README.md “已知局限”。
+见 README.md“已知局限”。

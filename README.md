@@ -219,62 +219,47 @@ Apache License 2.0，见 [LICENSE](LICENSE)。
 
 ---
 
-> **接入聊天 Agent（nanobot）**：见 [docs/SETUP.md](docs/SETUP.md)。仓库里的 `skills/` 是给 nanobot 用的说明书，`scripts/install_skills.py` 负责安装，`nanobot/config.example.json` 是配置样例（不含密钥）。
+# 📖 参考手册
+
+> 接入聊天 Agent（nanobot）见 [docs/SETUP.md](docs/SETUP.md)：仓库里的 `skills/` 是给 nanobot 用的说明书，`scripts/install_skills.py` 负责安装，`nanobot/config.example.json` 是配置样例（不含密钥）。
 
 ## 一、第一次运行（约 5 分钟）
 
-需要 Python 3.10 或更新版本（本项目在 Python 3.12 上测试通过）。
+需要 Python 3.10 或更新版本（在 Python 3.10 和 3.12 上运行过测试）。
 
 ```bash
-# 1. 进入项目文件夹
 cd tripcore
-
-# 2.（推荐）创建独立环境，避免污染系统
-python3 -m venv .venv
-source .venv/bin/activate          # Windows 用：.venv\Scripts\activate
-
-# 3. 安装依赖
+python3 -m venv .venv && source .venv/bin/activate    # Windows 用：.venv\Scripts\activate
 pip install -r requirements.txt
 
-# 4. 运行完整演示
-python -m tripcore demo
-
-# 5. 运行测试（应显示全部通过）
-python -m pytest -q
+python -m tripcore doctor     # 自检：还缺什么、怎么补
+python -m tripcore demo       # 用示例数据演示：分天 → 检查 → 推荐住宿 → 选定住宿后重新安排
+python -m pytest -q           # 运行测试（应全部通过）
 ```
 
 > Windows 上如果 `python3` 不可用，请改用 `python`。
-
-`demo` 会用 `examples/beijing.json` 演示完整流程：分天 → 检查 → 推荐住宿 → 选定住宿后重新安排。
-**示例里的坐标、闭馆日、预约信息都是近似值，只用于演示，真实出行请以官方信息为准。**
-
----
+> **示例里的坐标、闭馆日、预约信息都是近似值，只用于演示，真实出行请以官方信息为准。**
 
 ## 二、常用命令
 
 ```bash
-# 读取你自己的 JSON，自动分天并检查
-python -m tripcore plan examples/beijing.json
-
-# 指定节奏 / 交通方式 / 住宿，并把结果保存下来
+python -m tripcore web --open                 # 本机网页工作台（见下文“网页工作台”）
+python -m tripcore doctor                     # 只读自检，不显示 key 内容
+python -m tripcore plan examples/beijing.json # 读取 JSON，自动分天并检查
 python -m tripcore plan examples/beijing.json --pace relaxed --mode transit --lodging hotel_qianmen --out my_trip.json
+python -m tripcore check my_trip.json         # 检查一个已保存的行程
+python -m tripcore undo my_trip.json          # 撤销最近一次修改（会直接改写这个文件）
 
-# 检查一个已保存的行程
-python -m tripcore check my_trip.json
-
-# 撤销最近一次修改（会直接改写这个文件）
-python -m tripcore undo my_trip.json
-
-# 查某个地名的经纬度（需要联网，用的是 OpenStreetMap 的免费服务）
+# 查某个地名的经纬度（需要联网，用 OpenStreetMap 的免费服务）
 export TRIPCORE_CONTACT="你的邮箱或项目地址"   # 使用政策要求带上可联系的标识
 python -m tripcore geocode "故宫博物院" --city 北京
 ```
 
----
+日常使用时，行程由聊天助手通过 MCP 工具维护，上面的命令主要用于演示、调试和读取单个 JSON 文件。
 
-## 三、怎么写你自己的行程（JSON）
+## 三、行程数据（JSON）
 
-复制 `examples/beijing.json`，改成你自己的。关键字段：
+行程存成 JSON，复制 `examples/beijing.json` 改成你自己的即可；完整字段见 `tripcore/models.py`。常用字段：
 
 **meta（整体设置）**
 
@@ -283,68 +268,94 @@ python -m tripcore geocode "故宫博物院" --city 北京
 | `date_mode` | `exact` 日期已定 / `range` 只有范围 / `unknown` 还没定 |
 | `start_date` `end_date` | 日期已定时填写，天数由它们决定 |
 | `num_days` | 日期没定时填写天数 |
-| `pace` | `relaxed` 悠闲（每天 ≤2 个）/ `normal`（≤3 个）/ `packed`（≤5 个） |
+| `pace` | `relaxed`（每天 ≤2 个）/ `normal`（≤3 个）/ `packed`（≤5 个） |
 | `mode` | 交通偏好：`walk` / `transit` / `drive` |
+| `travelers` | 出行人数（门票、餐饮按人数估算） |
 | `budget_total` | 总预算，可不填 |
 
 **places（景点）**
 
 | 字段 | 含义 |
 |---|---|
-| `id` | 唯一标识，英文或拼音，不能重复 |
-| `name` `lat` `lon` | 名称、纬度、经度（WGS84） |
-| `status` | `idea` 想法 / `shortlist` 入围（默认）/ `planned` 已安排 / `confirmed` 已确认 / `excluded` 排除。其中 `shortlist`、`planned`、`confirmed` 会参与自动分天；`idea` 和 `excluded` 不会 |
-| `duration_min` | 预计游览分钟数 |
-| `priority` | 重要程度 1~5，名额不够时优先保留高的 |
-| `must_go` | 必去。必去景点即使放不下也会硬塞进去，并由检查提醒“太满” |
-| `closed_weekdays` | 每周闭馆日，0=周一 … 6=周日（仅在日期已定时生效） |
-| `reservation_required` `reserved` | 是否需要预约 / 是否已约好 |
+| `id` `name` `lat` `lon` | 唯一标识、名称、纬度、经度（WGS84） |
+| `status` | `idea` 想法 / `shortlist` 入围（默认）/ `planned` 已安排 / `confirmed` 已确认 / `excluded` 排除；前三者参与自动分天 |
+| `duration_min` `priority` `must_go` | 预计游览分钟数、重要程度 1~5、必去（放不下也会硬塞进去，并由检查提醒） |
+| `opening_hours` `hours_source` `closed_weekdays` | 营业时间文字及来源、每周闭馆日（0=周一 … 6=周日） |
+| `reservation_required` `reserved` `backups` | 是否需预约、是否已约、备选景点 |
 | `ticket_price` | 门票（元） |
 
 **lodgings（候选住宿）**：`id` `name` `lat` `lon` `price_min` `price_max`（每晚）。
-
----
 
 ## 四、代码结构（想读代码从这里开始）
 
 ```
 tripcore/
-├── models.py      数据结构：景点、住宿、行程、旅行（先读这个）
-├── geo.py         距离计算 + 通勤时间估算
-├── metrics.py     每天的统计（游览/交通分钟、费用）和各节奏的上限
-├── scheduler.py   自动分天 + 天内排序（核心算法，注释最多）
-├── validator.py   检查问题，返回问题清单
-├── lodging.py     住宿区域推荐、候选酒店排序
-├── proposals.py   提案：移动/移出/改状态/锁定，带版本检查
-├── state.py       版本号 + 历史快照 + 撤销
-├── storage.py     读写 JSON 文件
-├── geocode.py     地名 → 经纬度（OpenStreetMap）
-└── cli.py         命令行
-tests/             349 个测试（先看 test_scheduler.py，最容易读懂）
-examples/          示例数据
-DESIGN.md          设计原则、算法说明、已知局限、后续计划
+├── models.py       数据结构：景点、住宿、行程、旅行（先读这个）
+├── scheduler.py    自动分天 + 天内排序（地理 + 容量 + 营业时间）
+├── validator.py    检查问题，返回问题清单（闭馆、来不及、太赶、没预约……）
+├── hours.py        营业时间文字的保守解析（看不懂就返回“待核实”）
+├── timeline.py     每天各景点的预计到达/离开时间
+├── metrics.py      每天的统计、容量上限、费用与按天预算
+├── geo.py          距离计算 + 通勤估算
+├── lodging.py      住宿区域推荐（按每晚/每段、识别一日游）、候选酒店排序
+├── stays.py        分段住宿建议
+├── connections.py  到达/离开大交通对首末日可用时间的影响
+├── mealgaps.py     哪几天还缺午餐/晚餐
+├── proposals.py    提案：移动/移出/改状态/锁定/改停留时长，带版本检查
+├── state.py        版本号 + 历史快照 + 撤销
+├── workspace.py    多行程管理
+├── storage.py      读写 JSON
+├── amap.py gmaps.py geocode.py region.py coords.py   地图服务（高德 / Google / OSM）与坐标系
+├── weather.py openmeteo.py   天气
+├── candidates.py routeplace.py links.py   游记候选、路线型景点、跳转链接
+├── checklist.py review.py prefs.py   定稿清单、旅行复盘、长期偏好
+├── mapview.py gpx.py textview.py     地图页、GPX、手机/微信文字版
+├── web.py webpage.py   本机网页工作台
+├── mcp_server.py   MCP 服务（52 个工具）
+└── doctor.py cli.py    自检与命令行
+skills/             给聊天 Agent 的“说明书”（trip-planner、flyai-search）
+scripts/            install_skills.py（把技能装进 nanobot）
+tests/              自动化测试（先看 test_scheduler.py，最容易读懂）
+examples/           示例数据
+docs/               SETUP.md（接入 nanobot）、images/
+DESIGN.md           设计原则、算法说明
 ```
-
----
 
 ## 五、已知局限（请务必了解）
 
-- **交通时间只是估算**：用直线距离乘绕行系数再除以经验速度，不是真实路线。里程碑 3 才接入地图服务。
-- **分天是启发式，不保证最优**：相同输入结果一致，但不一定是数学上最好的方案。好坏以“检查结果”为准，可以用提案手动调整。
-- **闭馆只按“星期几”判断**，没有具体营业时间，也不知道法定节假日。
-- **只支持整个行程住同一个酒店**。
-- `date_mode` 为 `range` / `unknown` 时，不做闭馆日检查（因为不知道具体星期几）。
-- 长途旅行可分段住宿：`set_stays`（第几晚到第几晚住哪家，各段不重叠）/`clear_stays`。早上从前一晚的酒店出发，晚上回今晚的酒店，到达日去第一家、离开日从前一晚那家出发；费用按每晚所住酒店的价格相加。景点分布在相距较远的几片、而酒店离某片太远时（行程≥4天），`show_trip`/`check_plan` 会自动给一行“住宿建议”，**只是提示，不改行程**。多酒店时分天不再以单一酒店为锚点。
-- 费用只含“门票 + 住宿”，不含餐饮和交通。
-- 地理编码的结果有时不准（尤其是重名或中文别名），请人工核对。国内地图服务使用另一套坐标系（GCJ-02），以后接入时需要转换。
-- 目前只在 Python 3.12 上运行过测试。
+**成熟度**
+- 项目处于早期阶段。高德相关功能作者已用真实 key 测试可用；Google Maps、微信渠道、Docker 镜像、`doctor` 在各平台上的表现，真实环境验证有限（自动化测试主要用假服务，不联网）。
+- 聊天助手是否严格遵守技能里的规则，取决于所用的大模型，没有做系统评测。写入行程的操作都经过确认，但助手的话术和建议质量不受代码保证。
+- 文档和界面目前只有中文（README 有英文版，其余文档没有）。
 
----
+**数据与核查**
+- 价格、营业时间、天气、评分都是参考值（来自地图服务或你提供），不是实时数据；法定节假日、临时闭馆、限流预约都不知道。
+- 营业时间的解析很保守：支持常见写法（星期、季节、日期区间、最晚进入），看不懂的写法会如实显示“无法自动判断”，不会猜；没有营业时间的景点检查不了。
+- 没有真实路线（没配地图 key、或还没 `refine_routes`）时，通勤是按直线距离估算的，页面上会标“估算”。高德返回的是出行时点的方案，不含实时路况；深夜（23:00–05:30）的公交一律按已停运、改用打车估算，这是经验规则，不是真实末班车时间。
+- 费用只含已记录的部分：门票、已选餐厅、大交通、住宿；未选的餐食和市内交通不估算。住宿按整间整晚价，不乘人数。
+- 找餐厅和酒店只是给候选：评分和人均来自高德，酒店价格要你自己去平台查并告诉助手；“看攻略/看点评/看酒店价格”的跳转链接格式没有用真实账号逐一验证，平台改版后可能失效。
+- 不抓取小红书等平台的内容，攻略要靠你粘贴文字；游记里的价格和营业时间只作待核实线索。
 
-## 六、下一步
+**规划算法**
+- 分天是启发式，相同输入结果一致，但不保证数学上最优。节奏的每日容量是硬限制，景点多、天数少时，部分景点会被放进“未安排”并写明原因；这时需要调高节奏、增加天数或手动取舍。
+- 已锁定的安排不会被自动重排移动，即使营业时间不合适也只提示、不改。
+- 住宿区域推荐是按相关景点位置算的粗略建议：相邻两天景点相距很远（如第二天一早去远郊）时，推荐中心可能偏向远的一侧，实际更适合住在市区一侧；一日游的识别用固定距离阈值（40 km / 150 km），极端情况会判断不准。目前只在聊天里给出，还没有在地图上显示。
+- “缺午餐/晚餐”按固定饭点（11:30–13:30、17:30–19:30）判断，不知道你的真实用餐习惯。
+- 用餐点只是标记，不占景点容量，也不参与排程。
 
-- **里程碑 2**：用 Streamlit 做一个能看地图、能手动调整的页面；数据改存 SQLite。
-- **里程碑 3**：加聊天框，让大模型通过“工具调用”产出**提案**（不是直接改数据）；接入真实路线服务。
+**使用方式**
+- 网页工作台只能在运行它的那台电脑上用（只监听 127.0.0.1），不支持多人协作或云端同步；手机请用文字版、手机版地图页或高德专属地图。
+- 高德 App 的专属地图一次只显示一条行程，所以默认每天一个链接。
+- 助手不订票、不订酒店、不付款，也不会安装程序；机票/火车票/酒店参考价依赖你本机装好的 flyai、rgh 命令行并已登录。
+
+## 六、后续计划
+
+- **一键安装脚本**（类似 `setup.sh`）：自动安装 nanobot、合并配置、安装技能，最后跑 `doctor`。
+- **住宿区域在地图上显示**，并改进相邻两天相距很远时的推荐中心。
+- **更完整的预算**：市内交通和未选餐食的估算、按天明细在网页里显示。
+- **更多真实环境验证**：Google Maps、微信渠道、Docker 镜像。
+- **评测**：用固定的攻略样例评测助手遵守规则的程度。
+- 英文文档补全（SETUP、DESIGN）。
 
 ## 七、和 AI 编程助手配合的建议
 
@@ -352,15 +363,21 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 - 改代码前先跑 `python -m pytest -q`，改完再跑；红了就让它先修复。
 - 想改规则，先用大白话写成测试，再让它实现。
 - 把 `DESIGN.md` 发给它，让它遵守里面的设计原则。
-- 用 git 保存每个能跑通的版本：`git init && git add . && git commit -m "第一个能跑的版本"`。
+- 用 git 保存每个能跑通的版本。
 
-## MCP 服务（第 1 步）
+---
+
+# 🔧 功能与接口详解
+
+下面按功能分节，写得比较细，适合查阅；部分段落保留了早期的措辞，如与上文不一致，以代码和各 MCP 工具的说明为准。
+
+## MCP 服务
 
 `tripcore/mcp_server.py` 把 tripcore 包装成 52 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
-- 状态保存在 `~/.tripcore/trip.json`（环境变量 `TRIPCORE_FILE` 可改），待确认的提案在同目录 `proposals.json`。
+- 多个行程保存在 `~/.tripcore/trips/<名字>/`（当前行程记在 `active.json`）；设置环境变量 `TRIPCORE_FILE` 则只用这一个文件（单文件模式，不能切换/新建行程）。待确认的提案在同目录 `proposals.json`。
 - 所有修改走“提案 → 确认 → 套用”，`undo` 可撤销。
 - 依赖：`pip install -r requirements.txt`（mcp 需 <2）。
 
@@ -383,7 +400,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 提案需要确认码：`propose_change` 返回 4 位 `confirm_code`，用户回复后才能 `apply_proposal`（这只是减速带，不是安全边界）。
 
-## 高德地图（第 2 步）
+## 高德地图
 
 - 设置环境变量 `AMAP_KEY`（nanobot 配置里写在 `tripcore` 的 `env` 中，不要写进代码、不要提交）。境外行程可另配 `GOOGLE_MAPS_KEY` 改用 Google Maps（`set_provider`，见 docs/SETUP.md 第 8 节）。
 - `lookup_coords`：有 key 时用高德搜索，返回候选（地址、评分、参考价 `cost_reference`、今日营业时间）；没有 key 或高德失败时退回 OpenStreetMap。
