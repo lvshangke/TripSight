@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import secrets
@@ -198,7 +199,40 @@ def dates(body: dict) -> dict[str, Any]:
     return {"revision": new.revision, "message": head + "".join(notes)}
 
 
-ROUTES_GET = {"state": lambda: snapshot()}
+# ---- 聊天：转发到本机的 nanobot（OpenAI 兼容接口），用同一个 agent、skill 和工具 ----
+NANOBOT_DEFAULT = "http://127.0.0.1:8900"
+CHAT_SESSION = "tripsight-workbench"
+MAX_CHAT = 4000
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def _nanobot() -> tuple[str, int]:
+    """nanobot 接口地址（环境变量 NANOBOT_API_URL，默认 127.0.0.1:8900）。只允许本机，避免把行程和 key 发到别处。"""
+    u = urlparse(os.environ.get("NANOBOT_API_URL", "").strip() or NANOBOT_DEFAULT)
+    if u.scheme != "http" or (u.hostname or "") not in _LOOPBACK:
+        raise HttpError(400, "NANOBOT_API_URL 只能是本机的 http 地址（127.0.0.1 或 localhost）。")
+    return u.hostname, u.port or 8900
+
+
+def rev() -> dict[str, Any]:
+    return {"revision": ms._load().revision}
+
+
+def chat_status() -> dict[str, Any]:
+    try:
+        host, port = _nanobot()
+        conn = http.client.HTTPConnection(host, port, timeout=1.5)
+        conn.request("GET", "/health")
+        ok = conn.getresponse().status == 200
+        conn.close()
+    except HttpError as e:
+        return {"connected": False, "message": e.message}
+    except Exception:
+        ok = False
+    return {"connected": ok, "message": "" if ok else "没连上 nanobot。先启动它的接口：nanobot plugins enable api，然后 nanobot serve。"}
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "chat_status": chat_status}
 ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
@@ -254,7 +288,7 @@ def make_handler(token: str, state: dict):
             rest = self._guard()
             if rest is None:
                 return
-            if not rest.startswith("api/") or rest[4:] not in ROUTES_POST:
+            if not rest.startswith("api/") or (rest[4:] not in ROUTES_POST and rest[4:] != "chat"):
                 self._json(404, {"error": "not found"})
                 return
             if "application/json" not in (self.headers.get("Content-Type") or ""):
@@ -274,7 +308,60 @@ def make_handler(token: str, state: dict):
             except ValueError:
                 self._json(400, {"error": "JSON 格式不对"})
                 return
+            if rest[4:] == "chat":
+                self._chat(body)
+                return
             self._run(lambda: ROUTES_POST[rest[4:]](body), write=True)
+
+        def _chat(self, body: dict) -> None:
+            """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""
+            msg = body.get("message")
+            if not isinstance(msg, str) or not msg.strip():
+                self._json(400, {"error": "消息不能为空。"})
+                return
+            if len(msg) > MAX_CHAT:
+                self._json(400, {"error": f"消息太长（最多 {MAX_CHAT} 字）。"})
+                return
+            try:
+                host, port = _nanobot()
+            except HttpError as e:
+                self._json(e.status, {"error": e.message})
+                return
+            headers = {"Content-Type": "application/json"}
+            key = os.environ.get("NANOBOT_API_KEY", "").strip()
+            if key:
+                headers["Authorization"] = "Bearer " + key
+            payload = json.dumps({"messages": [{"role": "user", "content": msg}], "session_id": CHAT_SESSION, "stream": True})
+            try:
+                conn = http.client.HTTPConnection(host, port, timeout=130)
+                conn.request("POST", "/v1/chat/completions", payload.encode("utf-8"), headers)
+                resp = conn.getresponse()
+            except Exception:
+                self._json(502, {"error": "没连上 nanobot。先启动它的接口：nanobot plugins enable api，然后 nanobot serve。"})
+                return
+            if resp.status != 200:
+                resp.read()
+                conn.close()
+                hint = "nanobot 接口需要 key：启动工作台前设置环境变量 NANOBOT_API_KEY。" if resp.status == 401 else f"nanobot 返回了错误（HTTP {resp.status}）。"
+                self._json(502, {"error": hint})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            try:
+                while True:
+                    line = resp.readline()
+                    if not line:
+                        break
+                    self.wfile.write(line)
+                    self.wfile.flush()
+                    state["last"] = time.time()
+            except Exception:
+                pass                                           # 页面断开或 nanobot 中途结束：页面按“没收到 [DONE]”处理
+            finally:
+                conn.close()
 
         def _run(self, fn, write: bool = False) -> None:
             try:
@@ -366,4 +453,5 @@ def launch(root: Path) -> str:
 def _msg(url: str, reused: bool) -> str:
     return (f"工作台{'已在运行' if reused else '已启动'}：{url}\n"
             "在这台电脑的浏览器里打开（刚启动时会自动打开）。网址带一次性令牌，只在本机有效，不要转发给别人；空闲 2 小时自动退出。\n"
-            "页面里：拖动景点调整顺序或跨天移动（松手后先预览，点“确认”才生效），月历选日期，右上角可以撤销。")
+            "页面里：拖动景点调整顺序或跨天移动（松手后先预览，点“确认”才生效，并自动补真实路线），月历选日期，右上角可以撤销；"
+            "右侧“助手”聊天栏连的是 nanobot 本机接口（需要先运行 nanobot serve），加景点、选酒店、查车票机票都可以在里面说。")

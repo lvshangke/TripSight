@@ -65,6 +65,13 @@ nanobot 自带 `weixin` 渠道（二维码登录的个人微信，长轮询，�
 4. 创建境外行程后，对 agent 说“这个行程用 Google”，或让它调用 `set_provider("google")`。不设置时按景点位置自动选：大陆用高德、境外用 Google，缺哪个 key 就用另一个并提醒。
 说明：Google 后端没有天气接口，天气始终用 Open-Meteo；高德专属地图只支持国内行程；境外地图页的底图是 OpenStreetMap，分享链接是 Google Maps 网页链接。
 
+## 9. 可选：网页工作台的聊天栏
+工作台（`open_workbench` 或 `python -m tripcore web`）右侧的“助手”聊天栏需要 nanobot 的本机接口：
+1. `nanobot plugins enable api`，然后运行 `nanobot serve`（也可以在 nanobot WebUI 的“设置 → 系统”里启动接口）。默认只监听 127.0.0.1:8900，不需要 key。
+2. 如果你给接口设了 key，启动工作台前设置环境变量 `NANOBOT_API_KEY`；接口地址不是默认值时设置 `NANOBOT_API_URL`（只允许 127.0.0.1 / localhost）。
+3. 没启动接口时聊天栏显示“未连接”，其他功能（拖拽、日期、撤销）不受影响。
+注意：接口单次回复默认最多等 120 秒；超时或中断不会撤销 agent 已经做完的动作，聊天栏会提示“回复可能不完整”。
+
 ## 改 skill 时
 
 以仓库里的 `skills/` 为准，改完用 `scripts/install_skills.py` 同步到 nanobot（或用 `--link` 一次链好）。

@@ -55,11 +55,20 @@ a{color:#2563eb;text-decoration:none}
 #prev ul{margin:4px 0 6px 18px;padding:0;font-size:13px}
 #prev .w{color:#b45309}
 .pin{border-radius:50%;color:#fff;font-weight:700;width:26px;height:26px;line-height:26px;text-align:center;font-size:13px;border:2px solid #fff;box-shadow:0 0 3px #0006}
-#note{position:absolute;bottom:0;right:0;z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
-@media (max-width:760px){#app{flex-direction:column}#side{width:auto;max-width:none;height:60%}#map{height:40%}}
+#note{position:absolute;bottom:0;left:400px;max-width:calc(100vw - 760px);z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
+#chat{width:340px;max-width:40vw;display:flex;flex-direction:column;border-left:1px solid #ddd;background:#fff}
+#chat.hide{display:none}
+#chead{padding:8px 12px;border-bottom:1px solid #ddd;display:flex;gap:8px;align-items:center}#chead b{flex:1}#cstat{font-size:12px;color:#b45309}#chead button{border:0;font-size:18px;padding:0 4px}
+#cmsgs{flex:1;overflow:auto;padding:8px 10px;font-size:13px}
+.m{margin:6px 0;padding:6px 9px;border-radius:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.m.u{background:#dbeafe;margin-left:30px}.m.a{background:#f3f4f6;margin-right:20px}.m.e{background:#fee2e2;color:#991b1b}
+#chips{padding:4px 8px;display:flex;gap:4px;flex-wrap:wrap}#chips button{font-size:12px;padding:2px 8px;border-radius:12px}
+#cin{display:flex;gap:6px;padding:8px;border-top:1px solid #ddd}#cin textarea{flex:1;resize:none;font:inherit;font-size:13px;padding:4px 6px}
+@media (max-width:760px){#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
+@media (max-width:760px){#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column}#side{width:auto;max-width:none;height:60%}#map{height:40%}}
 </style></head><body>
 <div id="app"><div id="side">
-<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="refine" title="给还没查过的路段查真实路线">更新路线</button><button id="undo">撤销</button></header>
+<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="refine" title="给还没查过的路段查真实路线">更新路线</button><button id="undo">撤销</button></header>
 <div id="msg"></div>
 <div id="scroll">
 <div class="sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
@@ -68,7 +77,11 @@ a{color:#2563eb;text-decoration:none}
 <div class="sec" id="days"></div>
 </div>
 <div id="prev"><b>预览（还没有改动）</b><ul id="chg"></ul><div id="iss"></div><button id="ok" class="pri">确认</button> <button id="cancel">取消</button></div>
-</div><div id="map" style="position:relative"></div></div>
+</div><div id="map" style="position:relative"></div>
+<div id="chat"><div id="chead"><b>助手</b><span id="cstat"></span><button id="cclose" title="收起">×</button></div>
+<div id="cmsgs"></div>
+<div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
+<div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
 <script>__JS__</script>
 <script>
@@ -204,6 +217,36 @@ function renderMap() {
   });
   if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.2));
 }
+// ---- 聊天 + 自动刷新 ----
+const msgs = $('cmsgs'); let busy = false;
+function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
+async function chatStatus() { try { const r = await api('chat_status'); $('cstat').textContent = r.connected ? '' : '未连接'; if (!r.connected && !msgs.children.length) bubble('e', r.message); return r.connected; } catch (e) { $('cstat').textContent = '未连接'; return false; } }
+async function send() {
+  const text = $('ctext').value.trim(); if (!text || busy) return;
+  busy = true; $('csend').disabled = true; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
+  try {
+    const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text})});
+    if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); }
+    else {
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+      for (;;) { const {value, done: end} = await rd.read(); if (end) break; buf += dec.decode(value, {stream: true}); let i;
+        while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue; const d = line.slice(5).trim(); if (d === '[DONE]') { done = true; continue; }
+          try { const t = (JSON.parse(d).choices || [{}])[0].delta; if (t && t.content) { got += t.content; out.textContent = got; msgs.scrollTop = msgs.scrollHeight; } } catch (e) {} } }
+      if (!got) out.textContent = '（没有收到回复）';
+      if (!done) { const w = document.createElement('div'); w.className = 'm e'; w.textContent = '回复可能不完整（连接中断或超时）。agent 已经做完的操作不会撤销，请看看行程再决定。'; msgs.appendChild(w); }
+    }
+  } catch (e) { out.className = 'm e'; out.textContent = '请求失败：' + e.message; }
+  busy = false; $('csend').disabled = false; await load();
+}
+$('csend').onclick = send; $('ctext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
+document.querySelectorAll('#chips button').forEach(b => b.onclick = () => { $('ctext').value = b.dataset.t; $('ctext').focus(); });
+$('ctoggle').onclick = () => $('chat').classList.toggle('hide'); $('cclose').onclick = () => $('chat').classList.add('hide');
+setInterval(async () => {
+  if (document.hidden || !S || drag) return;
+  try { const r = await api('rev'); if (r.revision !== S.revision) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
+}, 2000);
+chatStatus();
 load();
 </script></body></html>
 """

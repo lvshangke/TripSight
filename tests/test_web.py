@@ -291,3 +291,93 @@ def test_dates_without_plan_just_sets_days():
     s.add_place("甲", 34.2, 108.9)
     out = s.set_dates("2026-11-01", "2026-11-03")
     assert s._load().plan is None and "还没有分天" in out
+
+
+# ---- 聊天转发 ----
+import http.server
+
+
+class _FakeNano(http.server.BaseHTTPRequestHandler):
+    seen: list = []
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        self.send_response(200 if self.path == "/health" else 404)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"ok":true}')
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        _FakeNano.seen.append((self.path, json.loads(self.rfile.read(n)), dict(self.headers)))
+        if self.headers.get("X-Fail"):
+            pass
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.end_headers()
+        for part in ["你", "好"]:
+            self.wfile.write(("data: " + json.dumps({"choices": [{"delta": {"content": part}}]}, ensure_ascii=False) + "\n\n").encode())
+            self.wfile.flush()
+        self.wfile.write(b"data: [DONE]\n\n")
+
+
+@pytest.fixture
+def nano(monkeypatch):
+    _FakeNano.seen = []
+    from http.server import ThreadingHTTPServer
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), _FakeNano)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    monkeypatch.setenv("NANOBOT_API_URL", f"http://127.0.0.1:{httpd.server_address[1]}")
+    monkeypatch.delenv("NANOBOT_API_KEY", raising=False)
+    yield httpd
+    httpd.shutdown()
+    httpd.server_close()
+
+
+def raw_post(base, path, body, headers=None):
+    req = urllib.request.Request(base + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, r.read().decode()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
+
+
+def test_chat_streams_and_sends_session(server, nano, monkeypatch):
+    monkeypatch.setenv("NANOBOT_API_KEY", "NANOKEY")
+    code, body = raw_post(server, "/tok/api/chat", {"message": "加一个景点"})
+    assert code == 200 and "你" in body and "[DONE]" in body and "NANOKEY" not in body
+    path, sent, headers = _FakeNano.seen[0]
+    assert path == "/v1/chat/completions" and sent["session_id"] == "tripsight-workbench" and sent["stream"] is True
+    assert sent["messages"] == [{"role": "user", "content": "加一个景点"}] and headers["Authorization"] == "Bearer NANOKEY"
+
+
+def test_chat_guards(server, nano):
+    assert raw_post(server, "/api/chat", {"message": "x"})[0] == 404                                   # 没有令牌
+    assert raw_post(server, "/tok/api/chat", {"message": "x"}, {"Origin": "https://evil.example.com"})[0] == 403
+    assert raw_post(server, "/tok/api/chat", {"message": "  "})[0] == 400
+    assert raw_post(server, "/tok/api/chat", {"message": "字" * 4001})[0] == 400
+    assert raw_post(server, "/tok/api/chat", {"message": 5})[0] == 400
+    assert _FakeNano.seen == []                                                                        # 被拒绝的请求不会到 nanobot
+
+
+def test_chat_only_loopback(server, monkeypatch):
+    monkeypatch.setenv("NANOBOT_API_URL", "http://evil.example.com:8900")
+    code, body = raw_post(server, "/tok/api/chat", {"message": "hi"})
+    assert code == 400 and "本机" in body
+    assert call(server, "/tok/api/chat_status")[1]["connected"] is False
+
+
+def test_chat_unreachable_is_friendly(server, monkeypatch):
+    monkeypatch.setenv("NANOBOT_API_URL", "http://127.0.0.1:9")            # 没人监听
+    code, body = raw_post(server, "/tok/api/chat", {"message": "hi"})
+    assert code == 502 and "nanobot" in body and "Traceback" not in body
+
+
+def test_chat_status_and_rev(server, nano):
+    assert call(server, "/tok/api/chat_status")[1]["connected"] is True
+    assert call(server, "/tok/api/rev")[1]["revision"] == state(server)["revision"]
+    s.set_travelers(3)
+    assert call(server, "/tok/api/rev")[1]["revision"] > 0
