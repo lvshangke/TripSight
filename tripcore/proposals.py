@@ -6,7 +6,7 @@
   提案就过期了，不能再套用，避免把别人刚改好的东西覆盖掉。
 - 用户锁定的条目不允许被提案移动。
 
-目前支持 4 种操作：move（移动）、remove（移出行程）、set_status（改状态）、lock（锁定/解锁）。
+目前支持 5 种操作：move（移动）、remove（移出行程）、set_status（改状态）、lock（锁定/解锁）、set_duration（改停留时长）。
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from .models import DayItem, DayPlan, PlaceStatus, Plan, Trip
+from .models import DayItem, DayPlan, Place, PlaceStatus, Plan, Trip
 from .state import commit
 
 
@@ -56,7 +56,13 @@ class LockOp(BaseModel):
     locked: bool = True
 
 
-Op = Annotated[Union[MoveOp, RemoveOp, SetStatusOp, LockOp], Field(discriminator="kind")]
+class SetDurationOp(BaseModel):
+    kind: Literal["set_duration"] = "set_duration"
+    place_id: str
+    minutes: int = Field(ge=10, le=720, description="停留时长（分钟）")
+
+
+Op = Annotated[Union[MoveOp, RemoveOp, SetStatusOp, LockOp, SetDurationOp], Field(discriminator="kind")]
 
 
 class Proposal(BaseModel):
@@ -106,6 +112,11 @@ def _apply_one(t: Trip, op: Op) -> None:
                     raise LockedItemError(f"「{t.place(op.place_id).name}」已锁定，不能排除")
                 t.plan.days[loc[0]].items.pop(loc[1])
         t.place(op.place_id).status = op.status
+        return
+
+    if isinstance(op, SetDurationOp):
+        old = t.place(op.place_id)
+        t.places[t.places.index(old)] = Place.model_validate({**old.model_dump(), "duration_min": op.minutes})
         return
 
     plan = _ensure_plan(t)
@@ -192,4 +203,6 @@ def describe_ops(trip: Trip, proposal: Proposal) -> list[str]:
             lines.append(f"「{name}」状态：{trip.place(op.place_id).status.value} → {op.status.value}")
         elif isinstance(op, LockOp):
             lines.append(f"{'锁定' if op.locked else '解锁'}「{name}」")
+        elif isinstance(op, SetDurationOp):
+            lines.append(f"「{name}」停留时间：{trip.place(op.place_id).duration_min} → {op.minutes} 分钟")
     return lines

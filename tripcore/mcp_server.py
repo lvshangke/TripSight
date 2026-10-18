@@ -1723,6 +1723,7 @@ def propose_change(summary: str, ops: list[dict[str, Any]], rationale: str = "")
     {"kind":"remove","place_id":"p2"}
     {"kind":"set_status","place_id":"p3","status":"excluded"}  （idea/shortlist/planned/confirmed/excluded）
     {"kind":"lock","place_id":"p1","locked":true}
+    {"kind":"set_duration","place_id":"p1","minutes":120}  （改停留时长，10–720 分钟）
     返回提案 id、confirm_code 和“改前→改后”说明。
     必须把 changes 和 confirm_code 展示给用户，请用户回复该确认码；用户回复后才能调用 apply_proposal。
     绝对不能自己代填确认码或在用户没回复时套用。"""

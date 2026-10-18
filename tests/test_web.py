@@ -556,3 +556,86 @@ def test_new_trip_disabled_in_single_file_mode(server):
 def test_mcp_new_trip_rejects_over_30_days_by_dates():
     with pytest.raises(s.ToolError):
         s.new_trip("太长", 3, start_date="2026-11-01", end_date="2026-12-15")
+
+
+# ---- 加景点 / 改停留时长 ----
+def _fake_lookup(monkeypatch, found=True, source="amap"):
+    def fake(query, city=None):
+        if not found:
+            return {"found": False, "source": "osm", "error": "没找到", "note": ""}
+        return {"found": True, "source": source, "name": "大雁塔", "lat": 34.2186, "lon": 108.9647, "warning": "", "note": "",
+                "candidates": [{"name": "大雁塔", "lat": 34.2186, "lon": 108.9647, "address": "雁塔路", "category": "风景名胜", "rating": 4.8, "opentime_today": "08:00-17:30"},
+                               {"name": "大雁塔北广场", "lat": 34.2200, "lon": 108.9650, "address": "雁塔北路", "category": "广场", "rating": None, "opentime_today": ""}]}
+    monkeypatch.setattr(s, "lookup_coords", fake)
+
+
+def test_lookup_hides_coords_and_add_place_uses_candidate(server, monkeypatch):
+    _fake_lookup(monkeypatch)
+    code, r = call(server, "/tok/api/lookup", {"query": "大雁塔"})
+    assert code == 200 and len(r["candidates"]) == 2 and "lat" not in json.dumps(r) and "lon" not in json.dumps(r)
+    st0 = state(server)
+    code, out = call(server, "/tok/api/add_place", {"base_revision": st0["revision"], "cid": r["candidates"][0]["cid"], "duration_min": 120})
+    assert code == 200
+    st = state(server)
+    assert st["revision"] > st0["revision"]
+    new = next(u for u in st["unscheduled"] if u["name"] == "大雁塔")
+    assert new["duration_min"] == 120
+    p = next(p for p in s._load().places if p.name == "大雁塔")
+    assert (p.lat, p.lon) == (34.2186, 108.9647) and p.category == "风景名胜"            # 坐标来自查询结果
+    call(server, "/tok/api/undo", {"base_revision": st["revision"]})
+    assert all(p.name != "大雁塔" for p in s._load().places)                                # 可撤销
+
+
+def test_add_place_rejects_made_up_coords_dupes_and_bad_input(server, monkeypatch):
+    _fake_lookup(monkeypatch)
+    rev_ = state(server)["revision"]
+    assert call(server, "/tok/api/add_place", {"base_revision": rev_, "name": "编的", "lat": 1, "lon": 2})[0] == 400      # 没有 cid：不能手填坐标
+    assert call(server, "/tok/api/add_place", {"base_revision": rev_, "cid": "nope"})[0] == 400
+    cid = call(server, "/tok/api/lookup", {"query": "大雁塔"})[1]["candidates"][0]["cid"]
+    for bad in (9, 721, "90", True, None):
+        assert call(server, "/tok/api/add_place", {"base_revision": rev_, "cid": cid, "duration_min": bad})[0] == 400
+    assert call(server, "/tok/api/add_place", {"base_revision": rev_ + 5, "cid": cid})[0] == 409
+    assert call(server, "/tok/api/add_place", {"base_revision": rev_, "cid": cid})[0] == 200
+    cid2 = call(server, "/tok/api/lookup", {"query": "大雁塔"})[1]["candidates"][0]["cid"]
+    assert call(server, "/tok/api/add_place", {"base_revision": state(server)["revision"], "cid": cid2})[0] == 400         # 重复
+    assert sum(1 for p in s._load().places if p.name == "大雁塔") == 1
+
+
+def test_lookup_not_found_and_osm_warning_and_bad_query(server, monkeypatch):
+    _fake_lookup(monkeypatch, found=False)
+    code, r = call(server, "/tok/api/lookup", {"query": "不存在的地方"})
+    assert code == 200 and r["candidates"] == [] and r["message"]
+    _fake_lookup(monkeypatch, source="osm")
+    assert "OpenStreetMap" in call(server, "/tok/api/lookup", {"query": "x"})[1]["warning"]
+    for bad in ({}, {"query": "  "}, {"query": 5}, {"query": "字" * 61}):
+        assert call(server, "/tok/api/lookup", bad)[0] == 400
+    assert raw_post(server, "/api/lookup", {"query": "x"})[0] == 404
+
+
+def test_set_duration_preview_apply_undo(server):
+    st = state(server)
+    pid = st["days"][0]["items"][0]["place_id"]
+    old = next(p.duration_min for p in s._load().places if p.id == pid)
+    code, pv = call(server, "/tok/api/preview", {"base_revision": st["revision"], "ops": [{"kind": "set_duration", "place_id": pid, "minutes": old + 30}]})
+    assert code == 200 and any(f"{old} → {old + 30} 分钟" in c for c in pv["changes"])
+    assert next(p.duration_min for p in s._load().places if p.id == pid) == old                    # 预览不改动
+    assert call(server, "/tok/api/apply", {"base_revision": st["revision"], "proposal_id": pv["proposal_id"]})[0] == 200
+    assert next(p.duration_min for p in s._load().places if p.id == pid) == old + 30
+    assert state(server)["days"][0]["items"][0]["duration_min"] == old + 30
+    call(server, "/tok/api/undo", {"base_revision": state(server)["revision"]})
+    assert next(p.duration_min for p in s._load().places if p.id == pid) == old
+
+
+@pytest.mark.parametrize("minutes", [9, 721, 0, -5, None])
+def test_set_duration_rejects_out_of_range(server, minutes):
+    st = state(server)
+    pid = st["days"][0]["items"][0]["place_id"]
+    assert call(server, "/tok/api/preview", {"base_revision": st["revision"], "ops": [{"kind": "set_duration", "place_id": pid, "minutes": minutes}]})[0] == 400
+
+
+def test_set_duration_via_agent_proposal_tool():
+    s.new_trip("t", 1)
+    s.add_place("甲", 34.2, 108.9)
+    pid = s._load().places[0].id
+    r = s.propose_change("改时长", [{"kind": "set_duration", "place_id": pid, "minutes": 150}])
+    assert "90 → 150 分钟" in r["changes"][0]

@@ -36,6 +36,18 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #nt .row{display:flex;gap:8px}#nt .row>div{flex:1}
 #nt .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #nt .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
+#ap{position:fixed;inset:0;background:#0006;z-index:3000;display:none;align-items:center;justify-content:center}
+#ap.on{display:flex}
+#ap .box{background:#fff;border-radius:10px;padding:16px 18px;width:min(440px,94vw);max-height:88vh;overflow:auto;box-shadow:0 8px 30px #0005;font-size:14px}
+#ap h3{margin:0 0 10px;font-size:16px}
+#ap .q{display:flex;gap:6px}#ap .q input{flex:1;font:inherit;padding:5px 6px;border:1px solid #bbb;border-radius:6px}
+.cand{display:block;border:1px solid #ddd;border-radius:8px;padding:7px 9px;margin:6px 0;cursor:pointer}
+.cand:has(input:checked){border-color:#2563eb;background:#eff6ff}
+.cand input{margin-right:6px}.cand .a{font-size:12px;color:#555;margin-left:22px}
+#ap .w{color:#b45309;font-size:12px;margin:6px 0}
+#ap .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
+#ap .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center}
+.dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
 .editonly{display:none}
 #app.edit .editonly{display:block}
 #app.edit #tabs{display:none}
@@ -103,6 +115,11 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
+<div id="ap"><div class="box"><h3>加景点</h3>
+<div class="q"><input id="ap_q" maxlength="60" placeholder="景点名称，例如：大雁塔"><button id="ap_go" class="pri">查找</button></div>
+<div id="ap_list"></div><div class="w" id="ap_warn"></div>
+<div class="btns"><span style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
+<button id="ap_cancel">取消</button><button id="ap_ok" class="pri" disabled>加入行程</button></div><div class="err" id="ap_err"></div></div></div>
 <div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
 <label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
 <label>目的地城市（选填，之后查坐标会限定在这个城市附近）</label><input id="nt_city" maxlength="40" placeholder="例如：东京">
@@ -144,7 +161,26 @@ async function loadTrips() {
     sel.disabled = r.single; sel.title = r.single ? '单文件模式不能切换或新建' : '切换行程 / 新建行程'; curTrip = r.current;
   } catch (e) {}
 }
-let curTrip = null;
+let curTrip = null, apPicked = null;
+function apOpen() { $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
+function apClose() { $('ap').classList.remove('on'); }
+$('ap_cancel').onclick = apClose; $('ap').onclick = e => { if (e.target === $('ap')) apClose(); };
+async function apSearch() {
+  const q = $('ap_q').value.trim(); if (!q) return; $('ap_err').textContent = ''; $('ap_go').disabled = true; $('ap_list').innerHTML = '<div class="empty">查询中…</div>'; apPicked = null; $('ap_ok').disabled = true;
+  try {
+    const r = await api('lookup', {query: q}); $('ap_warn').textContent = r.warning || '';
+    if (!r.candidates.length) { $('ap_list').innerHTML = '<div class="empty">' + esc(r.message || '没有找到') + '</div>'; }
+    else { $('ap_list').innerHTML = r.candidates.map((c, i) => '<label class="cand"><input type="radio" name="apc" value="' + esc(c.cid) + '"><b>' + esc(c.name) + '</b>' + (c.rating ? ' ⭐' + esc(c.rating) : '') + '<div class="a">' + esc(c.address) + (c.category ? ' · ' + esc(c.category) : '') + (c.opentime_today ? '<br>今日营业：' + esc(c.opentime_today) : '') + '</div></label>').join('');
+      $('ap_list').querySelectorAll('input').forEach(i => i.onchange = () => { apPicked = i.value; $('ap_ok').disabled = false; }); }
+  } catch (e) { $('ap_list').innerHTML = ''; $('ap_err').textContent = e.message; }
+  $('ap_go').disabled = false;
+}
+$('ap_go').onclick = apSearch; $('ap_q').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); apSearch(); } };
+$('ap_ok').onclick = async () => {
+  if (!apPicked) return; $('ap_ok').disabled = true;
+  try { const r = await api('add_place', {base_revision: S.revision, cid: apPicked, duration_min: Number($('ap_dur').value)}); apClose(); say(r.message); await load(); }
+  catch (e) { $('ap_err').textContent = e.message; $('ap_ok').disabled = false; if (e.status === 409) { apClose(); load(); } }
+};
 function ntOpen() { $('nt_err').textContent = ''; $('nt').classList.add('on'); $('nt_name').focus(); }
 function ntClose() { $('nt').classList.remove('on'); }
 $('nt_cancel').onclick = ntClose; $('nt').onclick = e => { if (e.target === $('nt')) ntClose(); };
@@ -246,8 +282,9 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   else if (e.type === 'term') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">' + e.icon + ' ' + esc(e.role) + '：' + esc(e.name) + '</span></div><div class="sub">' + lines + '</div>';
   else if (e.type === 'meal') row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 ' + esc(e.name) + '</span></div><div class="sub">' + lines + (e.web ? '<br><a href="' + esc(e.web) + '" target="_blank" rel="noopener noreferrer" style="color:#1a6fe8">地图</a>' : '') + '</div>';
   else {
-    row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + e.stay + ' 分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
+    row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + (edit ? '<input class="dur" type="number" min="10" max="720" step="15" value="' + e.stay + '"> ' : e.stay + ' ') + '分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
     if (edit) {
+      wireDur(row, e.pid, e.stay);
       row.dataset.pid = e.pid; row.draggable = true;
       row.querySelector('[data-a=up]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.max(stopIdx - 1, 0)); };
       row.querySelector('[data-a=dn]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.min(stopIdx + 1, nStops - 1)); };
@@ -274,11 +311,20 @@ function renderList() {
   });
   renderUnscheduled(list);
 }
+function wireDur(el, pid, cur) {
+  const inp = el.querySelector('.dur'); if (!inp) return;
+  ['click', 'dblclick'].forEach(t => inp.addEventListener(t, ev => ev.stopPropagation()));
+  inp.addEventListener('focus', () => { el.draggable = false; }); inp.addEventListener('blur', () => { el.draggable = true; });
+  const commit = () => { const v = Number(inp.value); if (!Number.isInteger(v) || v < 10 || v > 720) { say('停留时间要在 10 到 720 分钟之间。', true); inp.value = cur; return; } if (v !== cur) propose([{kind: 'set_duration', place_id: pid, minutes: v}]); };
+  inp.addEventListener('change', commit); inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); } });
+}
 function renderUnscheduled(list) {
   if (!S.unscheduled.length && !(S.orphan_meals || []).length && !edit) return;
-  const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + '</div>';
+  const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + (edit ? '<button id="addp" style="margin-left:auto">＋ 加景点</button>' : '') + '</div>';
+  if (edit) u.querySelector('#addp').onclick = apOpen;
   S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'it'; c.dataset.pid = it.place_id; c.style.cursor = edit ? 'grab' : 'default';
-    c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>';
+    c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>' + (edit ? '<div class="sub">停留 <input class="dur" type="number" min="10" max="720" step="15" value="' + it.duration_min + '"> 分钟</div>' : '');
+    if (edit) wireDur(c, it.place_id, it.duration_min);
     if (edit) { c.draggable = true; c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); }; c.ondragend = () => { drag = null; }; } u.appendChild(c); });
   (S.orphan_meals || []).forEach(m => u.insertAdjacentHTML('beforeend', '<div class="it" style="cursor:default"><div class="h"><span class="nm">🍜 ' + esc(m.name) + '</span></div><div class="sub">原来挂在「' + esc(m.after) + '」之后，该景点现在不在行程里（用餐点没有删除）</div></div>'));
   if (edit) wire(u, () => ({kind: 'none'}));

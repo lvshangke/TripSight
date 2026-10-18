@@ -99,11 +99,11 @@ def snapshot() -> dict[str, Any]:
             for it in day.items:
                 placed.add(it.place_id)
                 items.append({"place_id": it.place_id, "name": trip.place(it.place_id).name, "locked": it.locked,
-                              "time": times.get(it.place_id, "")})
+                              "time": times.get(it.place_id, ""), "duration_min": trip.place(it.place_id).duration_min})
             days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {dt.isoformat()}" if dt else ""),
                          "color": md["color"], "items": items, "rows": rows})
     reasons = {u.place_id: u.reason for u in (trip.plan.unscheduled if trip.plan else [])}
-    unscheduled = [{"place_id": p.id, "name": p.name, "reason": reasons.get(p.id, "")}
+    unscheduled = [{"place_id": p.id, "name": p.name, "reason": reasons.get(p.id, ""), "duration_min": p.duration_min}
                    for p in trip.places if p.id not in placed and p.status.value in ("shortlist", "planned", "confirmed")]
     names = {p.id: p.name for p in trip.places}
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
@@ -257,6 +257,53 @@ def new_trip(body: dict) -> dict[str, Any]:
     return {"trip": _slug(), "title": t.meta.name, "revision": t.revision, "message": msg.splitlines()[0]}
 
 
+# ---- 加景点：先查（lookup），再从结果里选一个（add_place）。坐标只能来自查询结果，页面不能手填 ----
+_CANDS: "dict[str, dict]" = {}
+_CANDS_MAX = 60
+
+
+def lookup(body: dict) -> dict[str, Any]:
+    q = body.get("query")
+    if not isinstance(q, str) or not q.strip():
+        raise HttpError(400, "请输入要查找的地点名称。")
+    if len(q.strip()) > 60:
+        raise HttpError(400, "名称太长（最多 60 个字）。")
+    r = ms.lookup_coords(q.strip())
+    if not r.get("found"):
+        return {"candidates": [], "message": r.get("error") or "没有找到，换个关键词试试。", "note": r.get("note", "")}
+    raw = r.get("candidates") or [{"name": r["name"], "lat": r["lat"], "lon": r["lon"], "address": r.get("display_name", ""),
+                                  "category": "", "rating": None, "opentime_today": ""}]
+    out = []
+    for c in raw[:5]:
+        cid = secrets.token_hex(6)
+        _CANDS[cid] = {"name": c["name"], "lat": c["lat"], "lon": c["lon"], "category": c.get("category") or "", "source": r["source"]}
+        while len(_CANDS) > _CANDS_MAX:
+            _CANDS.pop(next(iter(_CANDS)))
+        out.append({"cid": cid, "name": c["name"], "address": c.get("address") or "", "category": c.get("category") or "",
+                    "rating": c.get("rating"), "opentime_today": c.get("opentime_today") or ""})
+    warn = r.get("warning") or ""
+    if r["source"] == "osm":
+        warn = (warn + " " if warn else "") + "这是 OpenStreetMap 的结果，位置可能不如地图服务准确，请核对。"
+    return {"candidates": out, "source": r["source"], "warning": warn, "note": r.get("note", "")}
+
+
+def add_place_web(body: dict) -> dict[str, Any]:
+    cand = _CANDS.get(body.get("cid")) if isinstance(body.get("cid"), str) else None
+    if cand is None:
+        raise HttpError(400, "请先查找并从结果里选一个地点（坐标只能来自查询结果）。")
+    dm = body.get("duration_min", 90)
+    if not (isinstance(dm, int) and not isinstance(dm, bool) and 10 <= dm <= 720):
+        raise HttpError(400, "停留时间要在 10 到 720 分钟之间。")
+    trip = ms._load()
+    _check_rev(body, trip)
+    for p in trip.places:
+        if p.name == cand["name"] and abs(p.lat - cand["lat"]) < 0.001 and abs(p.lon - cand["lon"]) < 0.001:
+            raise HttpError(400, f"「{p.name}」已经在行程里了。")
+    msg = ms.add_place(cand["name"], cand["lat"], cand["lon"], duration_min=dm, category=cand["category"], source=cand["source"])
+    ms._save_proposals({})
+    return {"revision": ms._load().revision, "message": f"已添加「{cand['name']}」，放在“未安排”里，拖到某一天即可。"}
+
+
 def rev() -> dict[str, Any]:
     return {"revision": ms._load().revision, "trip": _slug()}
 
@@ -339,7 +386,7 @@ CODE_VERSION = code_version()
 
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
-ROUTES_POST = {"switch": switch, "new_trip": new_trip, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
+ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup, "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
 def make_handler(token: str, state: dict):
@@ -417,7 +464,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=True)
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] != "lookup")
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""
