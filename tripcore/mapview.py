@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .coords import wgs84_to_gcj02
+from .region import trip_region
 from .connections import day_window, leave_by, terminal_leg, terminal_point, transfer_target, arrival_day, departure_day
 from .metrics import day_stats
 from .models import Trip
@@ -31,8 +32,14 @@ def _gcj(lat: float, lon: float) -> list[float]:
     return [round(g_lat, 6), round(g_lon, 6)]
 
 
-def amap_link(a_name: str, a_lat: float, a_lon: float, b_name: str, b_lat: float, b_lon: float, mode: str) -> str:
-    """高德路线规划链接（电脑上打开网页版，手机上可调起 App）。坐标按高德坐标系（GCJ-02）。"""
+def amap_link(a_name: str, a_lat: float, a_lon: float, b_name: str, b_lat: float, b_lon: float, mode: str,
+              region: str = "cn") -> str:
+    """路线规划链接。国内：高德（电脑上打开网页版，手机上可调起 App，坐标 GCJ-02）；境外：Google Maps（https，坐标 WGS84）。"""
+    if region == "abroad":
+        q = urllib.parse.urlencode({"api": 1, "origin": f"{a_lat:.6f},{a_lon:.6f}", "destination": f"{b_lat:.6f},{b_lon:.6f}",
+                                    "travelmode": {"walk": "walking", "transit": "transit", "drive": "driving"}.get(mode, "driving")},
+                                   safe=",")
+        return "https://www.google.com/maps/dir/?" + q
     ga, gb = wgs84_to_gcj02(a_lat, a_lon), wgs84_to_gcj02(b_lat, b_lon)
     q = urllib.parse.urlencode({
         "from": f"{ga[1]:.6f},{ga[0]:.6f},{a_name}", "to": f"{gb[1]:.6f},{gb[0]:.6f},{b_name}",
@@ -41,8 +48,11 @@ def amap_link(a_name: str, a_lat: float, a_lon: float, b_name: str, b_lat: float
     return "https://uri.amap.com/navigation?" + q
 
 
-def marker_link(name: str, lat: float, lon: float) -> str:
-    """高德单点标注的网页链接（https，微信等聊天应用里可以点开；手机上可调起 App）。坐标是 WGS84，函数内转 GCJ-02。"""
+def marker_link(name: str, lat: float, lon: float, region: str = "cn") -> str:
+    """单点标注的网页链接（https，微信等聊天应用里可以点开；手机上可调起 App）。坐标是 WGS84。
+    国内用高德（函数内转 GCJ-02）；境外用 Google Maps（按坐标定位）。"""
+    if region == "abroad":
+        return "https://www.google.com/maps/search/?" + urllib.parse.urlencode({"api": 1, "query": f"{lat:.6f},{lon:.6f}"}, safe=",")
     g = wgs84_to_gcj02(lat, lon)
     q = urllib.parse.urlencode({
         "position": f"{g[1]:.6f},{g[0]:.6f}", "name": name, "coordinate": "gaode", "src": "tripcore", "callnative": 1,
@@ -54,6 +64,7 @@ def day_marker_links(trip: Trip, day_index: int) -> list[dict[str, str]]:
     """某一天按顺序的各站点（出发酒店、景点、用餐点、回到的酒店）的 https 网页链接。"""
     if trip.plan is None or not (0 <= day_index < len(trip.plan.days)):
         return []
+    region = trip_region(trip)
     day = trip.plan.days[day_index]
     places = [trip.place(it.place_id) for it in day.items]
     if not places:
@@ -61,15 +72,15 @@ def day_marker_links(trip: Trip, day_index: int) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     morning, night = trip.morning_lodging(day_index), trip.lodging_for_day(day_index)
     if morning:
-        out.append({"label": "出发酒店", "name": morning.name, "url": marker_link(morning.name, morning.lat, morning.lon)})
+        out.append({"label": "出发酒店", "name": morning.name, "url": marker_link(morning.name, morning.lat, morning.lon, region)})
     for i, p in enumerate(places):
         e = entry(p)
-        out.append({"label": f"第{i + 1}站", "name": p.name, "url": marker_link(p.name, e.lat, e.lon)})
+        out.append({"label": f"第{i + 1}站", "name": p.name, "url": marker_link(p.name, e.lat, e.lon, region)})
         for ml in trip.meals:
             if ml.day == day_index and ml.after_place_id == p.id:
-                out.append({"label": "用餐", "name": ml.name, "url": marker_link(ml.name, ml.lat, ml.lon)})
+                out.append({"label": "用餐", "name": ml.name, "url": marker_link(ml.name, ml.lat, ml.lon, region)})
     if night:
-        out.append({"label": "返回酒店", "name": night.name, "url": marker_link(night.name, night.lat, night.lon)})
+        out.append({"label": "返回酒店", "name": night.name, "url": marker_link(night.name, night.lat, night.lon, region)})
     return out
 
 
@@ -91,13 +102,13 @@ def _spread(positions: list[list[float]]) -> list[list[float]]:
     return out
 
 
-def _leg_entry(leg, a_name, a, b_name, b) -> dict[str, Any]:
+def _leg_entry(leg, a_name, a, b_name, b, region: str = "cn") -> dict[str, Any]:
     real = leg.detail_level == "route"
     path = [_gcj(lat, lon) for lat, lon in leg.path] if real and leg.path else []
     return {"type": "leg", "minutes": leg.minutes, "mode": _MODE.get(leg.mode, leg.mode), "km": leg.distance_km,
             "real": real, "note": leg.note, "path": path,
             "a": _gcj(a.lat, a.lon), "b": _gcj(b.lat, b.lon),
-            "link": amap_link(a_name, a.lat, a.lon, b_name, b.lat, b.lon, leg.mode)}
+            "link": amap_link(a_name, a.lat, a.lon, b_name, b.lat, b.lon, leg.mode, region)}
 
 
 def _route_data(p) -> dict[str, Any]:
@@ -119,6 +130,7 @@ def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
 
 
 def build_map_data(trip: Trip) -> dict[str, Any]:
+    region = trip_region(trip)
     days: list[dict[str, Any]] = []
     meals_by = {}
     for m in trip.meals:
@@ -138,14 +150,14 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                 tp, tg, tl = terminal_point(trip, "arrival"), transfer_target(trip, "arrival"), terminal_leg(trip, "arrival")
                 if tp and tg and tl:
                     timeline.append(_term_entry(trip.arrival, "到达", trip.arrival.arr_time, tp))
-                    timeline.append(_leg_entry(tl, tp.name, tp, tg.name, tg))
+                    timeline.append(_leg_entry(tl, tp.name, tp, tg.name, tg, region))
                     if lodging and not st.places:
                         timeline.append({"type": "hotel", "role": "到达", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
             if lod_m and st.places:
                 timeline.append({"type": "hotel", "role": "出发", "time": _hm(t), "name": lod_m.name, "pos": _gcj(lod_m.lat, lod_m.lon)})
                 if st.lodging_out:
                     e0 = entry(st.places[0])
-                    timeline.append(_leg_entry(st.lodging_out, lod_m.name, lod_m, e0.name, e0))
+                    timeline.append(_leg_entry(st.lodging_out, lod_m.name, lod_m, e0.name, e0, region))
                     t += st.lodging_out.minutes
             for i, p in enumerate(st.places):
                 lines = []
@@ -157,7 +169,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     lines.append(f"门票：{p.ticket_price:g} 元")
                 ent = entry(p)
                 stop = {"type": "stop", "n": i + 1, "name": p.name, "pos": _gcj(ent.lat, ent.lon), "arrive": _hm(t),
-                        "web": marker_link(p.name, ent.lat, ent.lon),
+                        "web": marker_link(p.name, ent.lat, ent.lon, region),
                         "leave": _hm(t + p.duration_min), "stay": p.duration_min, "lines": lines}
                 if p.waypoints:
                     stop["route"] = _route_data(p)
@@ -171,15 +183,15 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     ml.append(f"人均约 {m.cost_per_person:.0f} 元（参考）" if m.cost_per_person is not None else "人均待核实")
                     ml.append(f"营业时间：{m.opening_hours}（来源：{m.hours_source}）" if m.opening_hours else "营业时间待核实")
                     timeline.append({"type": "meal", "name": m.name, "pos": _gcj(m.lat, m.lon), "lines": ml,
-                                     "web": marker_link(m.name, m.lat, m.lon)})
+                                     "web": marker_link(m.name, m.lat, m.lon, region)})
                 if i < len(st.legs):
                     x, e = exit_(p), entry(st.places[i + 1])
-                    timeline.append(_leg_entry(st.legs[i], x.name, x, e.name, e))
+                    timeline.append(_leg_entry(st.legs[i], x.name, x, e.name, e, region))
                     t += st.legs[i].minutes
             if lodging and st.places:
                 if st.lodging_back:
                     xl = exit_(st.places[-1])
-                    timeline.append(_leg_entry(st.lodging_back, xl.name, xl, lodging.name, lodging))
+                    timeline.append(_leg_entry(st.lodging_back, xl.name, xl, lodging.name, lodging, region))
                     t += st.lodging_back.minutes
                 timeline.append({"type": "hotel", "role": "返回", "time": _hm(t), "name": lodging.name, "pos": _gcj(lodging.lat, lodging.lon)})
             if trip.departure and departure_day(trip) == day.index:
@@ -188,7 +200,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     if lod_m and not st.places:
                         timeline.append({"type": "hotel", "role": "出发", "time": _hm(leave_by(trip).hour * 60 + leave_by(trip).minute),
                                          "name": lod_m.name, "pos": _gcj(lod_m.lat, lod_m.lon)})
-                    timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp))
+                    timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp, region))
                     timeline.append(_term_entry(trip.departure, "离开", trip.departure.dep_time, tp))
             if w_why and t > w_end:
                 timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
@@ -201,8 +213,15 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {d.isoformat()}" if d else ""),
                          "color": _COLORS[day.index % len(_COLORS)], "timeline": timeline,
                          "closed_loop": bool(lod_m and lodging and lod_m.id == lodging.id and st.places)})
+    if region == "abroad":       # 境外：高德底图没有数据，用 OpenStreetMap；坐标本来就是 WGS84（_gcj 在境外不转换）
+        tiles = {"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "sub": "abc", "attr": "© OpenStreetMap",
+                 "note": "底图 © OpenStreetMap。实线是地图服务返回的真实路线；虚线是估算（直线）。路线时间仅供参考。"}
+    else:
+        tiles = {"url": "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                 "sub": "1234", "attr": "© 高德地图",
+                 "note": "底图 © 高德地图。实线是高德返回的真实路线；虚线是估算（直线）。路线时间仅供参考。"}
     return {"title": trip.meta.name, "days": days, "has_lodging": trip.has_lodging,
-            "start": _hm(DAY_START_MIN)}
+            "start": _hm(DAY_START_MIN), "tiles": tiles}
 
 
 _TEMPLATE = """<!doctype html>
@@ -235,14 +254,14 @@ html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsof
 @media(max-width:700px){#note{top:6px;left:58px;right:6px;bottom:auto;max-width:none;font-size:11px}#app{flex-direction:column-reverse}#side{width:auto;max-width:none;height:45%;border-right:0;border-top:1px solid #ddd}#map{height:55%;flex:none}}
 </style></head><body>
 <div id="app"><div id="side"><div id="tabs"><div class="t"></div></div><div id="list"></div></div><div id="map"></div></div>
-<div id="note">底图 © 高德地图。实线是高德返回的真实路线；虚线是估算（直线）。路线时间仅供参考。</div>
+<div id="note"></div>
 <script>__JS__</script>
 <script>
 const DATA = __DATA__;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const map = L.map('map');
-L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
-  {subdomains:'1234', maxZoom:18, minZoom:3, attribution:'© 高德地图'}).addTo(map);
+L.tileLayer(DATA.tiles.url, {subdomains:DATA.tiles.sub, maxZoom:18, minZoom:3, attribution:DATA.tiles.attr}).addTo(map);
+document.getElementById('note').textContent = DATA.tiles.note;
 const tabs = document.getElementById('tabs'), list = document.getElementById('list');
 tabs.querySelector('.t').textContent = DATA.title;
 const pin = (txt, color) => L.divIcon({className:'', html:'<div class="pin" style="background:'+color+'">'+esc(txt)+'</div>', iconSize:[26,26], iconAnchor:[13,13]});

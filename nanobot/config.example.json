@@ -10,7 +10,7 @@
         "command": "/绝对路径/到/你的/python",
         "args": ["-m", "tripcore.mcp_server"],
         "cwd": "/绝对路径/到/tripcore",
-        "env": { "AMAP_KEY": "在这里填你自己的高德 Web 服务 key（只放在你本机的配置里）" },
+        "env": { "AMAP_KEY": "在这里填你自己的高德 Web 服务 key（只放在你本机的配置里）", "GOOGLE_MAPS_KEY": "可选：境外行程用，Google Maps key（只放在你本机的配置里）" },
         "toolTimeout": 30
       },
       "amap-maps": {

@@ -36,6 +36,8 @@ from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
 from . import workspace as _ws
+from .gmaps import GoogleMapsClient
+from .region import BACKENDS, pick_backend, trip_region
 from . import review as _rv
 from .textview import build_text as _build_text, guard_text as _guard_text
 from .checklist import build_checklist as _build_checklist, render as _render_checklist
@@ -143,9 +145,37 @@ def _save_context(data: dict) -> None:
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _amap() -> Optional[AmapClient]:
-    """有 AMAP_KEY 才启用高德；测试里会替换这个函数。"""
-    return AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+_BACKEND = {"name": "高德", "note": ""}
+
+
+def _amap() -> Any:
+    """选地图后端：行程指定的（set_provider）> 国内高德 / 境外 Google；缺 key 时用另一个并提醒。
+    没有任何 key 返回 None。测试里会替换这个函数。"""
+    log = _root_dir() / "amap_calls.log"
+    a, g = AmapClient.from_env(log_path=log), GoogleMapsClient.from_env(log_path=log)
+    trip = None
+    try:
+        if trip_path().exists():
+            trip = load_trip(trip_path())
+    except Exception:
+        trip = None
+    backend, note = pick_backend(trip.meta.map_provider if trip else None, trip_region(trip) if trip else "cn",
+                                 a is not None, g is not None)
+    client = a if backend == "amap" else g if backend == "google" else None
+    _BACKEND["name"] = "Google" if backend == "google" else "高德"
+    _BACKEND["note"] = note
+    return client
+
+
+def _is_google(client: Any) -> bool:
+    return getattr(client, "provider", "amap") == "google"
+
+
+def _bn(client: Any = None) -> str:
+    return "Google" if (_is_google(client) if client is not None else _BACKEND["name"] == "Google") else "高德"
+
+
+_NO_KEY = "没有可用的地图 key（国内行程配 AMAP_KEY，境外行程配 GOOGLE_MAPS_KEY）"
 
 
 def _next_id(prefix: str, existing: list[str]) -> str:
@@ -329,7 +359,7 @@ def add_lodging(
 
 def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
     """查询地点坐标，返回候选列表 candidates（第一条也展开在顶层字段里）。
-    有高德 key 时用高德（限定在行程城市内，附带地址、评分、人均/参考价格 cost、今日营业时间）；
+    有地图 key 时用高德（国内）或 Google（境外，见 set_provider）（限定在行程城市内，附带地址、评分、人均/参考价格 cost、今日营业时间）；
     没有 key、不在国内或高德查不到时退回 OpenStreetMap。city 不填则用行程的目的地城市。
     候选不止一个且名称相近时，请把候选展示给用户确认，不要自己挑。坐标不能自己改。
     OSM 结果会检查离城市中心的距离：超过 60 km 时 warning 非空，说明可能查到了别处的同名地点。"""
@@ -340,10 +370,10 @@ def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
         try:
             hits = client.search_places(query, city, limit=5)
         except AmapError as e:
-            hits, amap_note = [], f"高德不可用（{e}），已退回 OpenStreetMap"
+            hits, amap_note = [], f"{_bn(client)}不可用（{e}），已退回 OpenStreetMap"
         else:
             if not hits:
-                amap_note = "高德没有找到，已退回 OpenStreetMap"
+                amap_note = f"{_bn(client)}没有找到，已退回 OpenStreetMap"
         if hits:
             cands = [{
                 "name": h.name, "lat": round(h.lat, 6), "lon": round(h.lon, 6), "address": h.address,
@@ -352,10 +382,11 @@ def lookup_coords(query: str, city: Optional[str] = None) -> dict[str, Any]:
                 "opentime_week": h.opentime_week,
             } for h in hits]
             top = cands[0]
-            return {"found": True, "source": "amap", "name": top["name"], "lat": top["lat"], "lon": top["lon"],
+            return {"found": True, "source": "google" if _is_google(client) else "amap", "name": top["name"], "lat": top["lat"], "lon": top["lon"],
                     "display_name": f"{top['name']} {top['address']}".strip(), "warning": "",
                     "candidates": cands,
-                    "note": "cost_reference 是高德的人均/参考价，不是实时价格，也不一定是门票。"}
+                    "note": f"cost_reference 是{_bn(client)}的人均/参考价，不是实时价格，也不一定是门票。"
+                            + (f"注意：{_BACKEND['note']}。" if _BACKEND["note"] else "")}
     try:
         r = _geocode(query, city)
     except GeocodeError as e:
@@ -491,7 +522,7 @@ def refine_routes(day: Optional[int] = None) -> str:
     出行方式沿用行程设置；两点很近时自动按步行。"""
     client = _amap()
     if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查询真实路线。")
+        raise ToolError(f"{_NO_KEY}，无法查询真实路线。")
     trip = _load()
     if trip.plan is None:
         raise ToolError("还没有分天，请先 schedule_days。")
@@ -556,7 +587,9 @@ def refine_routes(day: Optional[int] = None) -> str:
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
     todo = len([k for k in all_keys if k not in new_legs and not (k in trip.route_overrides and trip.route_overrides[k].path_checked and trip.route_overrides[k].route_ver >= ROUTE_VERSION)]) - len(failures)
-    msg = f"已更新 {len(new_legs)} 段为高德真实路线，{skipped} 段此前已查过。"
+    msg = f"已更新 {len(new_legs)} 段为{_bn(client)}真实路线，{skipped} 段此前已查过。"
+    if _BACKEND["note"]:
+        msg += f"\n注意：{_BACKEND['note']}。"
     if failures:
         msg += "\n失败：" + "；".join(failures[:5]) + "（这些路段仍用估算值）"
     if todo > 0 and requested >= MAX_ROUTE_REQUESTS:
@@ -573,7 +606,7 @@ def fill_hours() -> str:
     补不上的，才去联网搜索（必须附来源网址）或请用户确认，不要凭记忆填写。"""
     client = _amap()
     if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法查询营业时间。")
+        raise ToolError(f"{_NO_KEY}，无法查询营业时间。")
     trip = _load()
     city = _load_context().get("city")
     filled: dict[str, str] = {}
@@ -598,7 +631,7 @@ def fill_hours() -> str:
                 best = h
                 break
         if best is None:
-            missed.append(f"{p.name}（高德没有匹配的营业时间）")
+            missed.append(f"{p.name}（{_bn(client)}没有匹配的营业时间）")
             continue
         filled[p.id] = best.opentime_week or best.opentime_today
     if filled:
@@ -606,7 +639,7 @@ def fill_hours() -> str:
             for pid, text in filled.items():
                 old = t.place(pid)
                 t.places[t.places.index(old)] = Place.model_validate(
-                    {**old.model_dump(), "opening_hours": text, "hours_source": "amap"})
+                    {**old.model_dump(), "opening_hours": text, "hours_source": "google" if _is_google(client) else "amap"})
         _save(commit(trip, mutate))
     msg = f"已补充 {len(filled)} 个景点的营业时间（来源 amap）。"
     if missed:
@@ -625,7 +658,7 @@ def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: st
     评分和人均是高德的参考值，不是实时价格，不要说成准确价格。"""
     client = _amap()
     if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法搜索餐厅。")
+        raise ToolError(f"{_NO_KEY}，无法搜索餐厅。")
     trip = _load()
     if trip.plan is None:
         raise ToolError("还没有分天，请先 schedule_days。")
@@ -646,7 +679,7 @@ def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: st
             continue
         cands.append({"name": h.name, "address": h.address, "lat": h.lat, "lon": h.lon, "rating": h.rating,
                       "cost_per_person": h.cost, "opening_hours": h.opentime_week or h.opentime_today,
-                      "distance_m": dist, "amap_id": h.amap_id})
+                      "distance_m": dist, "amap_id": h.amap_id if h.source == "amap" else "", "source": h.source})
     cands.sort(key=lambda c: (-(c["rating"] or 0), c["distance_m"]))
     cands = cands[:8]
     stored = {}
@@ -659,7 +692,7 @@ def suggest_food(day: int, after_place_id: str, radius_m: int = 800, keyword: st
     shown = [{k: c[k] for k in ("candidate_id", "name", "address", "rating", "cost_per_person", "opening_hours", "distance_m")}
              for c in cands]
     res = {"place": pl.name, "day": day, "radius_m": radius_m, "candidates": shown,
-           "note": "评分/人均为高德参考值；营业时间为空表示高德无数据，需核实。请用户选择后调用 choose_food。"}
+           "note": f"评分/人均为{_bn(client)}参考值；营业时间为空表示{_bn(client)}无数据，需核实。请用户选择后调用 choose_food。"}
     fp_ = [x for x in _prefs.load(_prefs_path()) if x["category"] == "food"]
     if fp_:
         res["user_food_preferences"] = _prefs.describe(fp_)      # 只是提示，不自动过滤；请对照候选向用户说明
@@ -672,7 +705,7 @@ def find_food(name: str) -> dict[str, Any]:
     再调用 choose_food(candidate_id)（想换位置就传 day / after_place_id）。需要 AMAP_KEY。"""
     client = _amap()
     if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法搜索餐厅。")
+        raise ToolError(f"{_NO_KEY}，无法搜索餐厅。")
     trip = _load()
     city = _load_context().get("city")
     try:
@@ -689,7 +722,7 @@ def find_food(name: str) -> dict[str, Any]:
         cid = f"f{i}"
         entry = {"candidate_id": cid, "name": h.name, "address": h.address, "lat": h.lat, "lon": h.lon,
                  "rating": h.rating, "cost_per_person": h.cost,
-                 "opening_hours": h.opentime_week or h.opentime_today, "amap_id": h.amap_id}
+                 "opening_hours": h.opentime_week or h.opentime_today, "amap_id": h.amap_id if h.source == "amap" else "", "source": h.source}
         sug = None
         if stops:
             di, pl = min(stops, key=lambda x: haversine_km(x[1].lat, x[1].lon, h.lat, h.lon))
@@ -739,11 +772,11 @@ def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Op
     mid = _next_id("m", [m.id for m in trip.meals])
     meal = Meal(id=mid, day=day0, after_place_id=pid, name=c["name"], lat=c["lat"], lon=c["lon"],
                 address=c.get("address") or "", cost_per_person=c.get("cost_per_person"), rating=c.get("rating"),
-                opening_hours=c.get("opening_hours") or "", hours_source="amap" if c.get("opening_hours") else "",
+                opening_hours=c.get("opening_hours") or "", hours_source=c.get("source", "amap") if c.get("opening_hours") else "",
                 distance_m=dist, amap_id=c.get("amap_id") or "")
     _save(commit(trip, lambda t: t.meals.append(meal)))
     extra = "（离该景点较远，注意交通）" if dist > 3000 else ""
-    return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是高德参考值。"
+    return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是{_bn()}参考值。"
 
 
 def export_map(share: bool = False) -> str:
@@ -832,8 +865,8 @@ def personal_map_payload(day: Optional[int] = None) -> dict[str, Any]:
     把返回的 arguments 原样（不要改动任何字段）传给 amap-maps 的 maps_schema_personal_map，
     再把它返回的链接给用户。day 从 1 开始，不填则所有天。"""
     client = _amap()
-    if client is None:
-        raise ToolError("没有配置高德 key（环境变量 AMAP_KEY），无法匹配高德 POI。")
+    if client is None or _is_google(client):
+        raise ToolError("没有可用的高德 key（环境变量 AMAP_KEY），无法匹配高德 POI；高德专属地图只支持国内行程。")
     trip = _load()
     if trip.plan is None:
         raise ToolError("还没有分天，请先 schedule_days。")
@@ -1242,6 +1275,8 @@ def get_weather() -> str:
     if not wanted:
         return "还没有设置具体出行日期，无法查询天气。日期确定后再查。"
     amap_client, om_client = _amap(), _openmeteo()
+    if _is_google(amap_client):
+        amap_client = None             # Google 后端没有天气接口：只用 Open-Meteo
     city = _load_context().get("city")
     spots = weather_spots(trip)
     multi = len(spots) > 1
@@ -1610,6 +1645,24 @@ def archive_trip(name: str) -> str:
     return f"已归档「{name}」（文件移到了 trips/_archive/{dest.name}，没有删除）。"
 
 
+def set_provider(provider: str) -> str:
+    """设置当前行程用哪个地图后端：amap（高德）、google（Google Maps）或 auto（自动：国内高德、境外 Google）。
+    境外行程建议创建后马上设为 google（需要环境变量 GOOGLE_MAPS_KEY）。只在用户要求或创建境外行程时调用。"""
+    p = (provider or "").strip().lower()
+    if p not in (*BACKENDS, "auto"):
+        raise ToolError("provider 只能是 amap / google / auto")
+    trip = _load()
+    _save(commit(trip, lambda t: setattr(t.meta, "map_provider", None if p == "auto" else p)))
+    client = _amap()
+    name = {"auto": "自动选择", "amap": "高德", "google": "Google"}[p]
+    msg = f"已把这个行程的地图后端设为{name}（目的地在{'中国大陆' if trip_region(trip) == 'cn' else '境外'}）。"
+    if client is None:
+        msg += f"\n但{_NO_KEY}。"
+    elif _BACKEND["note"]:
+        msg += f"\n注意：{_BACKEND['note']}。"
+    return msg
+
+
 def suggest_lodging() -> dict[str, Any]:
     """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
     trip = _load()
@@ -1882,7 +1935,7 @@ def _resolve_name(name: str) -> tuple[Optional[dict[str, Any]], str, list[dict[s
     """按名字在地图上确定一个位置：只自动采用高德结果（名字相符且无歧义）；OpenStreetMap 结果精度低，不自动采用。"""
     res = lookup_coords(name)
     hits = res.get("candidates") or ([{"name": res["name"], "lat": res["lat"], "lon": res["lon"]}] if res.get("found") else [])
-    if res.get("found") and res.get("source") != "amap":
+    if res.get("found") and res.get("source") not in ("amap", "google"):
         return None, "高德没有找到（只有 OpenStreetMap 结果，精度低，不自动采用）", hits
     pick, why = _pick_hit(name, hits)
     return pick, why, hits
@@ -2010,7 +2063,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

@@ -151,7 +151,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 48 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 49 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
@@ -180,7 +180,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 ## 高德地图（第 2 步）
 
-- 设置环境变量 `AMAP_KEY`（nanobot 配置里写在 `tripcore` 的 `env` 中，不要写进代码、不要提交）。
+- 设置环境变量 `AMAP_KEY`（nanobot 配置里写在 `tripcore` 的 `env` 中，不要写进代码、不要提交）。境外行程可另配 `GOOGLE_MAPS_KEY` 改用 Google Maps（`set_provider`，见 docs/SETUP.md 第 8 节）。
 - `lookup_coords`：有 key 时用高德搜索，返回候选（地址、评分、参考价 `cost_reference`、今日营业时间）；没有 key 或高德失败时退回 OpenStreetMap。
 - `refine_routes`：把行程里的“估算”交通升级为高德真实路线时间并缓存（`Trip.route_overrides`）。公交方案里的铁路段（高铁/城际，高德只给站点不给形状）会写进线路摘要、计入换乘，并按站点间直线示意；路线形状若没走到出发地/目的地，会用直线补全并注明“已用直线连接（示意）”；某一段连续步行超过你设的上限时给出提示（你接受打车就建议改打车）。路线解析升级时（`ROUTE_VERSION`），旧缓存会在下次 `refine_routes` 时自动重查。
 - 内部坐标统一为 WGS84，和高德交互时在 `tripcore/coords.py` 里与 GCJ-02 互转。

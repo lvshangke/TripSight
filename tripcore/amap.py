@@ -44,6 +44,7 @@ class PlaceHit:
     opentime_today: str = ""
     opentime_week: str = ""
     tel: str = ""
+    source: str = "amap"       # 数据来自哪个后端：amap / google（google 的 id 不能当高德 POI id 用）
 
 
 @dataclass

@@ -57,6 +57,14 @@ nanobot 自带 `weixin` 渠道（二维码登录的个人微信，长轮询，�
 - 微信里看不到电脑上的文件路径。想看地图，用 `create_amap_map` 生成高德 App 链接；本地的 `map.html` 只能回电脑上打开。
 - 微信聊天里不渲染 markdown 表格，skill 里已提示用短句和编号。
 
+## 8. 可选：境外行程用 Google Maps
+国内行程用高德；目的地在境外（含港澳台）时可以改用 Google Maps：
+1. 在 Google Cloud 新建项目，开通 **Places API (New)** 和 **Routes API**（需要绑定付款方式，每月有免费额度）。
+2. 创建 API key，限制它只能调用这两个 API，并设一个预算提醒。
+3. 把 `GOOGLE_MAPS_KEY` 写进 nanobot 配置里 `tripcore` 的 `env`（和 `AMAP_KEY` 同一处，只放你本机，不要提交）。
+4. 创建境外行程后，对 agent 说“这个行程用 Google”，或让它调用 `set_provider("google")`。不设置时按景点位置自动选：大陆用高德、境外用 Google，缺哪个 key 就用另一个并提醒。
+说明：Google 后端没有天气接口，天气始终用 Open-Meteo；高德专属地图只支持国内行程；境外地图页的底图是 OpenStreetMap，分享链接是 Google Maps 网页链接。
+
 ## 改 skill 时
 
 以仓库里的 `skills/` 为准，改完用 `scripts/install_skills.py` 同步到 nanobot（或用 `--link` 一次链好）。

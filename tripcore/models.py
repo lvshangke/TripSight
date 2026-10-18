@@ -243,6 +243,7 @@ class TripMeta(BaseModel):
     budget_total: Optional[float] = Field(default=None, ge=0)
     travelers: int = Field(default=1, ge=1, le=50, description="出行人数（门票、餐饮按人数估算）")
     currency: str = "CNY"
+    map_provider: Optional[str] = Field(default=None, description="地图后端：amap / google；空表示自动（国内高德、境外 Google）")
     transport_prefs: TransportPrefs = Field(default_factory=TransportPrefs)
 
     @model_validator(mode="after")
