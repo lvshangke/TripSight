@@ -232,7 +232,7 @@ html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsof
 .pin{border-radius:50%;color:#fff;font-weight:700;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px #0006;width:26px;height:26px;line-height:22px;font-size:13px}
 .emo{font-size:22px;line-height:24px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
 #note{position:absolute;z-index:1000;bottom:6px;right:6px;background:#fffd;padding:3px 8px;border-radius:4px;font-size:12px;color:#444;max-width:50vw}
-@media(max-width:700px){#app{flex-direction:column-reverse}#side{width:auto;max-width:none;height:45%;border-right:0;border-top:1px solid #ddd}#map{height:55%;flex:none}}
+@media(max-width:700px){#note{top:6px;left:58px;right:6px;bottom:auto;max-width:none;font-size:11px}#app{flex-direction:column-reverse}#side{width:auto;max-width:none;height:45%;border-right:0;border-top:1px solid #ddd}#map{height:55%;flex:none}}
 </style></head><body>
 <div id="app"><div id="side"><div id="tabs"><div class="t"></div></div><div id="list"></div></div><div id="map"></div></div>
 <div id="note">底图 © 高德地图。实线是高德返回的真实路线；虚线是估算（直线）。路线时间仅供参考。</div>

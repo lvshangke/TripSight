@@ -57,3 +57,16 @@ def test_text_includes_weather_and_reservation(monkeypatch):
     s._save(t.model_copy(update={"weather": {"2026-10-18": WeatherSnap(day_weather="小雨", day_temp=12, fetched="2026-10-17", source="amap")}}))
     out = s.export_text(day=1)
     assert "🌤" in out and "小雨" in out and "需预约" in out
+
+
+def test_export_map_share_writes_named_file_and_guards(tmp_path):
+    _trip()
+    r = s.export_map(share=True)
+    assert "message" in r and "share" in r and "北京行.html" in r
+    f = s.trip_path().with_name("share") / "北京行.html"
+    assert f.exists() and "<script>" in f.read_text(encoding="utf-8")
+    assert s.export_map().endswith("底图需要联网。") and s.trip_path().with_name("map.html").exists()
+    s.update_place("p1", name="故宫 /Users/lv/x")
+    s.schedule_days()
+    with pytest.raises(s.ToolError):
+        s.export_map(share=True)

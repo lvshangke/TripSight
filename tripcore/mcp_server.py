@@ -30,7 +30,7 @@ from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .gpx import build_gpx
-from .mapview import build_map_html, day_marker_links
+from .mapview import build_map_data, build_map_html, day_marker_links
 from .lodging import rank_lodgings, suggest_stay_area
 from .metrics import day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -708,17 +708,36 @@ def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Op
     return f"已把「{meal.name}」记为第 {meal.day + 1} 天「{pl.name}」之后的用餐点（{meal.id}）{extra}。人均和评分是高德参考值。"
 
 
-def export_map() -> str:
-    """生成地图页 map.html（景点按天分色并按顺序连线，另有住宿、用餐点；点标记可看营业时间等）。
-    返回文件路径。让用户在浏览器里打开即可，不需要再做别的事。需要先 schedule_days 才有行程线。"""
+def export_map(share: bool = False) -> str:
+    """生成地图页 HTML（景点按天分色并按顺序连线，另有住宿、用餐点；点标记可看营业时间等）。
+    页面是单个自包含文件（地图脚本和行程数据都在里面，底图需要联网），手机上也是同样的页面（窄屏自动上下分栏）。
+    share=False（默认）：写到 ~/.tripcore/map.html，让用户在电脑浏览器里打开。
+    share=True：给手机/聊天用——写一个以行程名命名的文件（~/.tripcore/share/行程名.html），并先做外发检查
+    （带 key、本机路径的内容不会输出）。在微信等聊天应用里，拿到路径后用 message 工具把这个文件作为附件（media）发给用户，
+    并告诉他：收到后点开文件，选“用其他应用打开”→手机浏览器；这是发送那一刻的快照，行程改了要重新生成再发。
+    需要先 schedule_days 才有行程线。"""
     trip = _load()
-    path = trip_path().with_name("map.html")
+    base = trip_path().with_name("share") if share else trip_path().parent
+    if share:
+        import re as _re
+        stem = _re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]+", "_", trip.meta.name).strip("_") or "trip"
+        path = base / f"{stem}.html"
+    else:
+        path = trip_path().with_name("map.html")
     try:
+        html = build_map_html(trip)
+        if share:
+            bad = _guard_text(json.dumps(build_map_data(trip), ensure_ascii=False))
+            if bad:
+                raise ToolError("外发检查没通过，没有生成：" + "；".join(bad) + "。请检查景点名称/备注里是否混入了不该外发的内容。")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(build_map_html(trip), encoding="utf-8")
+        path.write_text(html, encoding="utf-8")
     except OSError as e:
         raise ToolError(f"写入地图文件失败：{e}")
     note = "" if trip.plan else "（还没有分天，地图上只有空白底图）"
+    if share:
+        return (f"手机版地图已生成：{path}{note}\n请用 message 工具把它作为附件发给用户，并说明：点开文件→“用其他应用打开”→手机浏览器；"
+                "底图需要联网；这是此刻的快照，行程改了要重新生成再发。")
     return f"地图已生成：{path}{note}\n在浏览器里打开即可（macOS 可用 open 命令）；底图需要联网。"
 
 
