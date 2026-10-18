@@ -47,9 +47,6 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #ap .w{color:#b45309;font-size:12px;margin:6px 0}
 #ap .err{color:#b91c1c;font-size:13px;min-height:16px;margin-top:6px}
 #ap .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center}
-.lrow{display:flex;gap:6px;align-items:baseline;padding:4px 0;font-size:13px;border-bottom:1px dashed #eee}
-.lrow .n{flex:1}.lrow .m{color:#666;font-size:12px}
-.srow{display:flex;gap:4px;align-items:center;margin:4px 0;font-size:13px}.srow select{font:inherit;font-size:12px;max-width:42%}
 .dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
 .editonly{display:none}
 #app.edit .editonly{display:block}
@@ -57,6 +54,8 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #tabs{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ddd;display:flex;flex-wrap:wrap;gap:6px;z-index:5}
 #tabs button.on{color:#fff;border-color:transparent}
 .sec{border-bottom:1px solid #eee;padding:8px 12px;background:#fff}
+#datedet summary{cursor:pointer;font-weight:700;font-size:14px;padding:2px 0}
+#datedet[open] summary{margin-bottom:6px}
 .sec h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
 #cal .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 #cal table{width:100%;border-collapse:collapse;text-align:center;font-size:13px}
@@ -88,7 +87,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .empty{font-size:12px;color:#999;padding:8px 12px}
 .pin{border-radius:50%;color:#fff;font-weight:700;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px #0006;width:26px;height:26px;line-height:22px;font-size:13px}
 .emo{font-size:22px;line-height:24px;text-align:center;filter:drop-shadow(0 1px 2px #0008)}
-#prev{font-size:13px;border-top:2px solid #2563eb;padding:8px 12px;background:#f8fbff;display:none;max-height:40%;overflow:auto}
+#prev{font-size:13px;border-top:2px solid #2563eb;padding:6px 12px;background:#f8fbff;display:none;max-height:28%;overflow:auto}
 #prev ul{margin:4px 0 6px 18px;padding:0}
 #prev .w{color:#b45309}
 #note{position:absolute;bottom:0;left:calc(var(--sw,400px) + 6px);max-width:calc(100vw - var(--sw,400px) - var(--cw,340px) - 24px);z-index:1000;background:#fffc;font-size:11px;padding:2px 6px}
@@ -106,24 +105,21 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
-<div class="editonly sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
-<div id="cal"></div><div id="calinfo"></div>
-<button id="dapply" class="pri" disabled>应用日期</button> <button id="dclear">清除日期</button></div>
-<div class="editonly sec" id="lodg"><h3>住宿 <button id="addl">＋ 加酒店</button></h3><div id="lbody"></div></div>
 <div id="tabs"></div>
-<div id="scroll"><div id="list"></div></div>
+<div id="scroll"><details class="editonly sec" id="datedet"><summary>日期：<span id="dstate"></span></summary>
+<div id="cal"></div><div id="calinfo"></div>
+<button id="dapply" class="pri" disabled>应用日期</button> <button id="dclear">清除日期</button></details><div id="list"></div></div>
 <div id="prev"><b>预览（还没有改动）</b><ul id="chg"></ul><div id="iss"></div><button id="ok" class="pri">确认</button> <button id="cancel">取消</button></div>
 </div><div class="sp" id="sp1" title="拖动调整宽度，双击恢复"></div><div id="map" style="position:relative"></div><div class="sp" id="sp2" title="拖动调整宽度，双击恢复"></div>
 <div id="chat"><div id="chead"><b>助手</b><span id="cstat"></span><button id="cclose" title="收起">×</button></div>
 <div id="cmsgs"></div>
-<div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
+<div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
-<div id="ap"><div class="box"><h3 id="ap_title">加景点</h3>
+<div id="ap"><div class="box"><h3>加景点</h3>
 <div class="q"><input id="ap_q" maxlength="60" placeholder="景点名称，例如：大雁塔"><button id="ap_go" class="pri">查找</button></div>
 <div id="ap_list"></div><div class="w" id="ap_warn"></div>
-<div class="btns"><span id="ap_durw" style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
-<span id="ap_pw" style="flex:1;font-size:13px;color:#555;display:none">每晚 <input id="ap_pmin" class="dur" type="number" min="0" placeholder="最低"> – <input id="ap_pmax" class="dur" type="number" min="0" placeholder="最高"> 元（选填，只填你知道的）</span>
+<div class="btns"><span style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
 <button id="ap_cancel">取消</button><button id="ap_ok" class="pri" disabled>加入行程</button></div><div class="err" id="ap_err"></div></div></div>
 <div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
 <label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
@@ -167,8 +163,7 @@ async function loadTrips() {
   } catch (e) {}
 }
 let curTrip = null, apPicked = null;
-let apMode = 'place';
-function apOpen(mode) { apMode = mode === 'lodging' ? 'lodging' : 'place'; $('ap_title').textContent = apMode === 'lodging' ? '加酒店（候选）' : '加景点'; $('ap_durw').style.display = apMode === 'lodging' ? 'none' : ''; $('ap_pw').style.display = apMode === 'lodging' ? '' : 'none'; $('ap_pmin').value = ''; $('ap_pmax').value = ''; $('ap_q').placeholder = apMode === 'lodging' ? '酒店名称，例如：西安钟楼亚朵酒店' : '景点名称，例如：大雁塔'; $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
+function apOpen() { $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
 function apClose() { $('ap').classList.remove('on'); }
 $('ap_cancel').onclick = apClose; $('ap').onclick = e => { if (e.target === $('ap')) apClose(); };
 async function apSearch() {
@@ -185,9 +180,7 @@ $('ap_go').onclick = apSearch; $('ap_q').onkeydown = e => { if (e.key === 'Enter
 $('ap_ok').onclick = async () => {
   if (!apPicked) return; $('ap_ok').disabled = true;
   try {
-    const pv = v => v === '' ? null : Number(v);
-    const r = apMode === 'lodging' ? await api('add_lodging', {base_revision: S.revision, cid: apPicked, price_min: pv($('ap_pmin').value), price_max: pv($('ap_pmax').value)})
-                                   : await api('add_place', {base_revision: S.revision, cid: apPicked, duration_min: Number($('ap_dur').value)});
+    const r = await api('add_place', {base_revision: S.revision, cid: apPicked, duration_min: Number($('ap_dur').value)});
     apClose(); say(r.message); await load(); }
   catch (e) { $('ap_err').textContent = e.message; $('ap_ok').disabled = false; if (e.status === 409) { apClose(); load(); } }
 };
@@ -211,7 +204,7 @@ $('trip').onchange = async () => {
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); }
   catch (e) { say(e.message, true); await loadTrips(); }
 };
-function renderAll() { renderDates(); renderLodging(); renderTabs(); renderList(); }
+function renderAll() { renderDates(); renderTabs(); renderList(); }
 $('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (S) renderAll(); };
 // ---- 日期 ----
 const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -219,7 +212,7 @@ const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y
 function renderDates() {
   if (!edit) return;
   const cur = S.dates;
-  $('dstate').textContent = cur.start ? cur.start + ' 至 ' + cur.end : '还没有设置日期';
+  $('dstate').textContent = cur.start ? cur.start + ' 至 ' + cur.end + '（共 ' + cur.num_days + ' 天）' : '还没有设置（点开选择）';
   if (!picks.length && cur.start) picks = [cur.start, cur.end];
   const base = calMonth || parse(cur.start || iso(new Date())); calMonth = new Date(base.getFullYear(), base.getMonth(), 1);
   const y = calMonth.getFullYear(), m = calMonth.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, n = new Date(y, m+1, 0).getDate();
@@ -244,32 +237,6 @@ function renderDates() {
 }
 $('dapply').onclick = async () => { try { const r = await api('dates', {base_revision: S.revision, start: picks[0], end: picks[1]}); say(r.message); await load(); } catch (e) { say(e.message, true); if (e.status === 409) load(); } };
 $('dclear').onclick = async () => { if (!S.dates.start) return; try { const r = await api('dates', {base_revision: S.revision, start: null, end: null}); picks = []; say(r.message); await load(); } catch (e) { say(e.message, true); } };
-// ---- 住宿（编辑模式）：全程住哪家 + 可选的分段（长途换酒店）；点“预览”后看改动再确认 ----
-let lf = null;
-function renderLodging() {
-  if (!edit) return; const L0 = S.lodging, box = $('lbody');
-  if (!lf || lf.rev !== S.revision) lf = {rev: S.revision, chosen: L0.chosen, stays: L0.stays.map(x => ({...x}))};
-  if (!L0.items.length) { box.innerHTML = '<div class="empty" style="padding:4px 0">还没有候选酒店。点“＋ 加酒店”，查询后从结果里选。</div>'; return; }
-  const price = it => it.price_max ? '¥' + (it.price_min && it.price_min !== it.price_max ? it.price_min + '–' : '') + it.price_max + '/晚' : '价格未填';
-  let h = '<div style="font-size:12px;color:#666;margin-bottom:4px">按到各景点的平均通勤（估算）排序；选一家作为全程住宿：</div>';
-  h += '<label class="lrow"><input type="radio" name="lc" value=""' + (!lf.chosen ? ' checked' : '') + '><span class="n">不指定</span></label>';
-  L0.items.forEach(it => { h += '<label class="lrow"><input type="radio" name="lc" value="' + esc(it.id) + '"' + (lf.chosen === it.id ? ' checked' : '') + '><span class="n">' + esc(it.name) + '</span><span class="m">' + price(it) + (it.avg_commute_min != null ? ' · 通勤约' + it.avg_commute_min + '分' : '') + '</span></label>'; });
-  h += '<div style="font-size:12px;color:#666;margin:8px 0 2px">分段住宿（可选，长途换酒店；第几晚到第几晚）：</div>';
-  const opts = id => L0.items.map(i => '<option value="' + esc(i.id) + '"' + (i.id === id ? ' selected' : '') + '>' + esc(i.name) + '</option>').join('');
-  const nopts = v => Array.from({length: L0.nights}, (_, k) => '<option' + (k + 1 === v ? ' selected' : '') + '>' + (k + 1) + '</option>').join('');
-  lf.stays.forEach((st, i) => { h += '<div class="srow" data-i="' + i + '"><select data-f="lodging_id">' + opts(st.lodging_id) + '</select>第<select data-f="from_day">' + nopts(st.from_day) + '</select>到<select data-f="to_day">' + nopts(st.to_day) + '</select>晚<button data-del="' + i + '">×</button></div>'; });
-  h += '<div style="margin-top:6px"><button id="adds">＋ 加一段</button> <button id="lprev" class="pri">预览住宿改动</button></div>';
-  box.innerHTML = h;
-  box.querySelectorAll('input[name=lc]').forEach(r => r.onchange = () => { lf.chosen = r.value || null; });
-  box.querySelectorAll('.srow select').forEach(sel => sel.onchange = () => { const row = sel.closest('.srow'), st = lf.stays[Number(row.dataset.i)]; st[sel.dataset.f] = sel.dataset.f === 'lodging_id' ? sel.value : Number(sel.value); });
-  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { lf.stays.splice(Number(b.dataset.del), 1); renderLodging(); });
-  $('adds').onclick = () => { lf.stays.push({lodging_id: L0.items[0].id, from_day: 1, to_day: L0.nights}); renderLodging(); };
-  $('lprev').onclick = async () => {
-    try { const r = await api('lodging_preview', {base_revision: S.revision, chosen: lf.chosen, stays: lf.stays}); showPrev({...r, kind: 'lodging'}); }
-    catch (e) { say(e.message, true); if (e.status === 409) load(); }
-  };
-}
-$('addl').onclick = () => apOpen('lodging');
 // ---- 标签页（查看模式）----
 function renderTabs() {
   const tabs = $('tabs'); tabs.innerHTML = '';
@@ -357,7 +324,7 @@ function wireDur(el, pid, cur) {
 function renderUnscheduled(list) {
   if (!S.unscheduled.length && !(S.orphan_meals || []).length && !edit) return;
   const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + (edit ? '<button id="addp" style="margin-left:auto">＋ 加景点</button>' : '') + '</div>';
-  if (edit) u.querySelector('#addp').onclick = () => apOpen('place');
+  if (edit) u.querySelector('#addp').onclick = apOpen;
   S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'it'; c.dataset.pid = it.place_id; c.style.cursor = edit ? 'grab' : 'default';
     c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>' + (edit ? '<div class="sub">停留 <input class="dur" type="number" min="10" max="720" step="15" value="' + it.duration_min + '"> 分钟</div>' : '');
     if (edit) wireDur(c, it.place_id, it.duration_min);
@@ -390,15 +357,13 @@ function showPrev(r) {
 }
 $('ok').onclick = async () => {
   if (!pending) return; const days = pending.affected_days || [];
-  const isL = pending.kind === 'lodging';
-  try { const r = await api(isL ? 'lodging_apply' : 'apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say(isL ? r.message : '已套用。'); } catch (e) { say(e.message, true); closePrev(); load(); return; }
+  try { await api('apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say('已套用。'); } catch (e) { say(e.message, true); closePrev(); load(); return; }
   closePrev(); await load();
-  if (isL) { await refineRoutes(null); return; }
   for (const dn of days) await refineRoutes(dn);
 };
 async function refineRoutes(day) {
   say(day ? '正在查询第' + day + '天的真实路线…' : '正在查询真实路线…');
-  try { const r = await api('refine', {base_revision: S.revision, day: day || null}); say(r.ok ? r.message : r.message + '（路线仍是估算）', false); } catch (e) { say(e.message, true); }
+  try { const r = await api('refine', {base_revision: S.revision, day: day || null}); say(r.ok ? r.message + (r.more ? '。还有部分路段没查，请再点“更新路线”。' : '') : r.message + '（路线仍是估算）', false); } catch (e) { say(e.message, true); }
   await load();
 }
 $('refine').onclick = () => refineRoutes(null);
@@ -416,7 +381,7 @@ function chatMark(up, msg) {
 async function chatStatus() { try { const r = await api('chat_status'); chatMark(r.connected, r.message); return r.connected; } catch (e) { chatMark(false, '没连上工作台服务。'); return false; } }
 async function send() {
   const text = $('ctext').value.trim(); if (!text || busy) return;
-  busy = true; $('csend').disabled = true; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
+  busy = true; $('csend').disabled = true; const rev0 = S ? S.revision : null, trip0 = S ? S.trip : null; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
   try {
     const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text})});
     if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); if (r.status >= 500) chatMark(false); }
@@ -431,6 +396,7 @@ async function send() {
     }
   } catch (e) { out.className = 'm e'; out.textContent = '请求失败：' + e.message; }
   busy = false; $('csend').disabled = false; await load();
+  if (S && S.days.length && S.trip === trip0 && S.revision !== rev0) await refineRoutes(null);      // 助手改了行程：自动补查还没有真实路线的路段（已查过的不会重查）
 }
 $('csend').onclick = send; $('ctext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
 document.querySelectorAll('#chips button').forEach(b => b.onclick = () => { $('ctext').value = b.dataset.t; $('ctext').focus(); });
