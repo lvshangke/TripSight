@@ -182,7 +182,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 - 设置环境变量 `AMAP_KEY`（nanobot 配置里写在 `tripcore` 的 `env` 中，不要写进代码、不要提交）。
 - `lookup_coords`：有 key 时用高德搜索，返回候选（地址、评分、参考价 `cost_reference`、今日营业时间）；没有 key 或高德失败时退回 OpenStreetMap。
-- `refine_routes`：把行程里的“估算”交通升级为高德真实路线时间并缓存（`Trip.route_overrides`）。
+- `refine_routes`：把行程里的“估算”交通升级为高德真实路线时间并缓存（`Trip.route_overrides`）。公交方案里的铁路段（高铁/城际，高德只给站点不给形状）会写进线路摘要、计入换乘，并按站点间直线示意；路线形状若没走到出发地/目的地，会用直线补全并注明“已用直线连接（示意）”；某一段连续步行超过你设的上限时给出提示（你接受打车就建议改打车）。路线解析升级时（`ROUTE_VERSION`），旧缓存会在下次 `refine_routes` 时自动重查。
 - 内部坐标统一为 WGS84，和高德交互时在 `tripcore/coords.py` 里与 GCJ-02 互转。
 - `cost_reference` 是高德的“人均消费”参考值，不是实时房价，也不一定是门票。
 - 目前所有高德代码只用假数据测试过，还没有用真实 key 联调。

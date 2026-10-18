@@ -185,6 +185,7 @@ class Leg(BaseModel):
     depart_at: str = Field(default="", description="大交通接驳段查询时用的出发时间（精确到小时），时间变了就要重查")
     path_checked: bool = Field(default=False, description="是否已向地图服务请求过路线形状（旧缓存没有，会重新查一次）")
     note: str = Field(default="", description="路线说明，如公交的线路、换乘次数、步行距离、票价")
+    route_ver: int = Field(default=0, description="生成这条缓存时的路线解析版本；低于当前版本的会重新查询")
 
 
 # ---------------------------------------------------------------------------

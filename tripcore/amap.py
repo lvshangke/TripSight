@@ -59,6 +59,7 @@ class RouteResult:
     uses_subway: bool = False
     path: list[tuple[float, float]] = field(default_factory=list)   # 路线形状 (lat, lon)，WGS84，已抽稀
     warning: str = ""          # 不满足用户偏好时的说明（如换乘超限）
+    max_walk_km: Optional[float] = None   # 其中最长的一段连续步行（公里）
 
 
 @dataclass
@@ -76,6 +77,8 @@ TRANSIT_STRATEGIES = {"fastest": 0, "cheapest": 1, "fewest_transfers": 2, "least
 
 
 _MAX_PATH_POINTS = 250
+ROUTE_VERSION = 2        # 路线解析版本：v2 起处理铁路/打车段并补全缺口；旧缓存（版本更低）会被重新查询
+GAP_KM = 0.5             # 路线形状的起点/终点离出发地/目的地超过这个距离，就认为缺了一段
 
 
 def _parse_polyline(text: Any) -> list[tuple[float, float]]:
@@ -100,6 +103,28 @@ def _thin(points: list[tuple[float, float]], limit: int = _MAX_PATH_POINTS) -> l
     step = (len(points) - 1) / (limit - 1)
     idx = sorted({round(i * step) for i in range(limit)} | {len(points) - 1})
     return [points[i] for i in idx]
+
+
+def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    import math
+    p = math.pi / 180
+    h = math.sin((b[0] - a[0]) * p / 2) ** 2 + math.cos(a[0] * p) * math.cos(b[0] * p) * math.sin((b[1] - a[1]) * p / 2) ** 2
+    return 2 * 6371.0 * math.asin(math.sqrt(h))
+
+
+def _close_gaps(r: "RouteResult", origin: tuple[float, float], dest: tuple[float, float]) -> None:
+    """路线形状必须从出发地走到目的地。起点/终点缺了一段（如高德没给铁路段的形状）就用直线补上，并写明。"""
+    if r.mode != "transit" or not r.path:
+        return
+    filled = False
+    if _km(r.path[0], origin) > GAP_KM:
+        r.path.insert(0, (round(origin[0], 5), round(origin[1], 5)))
+        filled = True
+    if _km(r.path[-1], dest) > GAP_KM:
+        r.path.append((round(dest[0], 5), round(dest[1], 5)))
+        filled = True
+    if filled:
+        r.warning = (r.warning + "；" if r.warning else "") + "部分路段高德没有给出路线形状，地图上已用直线连接（示意）"
 
 
 def _num(v: Any) -> Optional[float]:
@@ -281,7 +306,10 @@ class AmapClient:
                 if depart is not None:       # 按出发时间查（含夜班车），避免拿白天的地铁方案套深夜
                     params.update({"date": f"{depart.year}-{depart.month}-{depart.day}",
                                    "time": f"{depart.hour}:{depart.minute:02d}", "nightflag": "1"})
-                return self._transit_options(self._get("/v3/direction/transit/integrated", params))
+                opts = self._transit_options(self._get("/v3/direction/transit/integrated", params))
+                for o in opts:
+                    _close_gaps(o, (from_lat, from_lon), (to_lat, to_lon))
+                return opts
 
             options = query(transit_strategy)
             if max_transfers is None and not prefer_subway:
@@ -299,7 +327,7 @@ class AmapClient:
                     if fastest_subway.minutes <= best.minutes * 1.3:      # 地铁方案最多慢 30% 才优先
                         best = fastest_subway
             if not ok and max_transfers is not None:
-                best.warning = f"高德所有方案都要换乘 {best.transfers} 次，超过你的上限 {max_transfers} 次"
+                best.warning = (best.warning + "；" if best.warning else "") + f"高德所有方案都要换乘 {best.transfers} 次，超过你的上限 {max_transfers} 次"
             return best
         raise AmapError(f"不支持的出行方式：{mode}")
 
@@ -314,13 +342,32 @@ class AmapClient:
                 continue
             lines: list[tuple[str, str]] = []
             path: list[tuple[float, float]] = []
+            rail_note = ""
+            max_walk = 0.0
             for seg in t.get("segments") or []:
+                wd = _num((seg.get("walking") or {}).get("distance")) if isinstance(seg.get("walking"), dict) else None
+                if wd:
+                    max_walk = max(max_walk, wd / 1000)
                 for st in ((seg.get("walking") or {}).get("steps")) or []:
                     path += _parse_polyline(st.get("polyline"))
                 buslines = ((seg.get("bus") or {}).get("buslines")) or []
                 if buslines:
                     lines.append((_text(buslines[0].get("name")).split("(")[0], _text(buslines[0].get("type"))))
                     path += _parse_polyline(buslines[0].get("polyline"))
+                rw = seg.get("railway")
+                if isinstance(rw, dict) and (rw.get("departure_stop") or rw.get("arrival_stop") or rw.get("name") or rw.get("trip")):
+                    dep, arr = rw.get("departure_stop") or {}, rw.get("arrival_stop") or {}
+                    train = _text(rw.get("trip")) or _text(rw.get("name")) or "铁路"
+                    ends = "-".join(x for x in (_text(dep.get("name")), _text(arr.get("name"))) if x)
+                    lines.append((f"{train}（{ends}）" if ends else train, "铁路"))
+                    locs = [_text(x.get("location")) for x in [dep, *(rw.get("via_stops") or []), arr] if isinstance(x, dict)]
+                    straight = _parse_polyline(";".join(l for l in locs if l))
+                    if len(straight) >= 2:
+                        path += straight           # 高德不给铁路段的形状：站点之间用直线示意
+                        rail_note = "铁路段为站点间直线示意"
+                taxi = seg.get("taxi")
+                if isinstance(taxi, dict):
+                    path += _parse_polyline(taxi.get("polyline"))
             walk_m = _num(t.get("walking_distance"))
             out.append(RouteResult(
                 "transit", round(dist / 1000, 2), max(1, round(dur / 60)),
@@ -330,6 +377,7 @@ class AmapClient:
                 lines=[n for n, _ in lines],
                 uses_subway=any("地铁" in n or "地铁" in ty for n, ty in lines),
                 path=_thin(path),
+                warning=rail_note, max_walk_km=round(max_walk, 2) if max_walk else None,
             ))
         if not out:
             raise AmapError("没有找到公交方案" if not transits else "公交结果缺少时间或距离")

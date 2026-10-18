@@ -22,7 +22,7 @@ from typing import Any, Optional
 
 from pydantic import TypeAdapter, ValidationError
 
-from .amap import AmapClient, AmapError
+from .amap import ROUTE_VERSION, AmapClient, AmapError
 from .openmeteo import OpenMeteoClient, WeatherError
 from .weather import bad_weather, fmt_snap, weather_spots
 from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
@@ -434,8 +434,8 @@ def _transit_kwargs(prefs: Any) -> dict[str, Any]:
     return kw
 
 
-def _route_note(r: Any) -> str:
-    """路线说明：公交写线路、换乘、步行距离、票价；其余为空。"""
+def _route_note(r: Any, prefs: Any = None) -> str:
+    """路线说明：公交写线路、换乘、步行距离、票价；步行超过用户设的上限时提示；其余为空。"""
     if r.mode != "transit" or not getattr(r, "lines", None):
         return ""
     bits = ["→".join(r.lines), f"换乘{r.transfers}次" if r.transfers is not None else ""]
@@ -445,6 +445,12 @@ def _route_note(r: Any) -> str:
         bits.append(f"票价{r.cost_yuan:g}元")
     if getattr(r, "warning", ""):
         bits.append("⚠ " + r.warning)
+    mw = getattr(r, "max_walk_km", None)
+    if prefs is not None and mw is not None:
+        limit_km = prefs.walk_max_min / 60 * 5          # 按步行约 5 km/h 折算
+        if mw > limit_km * 1.2:
+            bits.append(f"⚠ 其中一段要连续步行约 {mw:g} km，超过你设的单段步行上限（{prefs.walk_max_min} 分钟）"
+                        + ("；你接受打车，可以考虑改成打车（set_leg_mode）" if getattr(prefs, "taxi_ok", False) else ""))
     return "，".join(b for b in bits if b)
 
 
@@ -488,7 +494,7 @@ def refine_routes(day: Optional[int] = None) -> str:
         when = terminal_depart_time(trip, "arrival") if a.id == "arrival" else (
             terminal_depart_time(trip, "departure") if b.id == "departure" else None)
         stamp = f"{when:%Y-%m-%d %H}" if when is not None else ""
-        if (cached is not None and cached.path_checked and cached.depart_at == stamp) or key in new_legs:
+        if (cached is not None and cached.path_checked and cached.depart_at == stamp and cached.route_ver >= ROUTE_VERSION) or key in new_legs:
             skipped += 1
             continue
         if requested >= MAX_ROUTE_REQUESTS:
@@ -513,11 +519,12 @@ def refine_routes(day: Optional[int] = None) -> str:
             continue
         new_legs[key] = Leg(from_id=a.id, to_id=b.id, mode=r.mode, distance_km=r.distance_km,  # type: ignore[arg-type]
                             minutes=r.minutes, detail_level="route", path=[list(pt) for pt in r.path],
-                            path_checked=True, depart_at=stamp, note="；".join(x for x in (_route_note(r), night_note) if x))
+                            path_checked=True, depart_at=stamp, route_ver=ROUTE_VERSION,
+                            note="；".join(x for x in (_route_note(r, pr), night_note) if x))
 
     if new_legs:
         _save(commit(trip, lambda t: t.route_overrides.update(new_legs)))
-    todo = len([k for k in all_keys if k not in new_legs and not (k in trip.route_overrides and trip.route_overrides[k].path_checked)]) - len(failures)
+    todo = len([k for k in all_keys if k not in new_legs and not (k in trip.route_overrides and trip.route_overrides[k].path_checked and trip.route_overrides[k].route_ver >= ROUTE_VERSION)]) - len(failures)
     msg = f"已更新 {len(new_legs)} 段为高德真实路线，{skipped} 段此前已查过。"
     if failures:
         msg += "\n失败：" + "；".join(failures[:5]) + "（这些路段仍用估算值）"

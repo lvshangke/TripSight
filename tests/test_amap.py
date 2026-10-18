@@ -177,3 +177,44 @@ def test_transit_depart_time_is_sent_to_amap():
     c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [_transit(3000, ["地铁1号线(x--y)"])]}}})
     c.route("transit", 34.26, 108.94, 34.22, 108.95, "西安", depart=datetime(2026, 10, 30, 7, 5))
     assert "date=2026-10-30" in c.calls[0] and "time=7%3A05" in c.calls[0] and "nightflag=1" in c.calls[0]
+
+
+def _poly(*pts):
+    return ";".join(_gcj_loc(la, lo) for la, lo in pts)
+
+
+def _rail_response():
+    """西安市区 → 华山：先坐地铁到西安北，再坐高铁到华山北（高德不给铁路段形状），最后一小段步行缺失。"""
+    return {"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "132000", "transits": [{
+        "duration": "13400", "distance": "132470", "walking_distance": "6620", "cost": "35.5",
+        "segments": [
+            {"walking": {"distance": "300", "steps": [{"polyline": _poly((34.2208, 108.8874), (34.2250, 108.8900))}]},
+             "bus": {"buslines": [{"name": "地铁2号线(A--B)", "type": "地铁线路",
+                                   "polyline": _poly((34.2250, 108.8900), (34.3770, 108.9390))}]}},
+            {"railway": {"trip": "G1234", "name": "G1234",
+                         "departure_stop": {"name": "西安北", "location": _gcj_loc(34.3770, 108.9390)},
+                         "arrival_stop": {"name": "华山北", "location": _gcj_loc(34.4800, 109.9900)}}},
+            {"walking": {"distance": "6200", "steps": []}},
+        ]}]}}}
+
+
+def test_transit_railway_segment_is_drawn_named_and_counted():
+    c = client(_rail_response())
+    r = c.route("transit", 34.2208, 108.8874, 34.4945, 110.0656, "西安")
+    assert any("G1234" in x and "西安北" in x and "华山北" in x for x in r.lines)
+    assert r.transfers == 1 and r.max_walk_km == 6.2
+    assert r.path[-1] == (34.4945, 110.0656)                # 路线一直画到目的地，不会停在西安市区
+    assert any(abs(p[0] - 34.4800) < 0.002 and abs(p[1] - 109.9900) < 0.002 for p in r.path)   # 铁路终点站在线上
+    assert "直线" in r.warning
+
+
+def test_gap_filled_when_destination_missing_even_without_railway():
+    c = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "9000", "transits": [{
+        "duration": "2400", "distance": "9500", "segments": [{"bus": {"buslines": [{
+            "name": "201路(A--B)", "type": "普通公交线路", "polyline": _poly((34.26, 108.94), (34.27, 108.95))}]}}]}]}}})
+    r = c.route("transit", 34.26, 108.94, 34.30, 109.00, "西安")
+    assert r.path[0] == (34.26, 108.94) and r.path[-1] == (34.30, 109.0) and "直线" in r.warning
+    ok = client({"/v3/direction/transit/integrated": {"status": "1", "route": {"distance": "900", "transits": [{
+        "duration": "600", "distance": "900", "segments": [{"bus": {"buslines": [{
+            "name": "201路", "type": "普通公交线路", "polyline": _poly((34.26, 108.94), (34.261, 108.941))}]}}]}]}}})
+    assert ok.route("transit", 34.26, 108.94, 34.261, 108.941, "西安").warning == ""      # 没缺口就不加说明

@@ -1084,3 +1084,35 @@ def test_create_amap_map_returns_https_web_links(monkeypatch):
     r = s.create_amap_map()
     assert r["maps"][0]["web_links"] and all(x["url"].startswith("https://uri.amap.com/marker") for x in r["maps"][0]["web_links"])
     assert "微信" in r["note"] and "SECRETKEY123" not in str(r)
+
+
+def test_refine_requeries_stale_cache_and_warns_on_long_walk(monkeypatch):
+    from tripcore.amap import ROUTE_VERSION, RouteResult
+    s.new_trip(num_days=1, city="北京")
+    s.add_place("甲", 39.90, 116.40)
+    s.add_place("乙", 39.99, 116.30)
+    s.add_lodging("酒店A", 39.91, 116.41, choose=True)
+    s.set_transport_prefs(walk_max_min=15, taxi_ok=True)
+    s.schedule_days()
+    calls = []
+
+    class A(FakeAmap):
+        def route(self, mode, a_lat, a_lon, b_lat, b_lon, city=None, transit_strategy="fastest", **kw):
+            calls.append(mode)
+            return RouteResult("transit", 8.0, 30, transfers=0, walking_km=6.6, lines=["华阴603路"], max_walk_km=6.6,
+                               path=[(a_lat, a_lon), (b_lat, b_lon)])
+
+    monkeypatch.setattr(s, "_amap", lambda: A())
+    s.set_leg_mode("l1", "p1", "transit")
+    out = s.refine_routes()
+    t = s._load()
+    assert all(v.route_ver == ROUTE_VERSION for v in t.route_overrides.values()) and t.route_overrides
+    assert any("连续步行约 6.6 km" in v.note and "打车" in v.note for v in t.route_overrides.values())
+    n = len(calls)
+    s.refine_routes()
+    assert len(calls) == n                                   # 版本够新，不重查
+    for k, v in list(t.route_overrides.items()):             # 模拟旧版本留下的缓存
+        t.route_overrides[k] = v.model_copy(update={"route_ver": 0})
+    s._save(t)
+    s.refine_routes()
+    assert len(calls) > n                                    # 旧缓存会被重新查询
