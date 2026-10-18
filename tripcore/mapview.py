@@ -168,7 +168,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                 if p.ticket_price:
                     lines.append(f"门票：{p.ticket_price:g} 元")
                 ent = entry(p)
-                stop = {"type": "stop", "n": i + 1, "name": p.name, "pos": _gcj(ent.lat, ent.lon), "arrive": _hm(t),
+                stop = {"type": "stop", "pid": p.id, "n": i + 1, "name": p.name, "pos": _gcj(ent.lat, ent.lon), "arrive": _hm(t),
                         "web": marker_link(p.name, ent.lat, ent.lon, region),
                         "leave": _hm(t + p.duration_min), "stay": p.duration_min, "lines": lines}
                 if p.waypoints:
@@ -182,7 +182,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                         ml.append(f"评分 {m.rating:g}（高德）")
                     ml.append(f"人均约 {m.cost_per_person:.0f} 元（参考）" if m.cost_per_person is not None else "人均待核实")
                     ml.append(f"营业时间：{m.opening_hours}（来源：{m.hours_source}）" if m.opening_hours else "营业时间待核实")
-                    timeline.append({"type": "meal", "name": m.name, "pos": _gcj(m.lat, m.lon), "lines": ml,
+                    timeline.append({"type": "meal", "mid": m.id, "name": m.name, "pos": _gcj(m.lat, m.lon), "lines": ml,
                                      "web": marker_link(m.name, m.lat, m.lon, region)})
                 if i < len(st.legs):
                     x, e = exit_(p), entry(st.places[i + 1])

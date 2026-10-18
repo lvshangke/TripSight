@@ -767,6 +767,9 @@ def choose_food(candidate_id: str, day: Optional[int] = None, after_place_id: Op
         pl = trip.place(pid)
     except KeyError as e:
         raise ToolError(str(e))
+    placed_day = next((d.index for d in trip.plan.days if any(it.place_id == pid for it in d.items)), None)
+    if placed_day is not None:
+        day0 = placed_day                  # 用餐点跟着景点所在的那天
     if any(m.name == c["name"] and m.day == day0 for m in trip.meals):
         raise ToolError(f"「{c['name']}」已经在第 {day0 + 1} 天的用餐点里了。")
     dist = int(haversine_km(pl.lat, pl.lon, c["lat"], c["lon"]) * 1000)
@@ -1648,7 +1651,8 @@ def archive_trip(name: str) -> str:
 
 def set_dates(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
     """修改（或清除）行程的确定日期，格式 YYYY-MM-DD；开始和结束要一起填，都不填表示清除日期。
-    天数会按日期重新计算，但已排好的分天不会自动改，需要再 schedule_days；旧的天气快照会作废。
+    天数会按日期重新计算；如果天数变了且已经分过天，会自动按新天数重新分天（已锁定且仍在范围内的景点保持原位，其余重排，
+    排不下的进“未安排”）；旧的天气快照会作废。
     这会改变行程，只能在用户明确要求并说清影响之后调用；可以 undo。"""
     trip = _load()
     sd = _parse_date(start_date or None, "start_date")

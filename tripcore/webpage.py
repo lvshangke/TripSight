@@ -45,6 +45,12 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .card .mv button{padding:0 5px;font-size:11px}
 .ins{height:3px;background:#2563eb;border-radius:2px;margin:-2px 0}
 .empty{font-size:12px;color:#999;padding:6px}
+.leg,.meal,.info{font-size:12px;color:#555;padding:2px 8px 2px 34px}
+.leg .real{color:#15803d}.leg .est{color:#b45309}
+.sub{font-size:11px;color:#888;margin-top:1px}
+.meal{background:#fff8ed;border-radius:6px;margin:2px 0;padding:4px 8px 4px 34px}
+.card .nm small{display:block;font-size:11px;color:#888}
+a{color:#2563eb;text-decoration:none}
 #prev{font-size:13px;border-top:2px solid #2563eb;padding:8px 12px;background:#f8fbff;display:none;max-height:40%;overflow:auto}
 #prev ul{margin:4px 0 6px 18px;padding:0;font-size:13px}
 #prev .w{color:#b45309}
@@ -53,7 +59,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 @media (max-width:760px){#app{flex-direction:column}#side{width:auto;max-width:none;height:60%}#map{height:40%}}
 </style></head><body>
 <div id="app"><div id="side">
-<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="undo">撤销</button></header>
+<header><b id="title"></b><span id="rev" style="font-size:12px;color:#777"></span><button id="refine" title="给还没查过的路段查真实路线">更新路线</button><button id="undo">撤销</button></header>
 <div id="msg"></div>
 <div id="scroll">
 <div class="sec"><h3>日期 <span id="dstate" style="font-weight:400;font-size:12px;color:#666"></span></h3>
@@ -110,11 +116,13 @@ function renderDates() {
     const k = b.dataset.d; if (picks.length !== 1) picks = [k]; else picks = k < picks[0] ? [k, picks[0]] : [picks[0], k]; renderDates(); });
   const full = picks.length === 2, days = full ? Math.round((parse(picks[1]) - parse(picks[0])) / 864e5) + 1 : 0;
   $('calinfo').textContent = !picks.length ? '先点出发日，再点结束日。绿色底是天气预报能覆盖的范围（约未来 16 天）。' : (full ? '已选 ' + picks[0] + ' 至 ' + picks[1] + '，共 ' + days + ' 天' + (days > 30 ? '（最多 30 天）' : '') : '已选出发日 ' + picks[0] + '，再点结束日');
+  if (full && S.days.length && days !== S.dates.num_days) $('calinfo').textContent += '。应用后天数会从 ' + S.dates.num_days + ' 天变成 ' + days + ' 天，并自动重新分天（已锁定且仍在范围内的景点保持原位）。';
   $('dapply').disabled = !full || days > 30 || (cur.start === picks[0] && cur.end === picks[1]);
 }
 $('dapply').onclick = async () => { try { const r = await api('dates', {base_revision: S.revision, start: picks[0], end: picks[1]}); say(r.message); await load(); } catch (e) { say(e.message, true); if (e.status === 409) load(); } };
 $('dclear').onclick = async () => { if (!S.dates.start) return; try { const r = await api('dates', {base_revision: S.revision, start: null, end: null}); picks = []; say(r.message); await load(); } catch (e) { say(e.message, true); } };
 // ---- 每天的卡片 ----
+const link = (u, t) => u ? ' <a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + t + '</a>' : '';
 function renderDays() {
   const root = $('days'); root.innerHTML = '';
   if (!S.days.length) { root.innerHTML = '<div class="empty">还没有分天。先对 agent 说“安排行程”（schedule_days）。</div>'; }
@@ -122,22 +130,34 @@ function renderDays() {
     const z = document.createElement('div'); z.className = 'day'; z.dataset.day = d.index;
     z.innerHTML = '<div class="dh"><span class="dot" style="background:' + d.color + '"></span>' + esc(d.label) + '</div>';
     z.querySelector('.dh').onclick = () => { selDay = d.index; renderMap(); };
-    d.items.forEach((it, i) => {
-      const c = document.createElement('div'); c.className = 'card'; c.draggable = true; c.dataset.pid = it.place_id;
-      c.innerHTML = '<span class="n" style="background:' + d.color + '">' + (i+1) + '</span><span class="nm">' + esc(it.name) + (it.locked ? ' 🔒' : '') + '</span><span class="tm">' + esc(it.time || '') + '</span><span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>';
-      c.querySelector('[data-a=up]').onclick = () => move(it.place_id, d.index, Math.max(i-1, 0));
-      c.querySelector('[data-a=dn]').onclick = () => move(it.place_id, d.index, Math.min(i+1, d.items.length-1));
-      c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); e.dataTransfer.effectAllowed = 'move'; };
-      c.ondragend = () => { drag = null; document.querySelectorAll('.drag,.over').forEach(x => x.classList.remove('drag', 'over')); document.querySelectorAll('.ins').forEach(x => x.remove()); };
-      z.appendChild(c);
+    const stops = d.rows.filter(r => r.t === 'stop'); let si = 0;
+    d.rows.forEach(r => {
+      if (r.t === 'stop') {
+        const i = si++, c = document.createElement('div'); c.className = 'card'; c.draggable = true; c.dataset.pid = r.place_id;
+        const hours = (r.lines || []).find(x => x.indexOf('营业时间') === 0);
+        c.innerHTML = '<span class="n" style="background:' + d.color + '">' + r.n + '</span><span class="nm">' + esc(r.name) + (r.locked ? ' 🔒' : '') + (hours ? '<small>' + esc(hours) + '</small>' : '') + '</span><span class="tm">' + esc(r.time) + '</span><span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>';
+        c.querySelector('[data-a=up]').onclick = () => move(r.place_id, d.index, Math.max(i-1, 0));
+        c.querySelector('[data-a=dn]').onclick = () => move(r.place_id, d.index, Math.min(i+1, stops.length-1));
+        c.ondragstart = e => { drag = r.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', r.place_id); e.dataTransfer.effectAllowed = 'move'; };
+        c.ondragend = () => { drag = null; document.querySelectorAll('.drag,.over').forEach(x => x.classList.remove('drag', 'over')); document.querySelectorAll('.ins').forEach(x => x.remove()); };
+        z.appendChild(c);
+      } else {
+        const e = document.createElement('div');
+        if (r.t === 'leg') { e.className = 'leg'; e.innerHTML = '↓ ' + r.minutes + ' 分钟 · ' + esc(r.mode) + ' · ' + r.km + ' km · <span class="' + (r.real ? 'real' : 'est') + '">' + (r.real ? '真实路线' : '估算') + '</span>' + link(r.link, '导航') + (r.note ? '<div class="sub">' + esc(r.note) + '</div>' : ''); }
+        else if (r.t === 'meal') { e.className = 'meal'; e.innerHTML = '🍜 <b>' + esc(r.name) + '</b>' + link(r.link, '地图') + '<div class="sub">' + (r.lines || []).map(esc).join(' · ') + '</div>'; }
+        else if (r.t === 'hotel') { e.className = 'info'; e.textContent = '🏨 ' + r.role + ' ' + r.time + ' ' + r.name; }
+        else { e.className = 'info'; e.textContent = r.text; }
+        z.appendChild(e);
+      }
     });
-    if (!d.items.length) z.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');
+    if (!stops.length) z.insertAdjacentHTML('beforeend', '<div class="empty">把景点拖到这里</div>');
     wire(z, () => ({kind: 'day', day: d.index})); root.appendChild(z);
   });
   const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排（拖到这里表示移出行程）</div>';
   S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'card'; c.draggable = true; c.dataset.pid = it.place_id;
     c.innerHTML = '<span class="nm">' + esc(it.name) + '</span><span class="tm">' + esc(it.reason || '') + '</span>';
     c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); }; c.ondragend = () => { drag = null; }; u.appendChild(c); });
+  (S.orphan_meals || []).forEach(m => u.insertAdjacentHTML('beforeend', '<div class="meal">🍜 <b>' + esc(m.name) + '</b><div class="sub">原来挂在「' + esc(m.after) + '」之后，该景点现在不在行程里（用餐点没有删除）</div></div>'));
   wire(u, () => ({kind: 'none'})); root.appendChild(u);
 }
 function wire(zone, info) {
@@ -159,7 +179,18 @@ async function propose(ops) {
   $('iss').innerHTML = pending.new_issues.length ? '<div class="w">改完后新增的问题：</div><ul>' + pending.new_issues.map(i => '<li class="w">' + esc(i) + '</li>').join('') + '</ul>' : '<div style="font-size:13px;color:#15803d">没有新增问题。</div>';
   $('prev').style.display = 'block'; say('');
 }
-$('ok').onclick = async () => { if (!pending) return; try { await api('apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say('已套用。'); } catch (e) { say(e.message, true); } closePrev(); load(); };
+$('ok').onclick = async () => {
+  if (!pending) return; const days = pending.affected_days || [];
+  try { await api('apply', {base_revision: S.revision, proposal_id: pending.proposal_id}); say('已套用。'); } catch (e) { say(e.message, true); closePrev(); load(); return; }
+  closePrev(); await load();
+  for (const dn of days) await refineRoutes(dn);
+};
+async function refineRoutes(day) {
+  say(day ? '正在查询第' + day + '天的真实路线…' : '正在查询真实路线…');
+  try { const r = await api('refine', {base_revision: S.revision, day: day || null}); say(r.ok ? r.message : r.message + '（路线仍是估算）', false); } catch (e) { say(e.message, true); }
+  await load();
+}
+$('refine').onclick = () => refineRoutes(null);
 $('cancel').onclick = closePrev; function closePrev() { pending = null; $('prev').style.display = 'none'; }
 $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revision}); say('已撤销。'); } catch (e) { say(e.message, true); } closePrev(); load(); };
 // ---- 地图 ----

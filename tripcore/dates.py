@@ -7,7 +7,8 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from .models import DateMode, Trip, TripMeta
+from .models import DateMode, PlaceStatus, Trip, TripMeta
+from .scheduler import build_plan
 from .state import commit
 
 
@@ -28,14 +29,32 @@ def apply_dates(trip: Trip, start: Optional[date], end: Optional[date]) -> tuple
     except ValidationError as e:
         raise ValueError("日期不合法：" + "；".join(x["msg"] for x in e.errors())) from None
 
+    replan = trip.plan is not None and meta.num_days != old_days
+    unscheduled: list[str] = []
+
     def mutate(t: Trip) -> None:
         t.meta = meta
         t.weather = {}                       # 旧日期的天气快照作废
+        if replan:                           # 天数变了：按新天数重新分天，免得留着超出范围的旧天（锁定且仍在范围内的保持原位）
+            plan = build_plan(t, keep_locked=True)
+            t.plan = plan
+            placed = {it.place_id for d in plan.days for it in d.items}
+            for p in t.places:
+                if p.id in placed and p.status == PlaceStatus.SHORTLIST:
+                    p.status = PlaceStatus.PLANNED
+                elif p.id not in placed and p.status == PlaceStatus.PLANNED:
+                    p.status = PlaceStatus.SHORTLIST
+            unscheduled.extend(f"{t.place(u.place_id).name}（{u.reason}）" for u in plan.unscheduled)
 
     new = commit(trip, mutate)
     notes: list[str] = []
-    if meta.num_days != old_days:
-        notes.append(f"天数从 {old_days} 天变成 {meta.num_days} 天，已排好的分天没有自动改动，请重新 schedule_days。")
+    if replan:
+        notes.append(f"天数从 {old_days} 天变成 {meta.num_days} 天，已按新天数重新分天（已锁定且仍在范围内的景点保持原位，其余重排；"
+                     "路线时间沿用已查过的，新相邻的景点先按估算，可以更新路线）。")
+        if unscheduled:
+            notes.append("没能排进去：" + "、".join(unscheduled) + "。")
+    elif meta.num_days != old_days:
+        notes.append(f"天数从 {old_days} 天变成 {meta.num_days} 天（还没有分天，之后 schedule_days 会按新天数排）。")
     if any(s.to_day >= meta.num_days for s in trip.stays):
         notes.append("有分段住宿超出了新的天数范围，请用 set_stays 重新设置。")
     if trip.weather:

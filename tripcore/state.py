@@ -21,11 +21,22 @@ def _snapshot(trip: Trip) -> dict:
     return trip.model_dump(mode="json", exclude={"history"})
 
 
+def sync_meal_days(trip: Trip) -> None:
+    """用餐点挂在某个景点之后：景点换了天，用餐点跟着换。景点不在行程里（已移出）时不动，也不删除。"""
+    if trip.plan is None or not trip.meals:
+        return
+    where = {it.place_id: d.index for d in trip.plan.days for it in d.items}
+    for m in trip.meals:
+        if m.after_place_id in where and m.day != where[m.after_place_id]:
+            m.day = where[m.after_place_id]
+
+
 def commit(trip: Trip, mutate: Callable[[Trip], None]) -> Trip:
     """复制 trip，对副本执行 mutate，然后返回新版本（版本号 +1，旧版本进入历史）。"""
     new = trip.model_copy(deep=True)
     snapshot = _snapshot(trip)
     mutate(new)
+    sync_meal_days(new)
     new.history = (trip.history + [snapshot])[-MAX_HISTORY:]
     new.revision = trip.revision + 1
     return new

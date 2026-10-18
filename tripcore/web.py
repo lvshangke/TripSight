@@ -56,31 +56,56 @@ def _check_rev(body: dict, trip: Trip) -> None:
         raise HttpError(409, "行程已经被别处修改过（版本变了），页面已刷新，请重新操作。")
 
 
+def _rows(trip: Trip, timeline: list[dict], locked: dict[str, bool]) -> list[dict]:
+    """把某一天的时间线整理成左栏的行：酒店、景点（可拖）、通勤、用餐点、航班/车次、提示。"""
+    rows: list[dict] = []
+    for e in timeline:
+        t = e["type"]
+        if t == "stop":
+            rows.append({"t": "stop", "place_id": e["pid"], "n": e["n"], "name": e["name"], "locked": locked.get(e["pid"], False),
+                         "time": f"{e['arrive']}–{e['leave']}", "lines": e.get("lines", [])})
+        elif t == "leg":
+            rows.append({"t": "leg", "minutes": e["minutes"], "mode": e["mode"], "km": e["km"], "real": e["real"],
+                         "note": e.get("note", ""), "link": e.get("link", "")})
+        elif t == "meal":
+            rows.append({"t": "meal", "name": e["name"], "lines": e.get("lines", []), "link": e.get("web", "")})
+        elif t == "hotel":
+            rows.append({"t": "hotel", "role": e["role"], "time": e["time"], "name": e["name"]})
+        elif t == "term":
+            rows.append({"t": "info", "text": f"{e['icon']} {e['role']} {e['time']} {e['name']}：" + "；".join(e.get("lines", []))})
+        elif t == "conn":
+            rows.append({"t": "info", "text": e["text"]})
+    return rows
+
+
 def snapshot() -> dict[str, Any]:
     trip = ms._load()
     mp = build_map_data(trip)
-    times: dict[int, list[str]] = {}
-    for d in mp["days"]:
-        stops = [e for e in d["timeline"] if e["type"] == "stop"]
-        times[d["index"]] = [f"{s['arrive']}–{s['leave']}" for s in stops]
+    by_day = {d["index"]: d for d in mp["days"]}
     days, placed = [], set()
     if trip.plan:
-        colors = {d["index"]: d["color"] for d in mp["days"]}
         for day in trip.plan.days:
-            ts = times.get(day.index, [])
-            ts = ts if len(ts) == len(day.items) else [""] * len(day.items)
+            md = by_day.get(day.index, {"timeline": [], "color": "#4363d8"})
+            locked = {it.place_id: it.locked for it in day.items}
+            rows = _rows(trip, md["timeline"], locked)
+            times = {r["place_id"]: r["time"] for r in rows if r["t"] == "stop"}
             dt = trip.day_date(day.index)
             items = []
-            for it, tm in zip(day.items, ts):
+            for it in day.items:
                 placed.add(it.place_id)
-                items.append({"place_id": it.place_id, "name": trip.place(it.place_id).name, "locked": it.locked, "time": tm})
+                items.append({"place_id": it.place_id, "name": trip.place(it.place_id).name, "locked": it.locked,
+                              "time": times.get(it.place_id, "")})
             days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {dt.isoformat()}" if dt else ""),
-                         "color": colors.get(day.index, "#4363d8"), "items": items})
+                         "color": md["color"], "items": items, "rows": rows})
     reasons = {u.place_id: u.reason for u in (trip.plan.unscheduled if trip.plan else [])}
     unscheduled = [{"place_id": p.id, "name": p.name, "reason": reasons.get(p.id, "")}
                    for p in trip.places if p.id not in placed and p.status.value in ("shortlist", "planned", "confirmed")]
+    names = {p.id: p.name for p in trip.places}
+    orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
+                    for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
     return {"title": m.name, "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+            "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},
             "map": mp}
@@ -105,7 +130,10 @@ def preview(body: dict) -> dict[str, Any]:
     store = ms._load_proposals()
     store[prop.id] = {"proposal": prop.model_dump(mode="json"), "confirm_code": secrets.token_hex(8)}   # 确认码不给任何人看：网页点“确认”才是用户确认
     ms._save_proposals(store)
-    return {"proposal_id": prop.id, "changes": lines, "new_issues": [m for k, m in after.items() if k not in before]}
+    affected = sorted({d.index + 1 for t in (trip, new) if t.plan for d in t.plan.days
+                       if any(it.place_id in {o.place_id for o in ops} for it in d.items)})
+    return {"proposal_id": prop.id, "changes": lines, "new_issues": [m for k, m in after.items() if k not in before],
+            "affected_days": affected}
 
 
 def apply(body: dict) -> dict[str, Any]:
@@ -137,6 +165,24 @@ def undo(body: dict) -> dict[str, Any]:
     return {"revision": new.revision}
 
 
+def refine(body: dict) -> dict[str, Any]:
+    """给指定的某天（不填=所有天）查真实路线。只补还没查过的路段。没有地图 key 或查询失败时保持估算，不算出错。
+    路线只是缓存：把这次更新并进上一步的撤销历史里，这样“撤销”一步就回到拖拽之前。"""
+    trip = ms._load()
+    _check_rev(body, trip)
+    day = body.get("day")
+    if day is not None and not isinstance(day, int):
+        raise HttpError(400, "day 需要是整数。")
+    try:
+        msg = ms.refine_routes(day)
+    except ms.ToolError as e:
+        return {"ok": False, "message": str(e), "revision": trip.revision}
+    new = ms._load()
+    if new.revision != trip.revision:
+        ms._save(new.model_copy(update={"history": trip.history}))
+    return {"ok": True, "message": msg.splitlines()[0], "revision": ms._load().revision}
+
+
 def dates(body: dict) -> dict[str, Any]:
     trip = ms._load()
     _check_rev(body, trip)
@@ -153,7 +199,7 @@ def dates(body: dict) -> dict[str, Any]:
 
 
 ROUTES_GET = {"state": lambda: snapshot()}
-ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates}
+ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
 def make_handler(token: str, state: dict):
