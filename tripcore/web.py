@@ -7,14 +7,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import http.client
 import json
 import os
 import secrets
+import signal
 import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -232,7 +235,24 @@ def chat_status() -> dict[str, Any]:
     return {"connected": ok, "message": "" if ok else "没连上 nanobot。先启动它的接口：nanobot plugins enable api，然后 nanobot serve。"}
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "chat_status": chat_status}
+_VERSION_FILES = ("web.py", "webpage.py", "mapview.py", "dates.py", "proposals.py", "state.py", "mcp_server.py")
+
+
+def code_version() -> str:
+    """工作台相关代码的指纹。启动时算一次：用来识别“后台还在跑的是旧代码的工作台”。"""
+    h = hashlib.sha1()
+    for n in _VERSION_FILES:
+        try:
+            h.update((Path(__file__).with_name(n)).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:12]
+
+
+CODE_VERSION = code_version()
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
 ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
@@ -427,10 +447,29 @@ def launch(root: Path) -> str:
     info = root / "workbench.json"
     try:
         cur = json.loads(info.read_text(encoding="utf-8"))
-        if _alive(int(cur["pid"])):
-            with urllib.request.urlopen(cur["url"] + "api/state", timeout=2):
-                pass
-            return _msg(cur["url"], reused=True)
+        pid, url = int(cur["pid"]), str(cur["url"])
+        if _alive(pid):
+            try:
+                with urllib.request.urlopen(url + "api/version", timeout=2) as r:
+                    same = json.loads(r.read().decode("utf-8")).get("version") == CODE_VERSION
+                if same:
+                    return _msg(url, reused=True)
+                stale = True                       # 是工作台，但代码版本不同
+            except urllib.error.HTTPError as e:
+                stale = e.code == 404              # 老版本的工作台没有 version 接口
+            except Exception:
+                stale = False                      # 连不上：不确定这个 pid 还是不是工作台，不去杀
+            if stale:
+                try:
+                    with urllib.request.urlopen(url + "api/state", timeout=2):
+                        pass                       # 能回答 state：确认是我们自己的工作台，才结束它
+                    os.kill(pid, signal.SIGTERM)
+                    for _ in range(30):
+                        if not _alive(pid):
+                            break
+                        time.sleep(0.1)
+                except Exception:
+                    pass
     except Exception:
         pass
     url_file = root / "workbench.url"

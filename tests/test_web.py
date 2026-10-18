@@ -381,3 +381,70 @@ def test_chat_status_and_rev(server, nano):
     assert call(server, "/tok/api/rev")[1]["revision"] == state(server)["revision"]
     s.set_travelers(3)
     assert call(server, "/tok/api/rev")[1]["revision"] > 0
+
+
+def test_version_endpoint_and_fingerprint(server):
+    code, v = call(server, "/tok/api/version")
+    assert code == 200 and v["version"] == web.CODE_VERSION and len(web.CODE_VERSION) == 12
+    assert web.code_version() == web.CODE_VERSION
+
+
+def test_launch_restarts_stale_workbench(tmp_path, monkeypatch):
+    """后台还在跑旧代码的工作台（没有 version 接口）时，launch 要结束它并重新启动。"""
+    import os, signal, subprocess, sys, time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Old(BaseHTTPRequestHandler):               # 假装是旧版工作台：有 state，没有 version
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            ok = self.path.endswith("api/state")
+            self.send_response(200 if ok else 404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Old)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    victim = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "workbench.json").write_text(json.dumps({"pid": victim.pid, "url": f"http://127.0.0.1:{httpd.server_address[1]}/tok/"}))
+    spawned = []
+
+    class FakeProc:
+        pid = 4242
+
+        def poll(self):
+            return None
+
+    def fake_popen(cmd, **kw):
+        spawned.append(cmd)
+        (root / "workbench.url").write_text("http://127.0.0.1:1/newtok/")
+        return FakeProc()
+
+    monkeypatch.setattr(web.subprocess, "Popen", fake_popen)
+    try:
+        out = web.launch(root)
+        assert victim.wait(timeout=5) is not None                    # 旧进程被结束
+        assert spawned and "newtok" in out and "已启动" in out
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        if victim.poll() is None:
+            victim.kill()
+
+
+def test_launch_keeps_current_version(tmp_path, monkeypatch, server):
+    import subprocess, sys
+    root = tmp_path / "root2"
+    root.mkdir()
+    keep = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        (root / "workbench.json").write_text(json.dumps({"pid": keep.pid, "url": server + "/tok/"}))
+        monkeypatch.setattr(web.subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(AssertionError("不应重启")))
+        out = web.launch(root)
+        assert "已在运行" in out and keep.poll() is None
+    finally:
+        keep.kill()
