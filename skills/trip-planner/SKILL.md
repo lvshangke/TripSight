@@ -31,7 +31,7 @@ always: true
 
 ## 工具一览
 
-new_trip / set_provider / list_trips / switch_trip / archive_trip / record_review / record_actual_cost / show_review / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
+new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip / archive_trip / record_review / record_actual_cost / show_review / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
 
 ## 长期偏好（跨行程、跨会话）
 - 用户**明确**说出长期偏好时（“我不爱走路”“我一般喜欢地铁”“以后住宿别超过400”“我不吃辣”），调用 `remember_preference`，并用一句话告诉用户记了什么、可以随时让你忘掉。value 只能用工具说明里列出的键，不确定就只写 text。
@@ -168,3 +168,8 @@ new_trip / set_provider / list_trips / switch_trip / archive_trip / record_revie
 - 目的地在境外（含港澳台）时，创建行程后用 `set_provider("google")`；国内行程不用管，默认高德。用户说“这个行程用高德/Google”也用它。
 - 工具返回里出现“数据可能不全”的提醒时，原样转告用户，并建议检查对应的 key（国内 AMAP_KEY，境外 GOOGLE_MAPS_KEY）。
 - 天气始终只用 `get_weather`；高德专属地图只支持国内行程，境外的链接是 Google Maps 网页链接。
+
+## 日期与网页工作台
+- 用户要改日期 → `set_dates(start_date, end_date)`（清除日期两个都不填）。改前说清影响：天数变了需要重新 `schedule_days`，旧天气作废。
+- 用户想拖动调整行程、点选日期 → `open_workbench`，把返回的网址告诉用户在这台电脑的浏览器里打开（带一次性令牌，不要转发）。
+- 用户在页面里改完后，你下次读行程就是新版本；不要拿旧的结果去回答。

@@ -1,0 +1,323 @@
+"""本机网页工作台：拖拽调整每天的景点、月历选日期，所有修改走现有的“提案 → 套用 → 撤销”。
+
+安全：只监听 127.0.0.1；网址里带一次性随机令牌，没有令牌一律 404；检查 Host 和 Origin，防止别的网站偷偷调用；
+修改请求必须带页面加载时的版本号，版本变了（agent 或别处改过）就拒绝，不会覆盖别人的修改。
+网页不直接写文件：每次修改都是 commit（可 undo），并且和 agent 共用同一份行程文件。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import secrets
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+from datetime import date
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Optional
+from urllib.parse import urlparse
+
+from pydantic import TypeAdapter, ValidationError
+
+from . import mcp_server as ms
+from .dates import apply_dates
+from .mapview import build_map_data
+from .models import Trip
+from .proposals import (InvalidOperationError, LockedItemError, Op, StaleProposalError, apply_proposal,
+                        describe_ops, make_proposal)
+from .proposals import Proposal
+from .state import NothingToUndo, undo as state_undo
+from .validator import validate
+from .webpage import page_html
+
+_OPS = TypeAdapter(list[Op])
+MAX_BODY = 100_000
+IDLE_SECONDS = 2 * 3600
+_lock = threading.Lock()
+
+
+class HttpError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status, self.message = status, message
+
+
+def _issue_keys(trip: Trip) -> dict[tuple, str]:
+    return {(i.code, i.day_index, i.place_id): f"{'第%d天：' % (i.day_index + 1) if i.day_index is not None else ''}{i.message}"
+            for i in validate(trip) if i.severity in ("error", "warning")}
+
+
+def _check_rev(body: dict, trip: Trip) -> None:
+    if body.get("base_revision") != trip.revision:
+        raise HttpError(409, "行程已经被别处修改过（版本变了），页面已刷新，请重新操作。")
+
+
+def snapshot() -> dict[str, Any]:
+    trip = ms._load()
+    mp = build_map_data(trip)
+    times: dict[int, list[str]] = {}
+    for d in mp["days"]:
+        stops = [e for e in d["timeline"] if e["type"] == "stop"]
+        times[d["index"]] = [f"{s['arrive']}–{s['leave']}" for s in stops]
+    days, placed = [], set()
+    if trip.plan:
+        colors = {d["index"]: d["color"] for d in mp["days"]}
+        for day in trip.plan.days:
+            ts = times.get(day.index, [])
+            ts = ts if len(ts) == len(day.items) else [""] * len(day.items)
+            dt = trip.day_date(day.index)
+            items = []
+            for it, tm in zip(day.items, ts):
+                placed.add(it.place_id)
+                items.append({"place_id": it.place_id, "name": trip.place(it.place_id).name, "locked": it.locked, "time": tm})
+            days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {dt.isoformat()}" if dt else ""),
+                         "color": colors.get(day.index, "#4363d8"), "items": items})
+    reasons = {u.place_id: u.reason for u in (trip.plan.unscheduled if trip.plan else [])}
+    unscheduled = [{"place_id": p.id, "name": p.name, "reason": reasons.get(p.id, "")}
+                   for p in trip.places if p.id not in placed and p.status.value in ("shortlist", "planned", "confirmed")]
+    m = trip.meta
+    return {"title": m.name, "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+            "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
+                      "mode": m.date_mode.value, "num_days": m.num_days},
+            "map": mp}
+
+
+def preview(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    try:
+        ops = _OPS.validate_python(body.get("ops"))
+    except ValidationError:
+        raise HttpError(400, "操作格式不对。")
+    if not ops:
+        raise HttpError(400, "没有操作。")
+    prop = make_proposal(trip, "网页工作台调整", ops, created_by="user")
+    try:
+        lines = describe_ops(trip, prop)
+        new = apply_proposal(trip, prop)
+    except (KeyError, LockedItemError, InvalidOperationError, StaleProposalError) as e:
+        raise HttpError(400, f"这个改动不能做：{e}")
+    before, after = _issue_keys(trip), _issue_keys(new)
+    store = ms._load_proposals()
+    store[prop.id] = {"proposal": prop.model_dump(mode="json"), "confirm_code": secrets.token_hex(8)}   # 确认码不给任何人看：网页点“确认”才是用户确认
+    ms._save_proposals(store)
+    return {"proposal_id": prop.id, "changes": lines, "new_issues": [m for k, m in after.items() if k not in before]}
+
+
+def apply(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    store = ms._load_proposals()
+    entry = store.get(body.get("proposal_id"))
+    if not entry:
+        raise HttpError(404, "找不到这条预览（可能已过期），请重新操作。")
+    prop = Proposal.model_validate(entry["proposal"])
+    try:
+        new = apply_proposal(trip, prop)
+    except (StaleProposalError, LockedItemError, InvalidOperationError, KeyError) as e:
+        raise HttpError(400, f"套用失败：{e}")
+    ms._save(new)
+    ms._save_proposals({})
+    return {"revision": new.revision}
+
+
+def undo(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    try:
+        new = state_undo(trip)
+    except NothingToUndo as e:
+        raise HttpError(400, str(e))
+    ms._save(new)
+    ms._save_proposals({})
+    return {"revision": new.revision}
+
+
+def dates(body: dict) -> dict[str, Any]:
+    trip = ms._load()
+    _check_rev(body, trip)
+    try:
+        sd = date.fromisoformat(body["start"]) if body.get("start") else None
+        ed = date.fromisoformat(body["end"]) if body.get("end") else None
+        new, notes = apply_dates(trip, sd, ed)
+    except (ValueError, TypeError) as e:
+        raise HttpError(400, str(e))
+    ms._save(new)
+    ms._save_proposals({})
+    head = "已清除日期。" if sd is None else f"已把日期设为 {sd.isoformat()} 至 {ed.isoformat()}（共 {new.meta.num_days} 天）。"
+    return {"revision": new.revision, "message": head + "".join(notes)}
+
+
+ROUTES_GET = {"state": lambda: snapshot()}
+ROUTES_POST = {"preview": preview, "apply": apply, "undo": undo, "dates": dates}
+
+
+def make_handler(token: str, state: dict):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "TripSight"
+
+        def log_message(self, *a):          # 不往终端打日志（网址里有令牌）
+            pass
+
+        def _send(self, status: int, body: bytes, ctype: str) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _json(self, status: int, obj: Any) -> None:
+            self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+        def _guard(self) -> Optional[str]:
+            """返回令牌之后的子路径；不合法返回 None（调用方回 404/403）。"""
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+            if host not in ("127.0.0.1", "localhost"):
+                self._json(403, {"error": "forbidden"})
+                return None
+            origin = self.headers.get("Origin")
+            if origin and urlparse(origin).hostname not in ("127.0.0.1", "localhost"):
+                self._json(403, {"error": "forbidden"})
+                return None
+            parts = urlparse(self.path).path.split("/", 2)       # ['', token, rest]
+            if len(parts) < 2 or not secrets.compare_digest(parts[1], token):
+                self._json(404, {"error": "not found"})
+                return None
+            state["last"] = time.time()
+            return parts[2] if len(parts) > 2 else ""
+
+        def do_GET(self) -> None:
+            rest = self._guard()
+            if rest is None:
+                return
+            if rest == "":
+                self._send(200, page_html().encode("utf-8"), "text/html; charset=utf-8")
+            elif rest.startswith("api/") and rest[4:] in ROUTES_GET:
+                self._run(ROUTES_GET[rest[4:]])
+            else:
+                self._json(404, {"error": "not found"})
+
+        def do_POST(self) -> None:
+            rest = self._guard()
+            if rest is None:
+                return
+            if not rest.startswith("api/") or rest[4:] not in ROUTES_POST:
+                self._json(404, {"error": "not found"})
+                return
+            if "application/json" not in (self.headers.get("Content-Type") or ""):
+                self._json(415, {"error": "需要 JSON"})
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = -1
+            if not 0 <= n <= MAX_BODY:
+                self._json(413, {"error": "请求太大"})
+                return
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}")
+                if not isinstance(body, dict):
+                    raise ValueError
+            except ValueError:
+                self._json(400, {"error": "JSON 格式不对"})
+                return
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=True)
+
+        def _run(self, fn, write: bool = False) -> None:
+            try:
+                if write:
+                    with _lock:
+                        out = fn()
+                else:
+                    out = fn()
+            except HttpError as e:
+                self._json(e.status, {"error": e.message})
+            except ms.ToolError as e:
+                self._json(400, {"error": str(e)})
+            except Exception as e:                           # 不把内部细节（路径等）发给页面
+                self._json(500, {"error": f"内部错误：{type(e).__name__}"})
+            else:
+                self._json(200, out)
+
+    return Handler
+
+
+def serve(port: int = 0, url_file: Optional[str] = None, open_browser: bool = False,
+          idle_seconds: float = IDLE_SECONDS) -> int:
+    token = secrets.token_urlsafe(16)
+    state = {"last": time.time()}
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(token, state))
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/{token}/"
+    if url_file:
+        tmp = Path(url_file + ".tmp")
+        tmp.write_text(url, encoding="utf-8")
+        tmp.replace(url_file)
+    else:
+        print(url, flush=True)
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+
+    def watchdog() -> None:
+        while True:
+            time.sleep(min(30, max(idle_seconds / 4, 0.05)))
+            if time.time() - state["last"] > idle_seconds:
+                httpd.shutdown()
+                return
+
+    threading.Thread(target=watchdog, daemon=True).start()
+    try:
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()
+    return 0
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def launch(root: Path) -> str:
+    """在后台启动工作台并返回说明（含网址）。已经在跑就复用同一个网址。"""
+    root.mkdir(parents=True, exist_ok=True)
+    info = root / "workbench.json"
+    try:
+        cur = json.loads(info.read_text(encoding="utf-8"))
+        if _alive(int(cur["pid"])):
+            with urllib.request.urlopen(cur["url"] + "api/state", timeout=2):
+                pass
+            return _msg(cur["url"], reused=True)
+    except Exception:
+        pass
+    url_file = root / "workbench.url"
+    url_file.unlink(missing_ok=True)
+    proc = subprocess.Popen([sys.executable, "-m", "tripcore", "web", "--url-file", str(url_file), "--open"],
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            start_new_session=True, env=os.environ.copy())
+    for _ in range(80):
+        if url_file.exists():
+            url = url_file.read_text(encoding="utf-8").strip()
+            info.write_text(json.dumps({"pid": proc.pid, "url": url}), encoding="utf-8")
+            url_file.unlink(missing_ok=True)
+            return _msg(url, reused=False)
+        if proc.poll() is not None:
+            break
+        time.sleep(0.1)
+    raise RuntimeError("工作台没能启动，请在终端运行 python -m tripcore web 看具体报错。")
+
+
+def _msg(url: str, reused: bool) -> str:
+    return (f"工作台{'已在运行' if reused else '已启动'}：{url}\n"
+            "在这台电脑的浏览器里打开（刚启动时会自动打开）。网址带一次性令牌，只在本机有效，不要转发给别人；空闲 2 小时自动退出。\n"
+            "页面里：拖动景点调整顺序或跨天移动（松手后先预览，点“确认”才生效），月历选日期，右上角可以撤销。")

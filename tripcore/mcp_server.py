@@ -39,6 +39,7 @@ from . import workspace as _ws
 from .gmaps import GoogleMapsClient
 from .region import BACKENDS, pick_backend, trip_region
 from . import review as _rv
+from .dates import apply_dates as _apply_dates
 from .textview import build_text as _build_text, guard_text as _guard_text
 from .checklist import build_checklist as _build_checklist, render as _render_checklist
 from .metrics import intercity_hint
@@ -1645,6 +1646,35 @@ def archive_trip(name: str) -> str:
     return f"已归档「{name}」（文件移到了 trips/_archive/{dest.name}，没有删除）。"
 
 
+def set_dates(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
+    """修改（或清除）行程的确定日期，格式 YYYY-MM-DD；开始和结束要一起填，都不填表示清除日期。
+    天数会按日期重新计算，但已排好的分天不会自动改，需要再 schedule_days；旧的天气快照会作废。
+    这会改变行程，只能在用户明确要求并说清影响之后调用；可以 undo。"""
+    trip = _load()
+    sd = _parse_date(start_date or None, "start_date")
+    ed = _parse_date(end_date or None, "end_date")
+    try:
+        new, notes = _apply_dates(trip, sd, ed)
+    except ValueError as e:
+        raise ToolError(str(e))
+    _save(new)
+    _save_proposals({})
+    head = "已清除日期。" if sd is None else f"已把日期设为 {sd.isoformat()} 至 {ed.isoformat()}（共 {new.meta.num_days} 天）。"
+    return head + ("\n" + "\n".join(notes) if notes else "")
+
+
+def open_workbench() -> str:
+    """打开本机网页工作台（拖拽调整每天的景点顺序/跨天移动，月历选日期，带校验预览和撤销）。
+    返回网址，让用户在这台电脑的浏览器里打开；网址带一次性令牌，只在本机有效，不要转发给别人。
+    服务空闲 2 小时自动退出。用户要求“打开工作台/想拖一下行程/想点选日期”时调用。"""
+    _load()
+    from .web import launch
+    try:
+        return launch(_root_dir())
+    except RuntimeError as e:
+        raise ToolError(str(e))
+
+
 def set_provider(provider: str) -> str:
     """设置当前行程用哪个地图后端：amap（高德）、google（Google Maps）或 auto（自动：国内高德、境外 Google）。
     境外行程建议创建后马上设为 google（需要环境变量 GOOGLE_MAPS_KEY）。只在用户要求或创建境外行程时调用。"""
@@ -2063,7 +2093,7 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
-    set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
 ]
 

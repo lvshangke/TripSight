@@ -151,7 +151,7 @@ DESIGN.md          设计原则、算法说明、已知局限、后续计划
 
 ## MCP 服务（第 1 步）
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 49 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 51 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
 
@@ -254,3 +254,8 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 查询机票/火车票/酒店价格使用飞猪 `flyai` 命令行，技能 `flyai-search` 限制为只读（只用 `search-flight`/`search-train`/`search-hotel`，不预订，不安装，不配置 key，价格标来源和日期；酒店坐标一律由高德查，不用 FlyAI 的）。
 
+## 网页工作台（本机）
+`python -m tripcore web`（或对 agent 说“打开工作台”，调用 `open_workbench`）在本机启动一个网页：按天拖动景点调整顺序或跨天移动、月历点选日期、一键撤销。
+松手后先显示“改前 → 改后”和新增的校验问题，点“确认”才生效；所有修改走现有的提案/版本/撤销机制，和 agent 共用同一份行程文件。
+只监听 127.0.0.1，网址带一次性令牌并检查 Host/Origin；提交时带版本号，行程被别处改过就拒绝；空闲 2 小时自动退出。只能在这台电脑上用，手机请用文字/HTML 分享。
+`set_dates` 工具可以修改或清除日期（天数按日期重算，不自动改已排好的分天）。

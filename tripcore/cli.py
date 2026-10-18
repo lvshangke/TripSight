@@ -163,6 +163,11 @@ def _cmd_geocode(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_web(args: argparse.Namespace) -> int:
+    from .web import serve
+    return serve(port=args.port, url_file=args.url_file, open_browser=args.open, idle_seconds=args.idle_minutes * 60)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tripcore", description="旅行规划核心（里程碑 1：无 AI、无界面）")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -190,6 +195,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("query")
     p.add_argument("--city")
     p.set_defaults(func=_cmd_geocode)
+
+    p = sub.add_parser("web", help="启动本机网页工作台（拖拽调整行程、月历选日期）")
+    p.add_argument("--port", type=int, default=0, help="端口，默认随机")
+    p.add_argument("--url-file", help="把网址写到这个文件（供程序读取）")
+    p.add_argument("--open", action="store_true", help="启动后自动用浏览器打开")
+    p.add_argument("--idle-minutes", type=float, default=120, help="空闲多久自动退出")
+    p.set_defaults(func=_cmd_web)
 
     args = parser.parse_args(argv)
     return args.func(args)
