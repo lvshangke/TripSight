@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
+from .mealgaps import meal_gaps
 from .metrics import day_stats
 from .models import DateMode, Trip
 from .validator import validate
@@ -40,6 +41,10 @@ def build_checklist(trip: Trip, today: Optional[date] = None) -> list[Item]:
         missing = [n + 1 for n in range(trip.meta.num_days - 1) if trip.lodging_for_day(n) is None]
         if missing:
             out.append(Item("warning", "住宿", f"第 {'、'.join(map(str, missing))} 晚还没有选定住宿。"))
+
+    # 用餐：游览时段覆盖了饭点但还没选餐厅
+    for idx, names in sorted(meal_gaps(trip).items()):
+        out.append(Item("info", "用餐", f"第 {idx + 1} 天还没安排{'、'.join(names)}（用 suggest_food 在附近找，或 find_food 找指定的店）。"))
 
     # 大交通
     for label, c in (("到达", trip.arrival), ("离开", trip.departure)):

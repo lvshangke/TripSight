@@ -32,6 +32,15 @@ python -m tripcore web --open  # open the local web workbench
 python -m pytest -q            # run the tests
 ```
 
+**Docker (optional, not yet verified in a real environment):** the `Dockerfile` runs the CLI and the MCP server. The web workbench deliberately listens on 127.0.0.1 only, so it is not part of the image — run `python -m tripcore web` on your machine.
+
+```bash
+docker build -t tripsight .
+docker run --rm tripsight python -m tripcore demo
+# as an MCP server over stdio, trip data kept in ./data on your machine:
+docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight
+```
+
 To use it through chat, follow [docs/SETUP.md](docs/SETUP.md) (written in Chinese) to connect nanobot. Keep Amap / Google keys in your own local configuration only; never commit them.
 
 ## Architecture

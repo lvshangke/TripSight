@@ -31,8 +31,8 @@ from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .gpx import build_gpx
 from .mapview import build_map_data, build_map_html, day_marker_links
-from .lodging import rank_lodgings, suggest_stay_area
-from .metrics import day_stats, estimate_cost, leg_key, leg_mode
+from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
+from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
 from . import prefs as _prefs
 from . import workspace as _ws
@@ -1700,7 +1700,9 @@ def set_provider(provider: str) -> str:
 
 
 def suggest_lodging() -> dict[str, Any]:
-    """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。"""
+    """推荐住宿区域，并把候选住宿按通勤排序（时间为估算值）。
+    segments 是按每晚/每段给的推荐：景点分布在不同区域或城市时会分成几段（建议中途换酒店），每段给出中心坐标、
+    search_near（搜酒店时用“某某附近”）和相关景点；有 segments 时优先按它去搜酒店，再 add_lodging / set_stays。"""
     trip = _load()
     area = suggest_stay_area(trip)
     return {
@@ -1714,6 +1716,20 @@ def suggest_lodging() -> dict[str, Any]:
             for r in rank_lodgings(trip)
         ],
         "chosen_lodging_id": trip.chosen_lodging_id,
+        "segments": [
+            {"nights": f"第{g.from_night + 1}–{g.to_night + 1}晚" if g.to_night > g.from_night else f"第{g.from_night + 1}晚",
+             "from_night": g.from_night + 1, "to_night": g.to_night + 1,
+             "center": {"lat": round(g.lat, 5), "lon": round(g.lon, 5)}, "radius_km": g.radius_km,
+             "search_near": g.near_place, "related_places": g.place_names,
+             "avg_minutes_to_places": g.avg_minutes_to_places,
+             "current_lodging": (lambda l: None if l is None else l.name)(trip.lodging_for_day(g.from_night))}
+            for g in suggest_stay_segments(trip)
+        ],
+        "day_trips": [
+            {"day": d + 1, "places": names, "km_from_main_area": km,
+             "note": "按一日游处理，酒店仍建议住主区域；如果打算当晚住在那边，请告诉我再重算"}
+            for d, (names, km) in sorted(day_trips(trip).items())
+        ],
     }
 
 
@@ -1898,6 +1914,10 @@ def _render(trip: Trip) -> str:
         total = c.tickets * n + food + c.lodging + fare
         out.append(f"按 {n} 人估算：门票 {c.tickets * n:.0f} + 已选餐厅 {food:.0f} + 大交通 {fare:.0f} + 住宿 {c.lodging:.0f}（按整间/整晚价，未乘人数）"
                    f" = 约 {total:.0f} {m.currency}（未含交通和未选的餐食，均为参考值）")
+    if any(b.tickets or b.meals for b in day_budgets(trip)):
+        out.append("按天（门票 + 已选餐厅，按 " + f"{n} 人）：" + "；".join(
+            f"第{b.index + 1}天 门票 {b.tickets:.0f}" + (f" + 餐饮 {b.meals:.0f}" if b.meals_chosen else "（餐饮未选）")
+            for b in day_budgets(trip)))
     hint = _stay_hint(trip)
     if hint:
         out.append("💡 " + hint)

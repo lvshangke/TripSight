@@ -16,6 +16,7 @@ always: true
 2. `new_trip`（务必填 city）→ 用 `lookup_coords` 查坐标 → `add_place`。
 3. `schedule_days` 分天 → `check_plan` 看问题，把 error / warning 用大白话告诉用户。
 4. 景点基本定了，再谈**住宿**：先 `suggest_lodging` 说推荐住哪一带；有具体酒店候选时用 `add_lodging`。住宿价格只用用户提供的，不要自己报价。
+   - `suggest_lodging` 返回的 `segments` 是按每晚/每段的推荐：景点分在不同区域或城市时会分成几段（建议中途换酒店）。搜酒店时用每段的 `search_near`（“某某附近”）和 `center`，把各段的候选分别给用户对比；用户选定后用 `add_lodging`，分段住用 `set_stays`。区域只是依据景点位置算的建议，不是酒店推荐，价格仍只用用户提供的。
    长途旅行（≥4天）若 show_trip / check_plan 出现“💡 住宿建议”，把这条提示转述给用户并问是否分段住；用户同意并给出各段酒店后，先 `add_lodging` 添加，再用 `set_stays`（天数从 1 起），随后 `schedule_days`、`refine_routes`。不要自己改动行程或擅自换酒店，也不要在用户没确认前调用 set_stays。
 5. 任何调整都走**提案**（见下）。
 
@@ -82,6 +83,7 @@ new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip 
 ## 沿途美食
 
 - 用户想吃饭或问“附近有什么吃的”时：调用 `suggest_food(day, after_place_id)`（可加 keyword，如“面食”“清真”），把候选（名称、评分、人均、营业时间、距离）原样展示给用户，由用户挑选。
+- `final_check` 或页面里提示“第 N 天还没安排午餐/晚餐”时，主动问用户要不要找；用户说“找第 N 天的午餐/晚餐”就按上面的流程对该天游览中间或最后的景点调用 `suggest_food`，让用户选。这只是提醒，用餐点不占景点容量。
 - 评分和人均是高德参考值，不是实时价格，要这样告诉用户；营业时间为空就说“待核实”。
 - 用户明确选定后才调用 `choose_food(candidate_id)`；不要替用户挑，也不要自己编餐厅或价格。取消用 `remove_food`。
 - 用餐点不占景点容量；`show_trip` 里会显示，并给出已选餐厅的人均参考合计（没乘人数，不计入粗略费用）。

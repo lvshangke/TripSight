@@ -150,3 +150,26 @@ def estimate_cost(trip: Trip) -> CostEstimate:
             nights += 1
             lodging_cost += lod.price_mid
     return CostEstimate(tickets=tickets, lodging=lodging_cost, nights=nights)
+
+
+@dataclass
+class DayBudget:
+    index: int
+    tickets: float        # 当天景点门票（按人数）
+    meals: float          # 当天已选餐厅的人均参考（按人数）；没选餐厅就是 0
+    meals_chosen: int
+
+
+def day_budgets(trip: Trip) -> list[DayBudget]:
+    """按天的费用明细（门票 + 已选餐厅，均按 trip.meta.travelers 乘人数）。住宿和大交通按整个行程算，不分到天。
+    没选的餐食、市内交通不在里面（没有可靠数据，不估）。"""
+    n = trip.meta.travelers
+    out: list[DayBudget] = []
+    if trip.plan is None:
+        return out
+    for day in trip.plan.days:
+        tickets = sum(trip.place(it.place_id).ticket_price for it in day.items) * n
+        chosen = [m for m in trip.meals if m.day == day.index]
+        meals = sum(m.cost_per_person or 0 for m in chosen) * n
+        out.append(DayBudget(day.index, tickets, meals, len(chosen)))
+    return out

@@ -10,6 +10,7 @@ from tripcore.mcp_server import TOOLS
 SKILL = Path(__file__).resolve().parent.parent / "skills" / "trip-planner" / "SKILL.md"
 # skill 里出现的、不是 tripcore 工具的 snake_case 名字（返回字段、外部工具、数据字段等）
 NOT_TOOLS = {
+    "search_near",
     "web_search", "web_fetch", "confirm_code", "cost_reference", "opentime_week", "web_links",
     "closed_weekdays", "hours_source", "opening_hours", "reservation_required", "ticket_price",
     "terminal_name", "per_day", "user_food_preferences", "walk_max_min", "prefer_subway", "max_transfers",

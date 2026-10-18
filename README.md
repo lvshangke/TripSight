@@ -32,6 +32,15 @@ python -m tripcore web --open # 打开本机网页工作台
 python -m pytest -q           # 运行测试
 ```
 
+**Docker（可选，尚未在真实环境验证）**：仓库带有 `Dockerfile`，用于跑命令行和 MCP 服务；网页工作台只监听本机 127.0.0.1，不放进容器。
+
+```bash
+docker build -t tripsight .
+docker run --rm tripsight python -m tripcore demo
+# 作为 MCP 服务（stdio），行程数据存在本机 ./data：
+docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight
+```
+
 要在聊天里使用，请按 [docs/SETUP.md](docs/SETUP.md) 接入 nanobot。高德/Google key 只放在你自己本机的配置里，不要提交到仓库。
 
 > 下面的“第一次运行”等章节是更详细的参考文档，部分描述写于早期里程碑，具体以 `DESIGN.md` 和各 MCP 工具的说明为准。
