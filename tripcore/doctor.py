@@ -98,7 +98,7 @@ def check_skills() -> list[Check]:
     out = []
     src = REPO / "skills"
     if not src.is_dir():
-        return [Check("技能", WARN, "仓库里没有 skills 目录")]
+        return [Check("技能", WARN, "找不到 skills 目录（pip 安装的包里不含技能）", "在源码目录里运行：git clone 后 pip install -e .，再 python scripts/install_skills.py")]
     import filecmp
 
     for s in sorted(p for p in src.iterdir() if (p / "SKILL.md").is_file()):

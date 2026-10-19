@@ -12,7 +12,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-370%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
 <img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
@@ -44,7 +44,7 @@ TripSight 把这些问题拆开来解决：
 
 它不是又一个“一键生成攻略”的模板，而是一个**能反复调整、每一步都可核对**的行程工作台。
 
-> ✅ 高德路线、营业时间、坐标核实等功能，作者已使用真实高德 key 测试，可用。Google Maps、微信渠道等其他接入目前主要用假服务做了自动化测试（370 个），真实环境验证有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
+> ✅ 高德路线、营业时间、坐标核实等功能，作者已使用真实高德 key 测试，可用。Google Maps、微信渠道等其他接入目前主要用假服务做了自动化测试（375 个），真实环境验证有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
 
 ## 💡 为什么是 TripSight
 
@@ -94,7 +94,7 @@ TripSight 把这些问题拆开来解决：
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、370 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、375 个自动化测试 |
 
 ---
 
@@ -168,12 +168,15 @@ TripSight 把这些问题拆开来解决：
 
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+./setup.sh                     # 一键：虚拟环境 + 安装 + 检查 nanobot + 登记 + 安装技能 + 自检（改 nanobot 配置前会先让你确认）
 
-python -m tripcore doctor      # 自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）
-python -m tripcore demo        # 用示例数据完整演示一遍
-python -m tripcore web --open  # 打开本机网页工作台
+# 或者手动：
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"        # 装好后有 tripcore、tripcore-mcp 两个命令
+
+tripcore doctor                # 自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）
+tripcore demo                  # 用示例数据完整演示一遍
+tripcore web --open            # 打开本机网页工作台
 python -m pytest -q            # 运行测试
 ```
 
@@ -314,7 +317,9 @@ tripcore/
 ├── mcp_server.py   MCP 服务（52 个工具）
 └── doctor.py cli.py    自检与命令行
 skills/             给聊天 Agent 的“说明书”（trip-planner、flyai-search）
-scripts/            install_skills.py（把技能装进 nanobot）
+scripts/            install_skills.py（把技能装进 nanobot）、merge_nanobot_config.py（登记到 nanobot 配置，先预览）
+setup.sh            一键安装
+pyproject.toml      打包（pip install -e .）
 tests/              自动化测试（先看 test_scheduler.py，最容易读懂）
 examples/           示例数据
 docs/               SETUP.md（接入 nanobot）、images/
@@ -350,7 +355,7 @@ DESIGN.md           设计原则、算法说明
 
 ## 六、后续计划
 
-- **一键安装脚本**（类似 `setup.sh`）：自动安装 nanobot、合并配置、安装技能，最后跑 `doctor`。
+- **nanobot 的自动安装**：现在 `setup.sh` 只检查、不自动装 nanobot；是否内置其中一部分代码还在评估。
 - **住宿区域在地图上显示**，并改进相邻两天相距很远时的推荐中心。
 - **更完整的预算**：市内交通和未选餐食的估算、按天明细在网页里显示。
 - **更多真实环境验证**：Google Maps、微信渠道、Docker 镜像。

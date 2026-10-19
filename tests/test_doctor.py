@@ -53,3 +53,10 @@ def test_doctor_subcommand_registered(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("NANOBOT_SKILLS_DIR", str(tmp_path / "skills"))
     assert main(["doctor"]) in (0, 1)
     assert "自检" in capsys.readouterr().out
+
+
+def test_demo_without_examples_gives_friendly_message(monkeypatch, tmp_path, capsys):
+    from tripcore import cli
+    monkeypatch.setattr(cli, "_DEMO_FILE", tmp_path / "nope.json")
+    assert cli.main(["demo"]) == 1
+    assert "pip install -e ." in capsys.readouterr().out

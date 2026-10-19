@@ -107,6 +107,9 @@ def _cmd_plan(args: argparse.Namespace) -> int:
 
 
 def _cmd_demo(_: argparse.Namespace) -> int:
+    if not _DEMO_FILE.exists():
+        print("找不到示例数据 examples/beijing.json：它不在 pip 安装的包里。请在源码目录里运行（git clone 后 pip install -e .）。")
+        return 1
     trip = load_trip(_DEMO_FILE)
     print("（示例数据：坐标和闭馆日为近似值，仅用于演示）")
     # 第一次：没选住宿

@@ -11,7 +11,7 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-370%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
 
 <img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
@@ -43,7 +43,7 @@ TripSight attacks these one by one:
 
 It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
-> ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (370 automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
+> ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (375 automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
 
 ## 💡 Why TripSight
 
@@ -84,7 +84,7 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
 | **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
-| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 370 automated tests |
+| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 375 automated tests |
 
 ## 🔍 Feature details
 
@@ -107,12 +107,16 @@ Python 3.10 or newer is required.
 
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+./setup.sh                     # one step: venv + install + nanobot check + register + skills + self-check
+                               # (asks before touching your nanobot config; never installs nanobot or writes keys)
 
-python -m tripcore doctor      # read-only self-check (never prints key values)
-python -m tripcore demo        # full demo on the sample data
-python -m tripcore web --open  # local web workbench
+# or manually:
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"        # provides the `tripcore` and `tripcore-mcp` commands
+
+tripcore doctor                # read-only self-check (never prints key values)
+tripcore demo                  # full demo on the sample data
+tripcore web --open            # local web workbench
 python -m pytest -q            # run the tests
 ```
 

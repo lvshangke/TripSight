@@ -6,13 +6,26 @@ tripcore 本身是一个 MCP 服务（52 个工具）。要在聊天里使用它
 
 ## 1. 安装 tripcore
 
+**方式一：一键脚本（推荐）**
+
+```bash
+git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
+./setup.sh
+```
+
+脚本会：创建 `.venv` 并安装 → 检查 nanobot（没有就只提示怎么装，**不会自动安装**）→ 预览要写入 nanobot 配置的改动，**你确认后才写**（先备份成 `.bak`，不含任何 key）→ 安装技能 → 运行 `tripcore doctor`。它不会登录 flyai / rgh，也不会写入任何 key。
+
+**方式二：手动安装**
+
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m pytest -q          # 应全部通过
-python -m tripcore doctor    # 自检，缺什么会告诉你怎么补
+pip install -e ".[dev]"          # 装好后有 tripcore 和 tripcore-mcp 两个命令
+python -m pytest -q              # 应全部通过
+tripcore doctor                  # 自检，缺什么会告诉你怎么补
 ```
+
+只想用网页工作台和命令行的话，到这里就够了：`tripcore web --open`。
 
 ## 2. 申请高德 Web 服务 key
 
@@ -20,7 +33,7 @@ python -m tripcore doctor    # 自检，缺什么会告诉你怎么补
 
 ## 3. 把 tripcore 登记到 nanobot
 
-把 `nanobot/config.example.json` 里 `tools.mcpServers` 下的 `tripcore`（和可选的 `amap-maps`）合并进你自己的 `~/.nanobot/config.json`，把路径和 key 换成你自己的。重启 nanobot 后，应能看到 tripcore 的工具。
+可以运行 `python scripts/merge_nanobot_config.py` 预览改动、加 `--apply` 写入（先备份、不含 key、已有 tripcore 条目不覆盖）；也可以手动把 `nanobot/config.example.json` 里 `tools.mcpServers` 下的 `tripcore`（和可选的 `amap-maps`）合并进你自己的 `~/.nanobot/config.json`，把路径和 key 换成你自己的。重启 nanobot 后，应能看到 tripcore 的工具。
 
 ## 4. 安装 skill
 

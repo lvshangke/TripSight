@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tripsight"
+version = "0.1.0"
+description = "可靠的旅行行程规划 Agent：大模型提出修改，确定性代码排程、核查营业时间与路线、记版本并可撤销"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "pydantic>=2.5",
+    "mcp>=1.8,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+tripcore = "tripcore.cli:main"
+tripcore-mcp = "tripcore.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/lvshangke/TripSight"
+
+[tool.setuptools.packages.find]
+include = ["tripcore*"]
+
+[tool.setuptools.package-data]
+tripcore = ["assets/*"]
