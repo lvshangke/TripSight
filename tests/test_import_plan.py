@@ -183,3 +183,72 @@ def test_workbench_snapshot_exposes_intro_as_quoted_text(monkeypatch):
     x = snap["intros"][pid]
     assert x["text"].startswith("兵马俑：秦始皇陵的陪葬坑") and "他人说法" in x["source"] and x["day"] == 1
     assert "introHtml" in page_html() and "游记里怎么说" in page_html()
+
+
+# ---------------- 加入时带营业时间 / 补营业时间提示冲突 / 餐饮锚点 ----------------
+HARBIN = """第一天走的是city walk 路线
+1.早晨打车到红专街早市，逛吃逛喝，我最喜欢的是烤冷面和肉蛋堡。
+2.步行10分钟到中央大街，一定要吃马迭尔冰棍。
+3.坐公交一个小时去哈药六版画博物馆，主要是去拍照。
+4.哈药六版画博物馆出来去吃午饭，可以选铁锅炖，我们在出口右拐第一家吃的铁锅炖(店名忘了)，人均50。
+"""
+HPOS = {"红专街早市": (45.7620, 126.6480, "周一至周日 04:00-10:00"),
+        "中央大街": (45.7710, 126.6200, ""),
+        "哈药六版画博物馆": (45.7330, 126.5990, "周二至周日 09:00-17:00开放(16:30停止入馆),周一 不开放")}
+
+
+class HAmap:
+    def search_places(self, query, city=None, limit=5):
+        if query in HPOS:
+            la, lo, hrs = HPOS[query]
+            return [PlaceHit(name=query, lat=la, lon=lo, address="哈尔滨", opentime_week=hrs)]
+        return []
+
+
+def _harbin(monkeypatch):
+    s.new_trip(start_date="2026-11-17", end_date="2026-11-17", city="哈尔滨", name="哈尔滨")
+    monkeypatch.setattr(s, "_amap", lambda: HAmap())
+    s.submit_candidates(HARBIN, [
+        {"name": "中央大街", "kind": "attraction", "quote": "步行10分钟到中央大街"},
+        {"name": "红专街早市", "kind": "attraction", "quote": "早晨打车到红专街早市"},
+        {"name": "哈药六版画博物馆", "kind": "attraction", "quote": "坐公交一个小时去哈药六版画博物馆"},
+        {"name": "铁锅炖", "kind": "food", "quote": "出口右拐第一家吃的铁锅炖(店名忘了)", "clues": ["人均50"]},
+    ], source="哈尔滨游记")
+    return {c["name"]: c["id"] for c in s.list_candidates()}
+
+
+def test_adopt_records_amap_hours_so_first_schedule_respects_them(monkeypatch):
+    ids = _harbin(monkeypatch)
+    s.adopt_candidates([ids["中央大街"], ids["红专街早市"]])
+    t = s._load()
+    m = next(p for p in t.places if p.name == "红专街早市")
+    assert m.opening_hours == "周一至周日 04:00-10:00" and m.hours_source == "amap"
+    assert next(p for p in t.places if p.name == "中央大街").hours_source == ""            # 没有营业时间就不编
+    s.schedule_days()
+    order = [s._load().place(it.place_id).name for it in s._load().plan.days[0].items]
+    assert order == ["红专街早市", "中央大街"]                                        # 10 点关门的早市排在最前
+    assert not [i for i in s.check_plan()["issues"] if i["severity"] == "error"]
+
+
+def test_fill_hours_reports_conflicts_with_existing_plan(monkeypatch):
+    s.new_trip(start_date="2026-11-17", end_date="2026-11-17", city="哈尔滨", name="哈尔滨")
+    s.add_place("中央大街", 45.7710, 126.6200, duration_min=90)
+    s.add_place("红专街早市", 45.7620, 126.6480, duration_min=60)
+    s.schedule_days()
+    t = s._load()
+    names = [t.place(it.place_id).name for it in t.plan.days[0].items]
+    if names[0] != "中央大街":                                                       # 让早市排在后面，模拟“先分天后补营业时间”
+        pid = next(p.id for p in t.places if p.name == "中央大街")
+        r = s.propose_change("中央大街放前面", [{"kind": "move", "place_id": pid, "to_day": 0, "to_position": 0}])
+        s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    monkeypatch.setattr(s, "_amap", lambda: HAmap())
+    out = s.fill_hours()
+    assert "对不上" in out and "红专街早市" in out and "schedule_days" in out
+
+
+def test_food_candidate_gets_anchor_hint_for_suggest_food(monkeypatch):
+    ids = _harbin(monkeypatch)
+    out = s.adopt_candidates([ids["铁锅炖"], ids["哈药六版画博物馆"]])                 # 餐饮写在前面也一样找得到锚点
+    assert "铁锅炖：是餐饮类" in out and "suggest_food" in out and "哈药六版画博物馆" in out and "不一定是游记里那家" in out
+    pid = next(p.id for p in s._load().places if p.name == "哈药六版画博物馆")
+    assert pid in out

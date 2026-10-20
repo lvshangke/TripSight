@@ -137,6 +137,8 @@ new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip 
 - 提交后返回的每个景点候选带 `match`（代码已经查过地图）：`matched` 给用户看地图上的名字、地址和 `link`；`ambiguous` 把 `options` 里的同名地点列给用户，不要替他挑；`not_found` / `unchecked` 如实说明；再附上 `links`（去小红书等平台看这个景点，用户自己点开登录）。这些只是标注，景点还没加入。
 - 然后把候选清单（含原话出处）展示给用户，由用户挑选；用户没选之前不要加入行程。游记如果是一条顺路路线，候选的顺序就是原文的游览顺序，可以告诉用户，但分天仍由 `schedule_days` 决定。
 - 用户选定后调用 `adopt_candidates(ids)`：坐标由代码查地图，不歧义、不与已有景点重合才会加入。被拒绝的原因要如实转述，让用户决定（换更准确的名字，或自己指定）。餐饮类候选用 `find_food` / `choose_food`。
+  - `adopt_candidates` 会把地图这次返回的营业时间一并记下（来源 amap）。**顺序：先加入景点，没带上营业时间的再 `fill_hours`，最后才 `schedule_days`**，分完用 `check_plan` 看一遍；先分天后补营业时间，早市这类早关门的景点会被排到关门之后。`fill_hours` 如果提示现有行程对不上，如实告诉用户，征得同意再重新 `schedule_days`（已锁定的不动）。
+  - 餐饮类候选（尤其是游记没写店名、或高德搜不到这家店）**不要只问用户“到了再找吗”**：`adopt_candidates` 的返回会给出它在游记里排在哪个景点之后，用 `suggest_food(day, after_place_id, keyword="铁锅炖")` 在那个景点附近按关键词搜，把几家（评分、人均、距离）给用户选，选定后 `choose_food`。要说明这是“附近的同类餐厅，不一定是游记里那家”；游记里的人均价格只是对照用的线索。
 - 游记里的价格、营业时间、“建议上午去”只是待核实线索，不能当事实告诉用户或填进 `ticket_price`、`opening_hours`；营业时间用 `fill_hours` 向地图核实。
 - 用户不要的候选用 `drop_candidates` 放弃。
 - **游记分天怎样融合进我们的行程**（原文有“第N天/Day N”时，提交结果里有 `source_days`）：

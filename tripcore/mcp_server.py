@@ -649,6 +649,13 @@ def fill_hours() -> str:
     msg = f"已补充 {len(filled)} 个景点的营业时间（来源 amap）。"
     if missed:
         msg += "\n仍待核实：" + "；".join(missed)
+    if filled:
+        bad = [i.message for i in validate(_load()) if i.place_id in filled and i.severity in ("error", "warning")
+               and i.code in ("OUTSIDE_HOURS", "ARRIVE_BEFORE_OPEN", "LEAVE_AFTER_CLOSE")]
+        if bad:
+            msg += ("\n⚠ 补上营业时间后，现有行程有 " + str(len(bad)) + " 处对不上（这些景点是在没有营业时间时排的）：\n"
+                    + "\n".join("· " + b for b in bad)
+                    + "\n请如实告诉用户；征得同意后再 schedule_days 重排（已锁定的不会动）。")
     return msg + ("\n" + _render(_load()) if trip.plan else "")
 
 
@@ -2095,6 +2102,7 @@ def adopt_candidates(ids: list[str]) -> str:
         raise ToolError(f"没有这些候选：{'、'.join(missing)}")
     trip = _load()
     lines: list[str] = []
+    foods: list[tuple[int, dict[str, Any]]] = []
     for cid in ids:
         c = by_id[cid]
         if c["status"] == "added":
@@ -2102,6 +2110,8 @@ def adopt_candidates(ids: list[str]) -> str:
             continue
         if c["kind"] in ("food", "other"):
             lines.append(f"· {c['name']}：是{'餐饮' if c['kind'] == 'food' else '其他'}类，请用 find_food 搜店后 choose_food 安排，没有加入景点")
+            if c["kind"] == "food":
+                foods.append((len(lines) - 1, c))
             continue
         pick, why, hits = _resolve_name(c["name"])
         if pick is None:
@@ -2114,8 +2124,11 @@ def adopt_candidates(ids: list[str]) -> str:
             lines.append(f"· {c['name']}：没有加入——和已有景点「{near.name}」({near.id}) 重合或相距不到 300 米")
             continue
         clue = f"[游记线索，待核实：{'；'.join(c['clues'])}] " if c["clues"] else ""
+        hrs = pick.get("opentime_week") or pick.get("opentime_today") or ""       # 地图这次已经返回了营业时间，一并记下，分天时才知道几点关门
+        cl = _amap()
         msg = add_place(pick["name"], round(pick["lat"], 6), round(pick["lon"], 6), source=f"{c['source']}（{c['id']}）",
-                        notes=f"{clue}游记原话：{c['quote']}", category=pick.get("category") or "")
+                        notes=f"{clue}游记原话：{c['quote']}", category=pick.get("category") or "",
+                        opening_hours=hrs, hours_source=(("google" if _is_google(cl) else "amap") if hrs else ""))
         pid = msg.split("id=")[1].split(")")[0]
 
         def _tag(t: Trip, pid: str = pid, c: dict[str, Any] = c) -> None:
@@ -2128,6 +2141,17 @@ def adopt_candidates(ids: list[str]) -> str:
         c["status"], c["place_id"] = "added", pid
         lines.append(f"· {c['name']}：已加入（地图点：{pick['name']}，{pick.get('address') or ''}；{pid}）")
     _save_cands(items)
+    cur = _load()
+    for li, c in foods:                       # 餐饮：游记里它前面最近的那个已加入的景点，就是找店的锚点
+        prev = [x for x in items if x["source"] == c["source"] and x["status"] == "added" and x["order"] < c["order"] and x["place_id"]]
+        if not prev:
+            continue
+        a = max(prev, key=lambda x: x["order"])
+        day = next((d.index + 1 for d in (cur.plan.days if cur.plan else []) for it in d.items if it.place_id == a["place_id"]), None)
+        where = f"第 {day} 天" if day else "它所在的那天（先 schedule_days）"
+        lines[li] += (f"。游记里它排在「{a['name']}」({a['place_id']}) 之后：没有店名或高德搜不到时，用 suggest_food(day={day or '?'}, "
+                      f"after_place_id=\"{a['place_id']}\", keyword=\"餐饮类型，如铁锅炖\") 在那附近按关键词搜（{where}），"
+                      "把几家候选给用户选；它们是附近的同类餐厅，不一定是游记里那家，要如实说明")
     return "\n".join(lines) + "\n请再调用 schedule_days 重新分天（门票、时长、营业时间仍待核实，可用 fill_hours 补营业时间）。"
 
 
