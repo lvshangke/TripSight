@@ -30,7 +30,8 @@ from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
 from .geocode import GeocodeError, geocode as _geocode
 from .gpx import build_gpx
-from .mapview import build_map_data, build_map_html, day_marker_links
+from .mapview import build_map_data, build_map_html, day_marker_links, marker_link
+from . import importplan as _importplan
 from . import links as _links
 from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
 from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
@@ -1966,13 +1967,51 @@ def _save_cands(items: list[dict[str, Any]]) -> None:
     tmp.replace(p)
 
 
+MAX_PRECHECK = 30       # 提交游记时最多顺手查多少个地点（每个一次地图请求）
+
+
+def _guide_links(name: str) -> dict[str, str]:
+    try:
+        city = _load_context().get("city")
+    except Exception:
+        city = None
+    try:
+        return {x["name"]: x["url"] for x in _links.search_links(name, city, _links.GUIDE)}
+    except ValueError:
+        return {}
+
+
+def _precheck(trip: Optional[Trip], cand: dict[str, Any], budget: int) -> dict[str, Any]:
+    """提交游记时顺手查一下地图，只做标注（已匹配 / 有歧义 / 没找到），不加入行程。判断规则和 adopt_candidates 完全一样。"""
+    if cand["kind"] not in ("attraction", "area"):
+        return {"status": "n/a", "why": "餐饮/其他类不按景点查坐标"}
+    if _amap() is None:
+        return {"status": "unchecked", "why": "没有配置地图 key，加入时再查（只有 OpenStreetMap 结果不会自动采用）"}
+    if budget <= 0:
+        return {"status": "unchecked", "why": f"一次最多预查 {MAX_PRECHECK} 个，加入时再查"}
+    try:
+        pick, why, hits = _resolve_name(cand["name"])
+    except Exception as e:
+        return {"status": "unchecked", "why": f"预查失败：{e}"}
+    if pick is None:
+        return {"status": "ambiguous" if "多个同名" in why else "not_found", "why": why,
+                "options": [{"name": h["name"], "address": h.get("address") or ""} for h in hits[:3]]}
+    lat, lon = round(pick["lat"], 6), round(pick["lon"], 6)
+    return {"status": "matched", "name": pick["name"], "address": pick.get("address") or "", "lat": lat, "lon": lon,
+            "link": marker_link(pick["name"], lat, lon, trip_region(trip) if trip else "cn")}
+
+
 def submit_candidates(text: str, items: list[dict[str, Any]], source: str = "游记") -> dict[str, Any]:
-    """把用户粘贴的游记/攻略里提到的地点整理成候选清单（不加入行程，不查坐标）。
+    """把用户粘贴的游记/攻略里提到的地点整理成候选清单（不加入行程）。
     text：用户粘贴的原文，必须完整原样传入；source：给这篇游记起个简短名字。
-    items：每项 {name, kind, quote, clues}。name 是地点名；kind 是 attraction（景点）/area（街区、步道）/food（餐馆、小吃）/other；
-    quote 必须是原文里逐字摘录的一句话，且包含 name；clues 是原文里逐字摘录的价格、时间、建议等片段（没有就留空），
-    它们只是“待核实线索”。代码会核对 quote 和 clues 是否真在原文里，对不上的拒收，所以不要改写、不要补充原文没有的内容。
-    候选按它们在原文中出现的先后排序（游记若是一条顺路路线，这就是游览顺序）。之后由用户挑选，再调用 adopt_candidates。"""
+    items：每项 {name, kind, quote, passage, clues}。name 是地点名；kind 是 attraction（景点）/area（街区、步道）/food（餐馆、小吃）/other；
+    quote 必须是原文里逐字摘录的一句话，且包含 name；passage 是原文里讲这个地点的那一段（逐字摘录，包含 name，最多 300 字，
+    会作为景点的可展开介绍显示给用户；没有就不填，用 quote 代替）；clues 是原文里逐字摘录的价格、时间、建议等片段（没有就留空），
+    它们只是“待核实线索”。代码会核对 quote、passage 和 clues 是否真在原文里，对不上的拒收，所以不要改写、不要补充原文没有的内容。
+    候选按它们在原文中出现的先后排序（游记若是一条顺路路线，这就是游览顺序）。
+    原文里的“第N天 / Day N / D2”标记由代码识别，每个候选会带上它属于游记的第几天（day）。
+    有地图 key 时，代码会顺手查地图，给每个景点候选标注 match：matched（找到了，附地址和地图链接）/ ambiguous（有同名，需用户确认）/ not_found，
+    并附上去小红书等平台看攻略的跳转链接 links。这些只是标注，景点还没加入行程；之后由用户挑选，再调用 adopt_candidates。"""
     if not text.strip():
         raise ToolError("text 不能为空，请把用户粘贴的游记原文完整传入。")
     ok, rejected = _validate_items(text, items)
@@ -1985,20 +2024,30 @@ def submit_candidates(text: str, items: list[dict[str, Any]], source: str = "游
     have = [c["name"] for c in existing if c["status"] != "dropped"] + ([p.name for p in trip.places] if trip else [])
     added, dup = [], []
     n = max([int(c["id"][1:]) for c in existing] or [0])
+    budget = MAX_PRECHECK
     for e in ok:
         if any(_similar_name(e["name"], h) for h in have):
             dup.append(e["name"])
             continue
         n += 1
         cand = {"id": f"c{n}", "name": e["name"], "kind": e["kind"], "quote": e["quote"], "clues": e["clues"],
+                "passage": e["passage"], "day": e["day"],
                 "source": source, "order": e["order"], "status": "pending", "place_id": ""}
+        cand["match"] = _precheck(trip, cand, budget)
+        if cand["match"]["status"] in ("matched", "ambiguous", "not_found"):
+            budget -= 1
         existing.append(cand)
-        added.append({**cand, **({"dropped_clues": e["dropped_clues"]} if e.get("dropped_clues") else {})})
+        added.append({**cand, "links": _guide_links(cand["name"]) if cand["kind"] in ("attraction", "area") else {},
+                      **({"dropped_clues": e["dropped_clues"]} if e.get("dropped_clues") else {})})
         have.append(e["name"])
     _save_cands(existing)
+    days = sorted({c["day"] for c in added if c.get("day")})
     return {"added": added, "skipped_duplicates": dup, "rejected": rejected,
-            "note": "这些只是候选，还没加入行程。请把候选和原文出处展示给用户，由用户选择后再调用 adopt_candidates；"
-                    "clues 只是游记里的说法，价格和营业时间不要当作事实。"}
+            "source_days": days,
+            "note": "这些只是候选，还没加入行程。请把候选、原文出处和 match 结果展示给用户（matched 的给地图链接，ambiguous/not_found 如实说明），"
+                    "由用户选择后再调用 adopt_candidates；clues 只是游记里的说法，价格和营业时间不要当作事实。"
+                    + ("原文有分天（第 " + "、".join(map(str, days)) + " 天）：加入景点后，可用 compare_with_source 对照，"
+                       "用户明确要求“按游记原样排”时才用 follow_source_days。" if days else "")}
 
 
 def list_candidates(status: str = "pending") -> list[dict[str, Any]]:
@@ -2068,6 +2117,14 @@ def adopt_candidates(ids: list[str]) -> str:
         msg = add_place(pick["name"], round(pick["lat"], 6), round(pick["lon"], 6), source=f"{c['source']}（{c['id']}）",
                         notes=f"{clue}游记原话：{c['quote']}", category=pick.get("category") or "")
         pid = msg.split("id=")[1].split(")")[0]
+
+        def _tag(t: Trip, pid: str = pid, c: dict[str, Any] = c) -> None:
+            pl = t.place(pid)
+            pl.intro = c.get("passage") or c["quote"]            # 游记原文的逐字摘录，不是模型写的
+            pl.intro_source = f"游记《{c['source']}》（他人说法，未核实）"
+            pl.source_name, pl.source_day = c["source"], c.get("day")
+
+        _save(commit(_load(), _tag))
         c["status"], c["place_id"] = "added", pid
         lines.append(f"· {c['name']}：已加入（地图点：{pick['name']}，{pick.get('address') or ''}；{pid}）")
     _save_cands(items)
@@ -2144,6 +2201,35 @@ def add_route_place(name: str, waypoints: list[str], stay_per_stop_min: int = 15
     return (f"已添加路线型景点「{name}」(id={pid})，地图上匹配到的点：{listing}。请把这些点展示给用户核对。\n{len(wps)} 个途经点，步行约 {walk} 分钟，估算总时长 {duration} 分钟"
             f"（{'步行路线来自高德' if all(w.next_real for w in wps[:-1]) else '部分路段为直线估算'}）。请再 schedule_days。{warn}")
 
+def compare_with_source(source: str = "") -> dict[str, Any]:
+    """对照游记的分天和我们的行程（只读，不改任何东西）：游记第 N 天的景点，在我们的行程里落在哪一天、有没有被拆开，
+    拆开的原因（闭馆、相距太远，或排程为了整体路程更顺）。source 是游记名（submit_candidates 的 source），不填就看全部游记。
+    需要景点来自 adopt_candidates 且游记原文里有“第N天/Day N”标记。把结果如实告诉用户，由用户决定要不要调整。"""
+    res = _importplan.compare(_load(), source)
+    if not res:
+        raise ToolError("没有带分天信息的游记景点。要先用 submit_candidates 提交带“第N天/Day N”标记的游记，再 adopt_candidates 加入景点。")
+    return {"groups": res, "note": "这是对照，没有修改行程。想完全按游记的分天来排，需要用户明确说“按游记原样排”，再用 follow_source_days。"}
+
+
+def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) -> dict[str, Any]:
+    """照搬式：把游记第 N 天的景点放到我们的第 N 天（锁定），天内顺序由排程优化。只有用户明确说“按游记原样排 / 照这篇排”才能调用。
+    source：游记名。day_map：可选，游记天数 → 我们的天数，如 {"1": 2, "2": 3}（键用字符串）；不给就同号，超出我们天数的不放并列出来让用户选。
+    已被用户锁定的景点不动；去不了的（闭馆、营业时间对不上）照放，但列在 conflicts 里，要如实告诉用户由他决定。
+    结果里的 issues 是用我们自己的校验器核查出来的问题。这个操作是一个版本，可以 undo；放进去的景点是锁定状态，之后的 schedule_days 不会再动它们。"""
+    trip = _load()
+    try:
+        dm = {int(k): int(v) for k, v in (day_map or {}).items()}
+    except (TypeError, ValueError):
+        raise ToolError("day_map 的键和值都要是天数（整数），如 {\"1\": 2}。")
+    try:
+        new, report = _importplan.follow(trip, source, dm)
+    except ValueError as e:
+        raise ToolError(str(e))
+    _save(new)
+    return {"report": report, "plan": _render(new),
+            "note": "已按游记分天放置并锁定。conflicts 和 issues 请如实转述；不满意可以 undo。"}
+
+
 # ---------------------------------------------------------------------------
 # MCP 注册
 # ---------------------------------------------------------------------------
@@ -2152,7 +2238,7 @@ TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
-    submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place,
+    submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
 
 

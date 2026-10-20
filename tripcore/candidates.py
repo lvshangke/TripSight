@@ -10,6 +10,47 @@ import re
 from typing import Any, Optional
 
 KINDS = ("attraction", "area", "food", "other")
+MAX_PASSAGE = 300          # 展开介绍里最多放多少字原文
+
+
+_CN_NUM = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+# 分天标记：第N天 / 第N日 / DayN / D N（N 可以是阿拉伯数字或中文数字）
+_DAY_RE = re.compile(r"第([0-9]{1,2}|[一二两三四五六七八九十]{1,3})[天日]|(?<![A-Za-z0-9])(?:[Dd][Aa][Yy]|[Dd])\s*([0-9]{1,2})(?![0-9A-Za-z])")
+
+
+def _cn_to_int(s: str) -> Optional[int]:
+    if s.isdigit():
+        return int(s)
+    if s == "十":
+        return 10
+    if s.startswith("十") and len(s) == 2 and s[1] in _CN_NUM:
+        return 10 + _CN_NUM[s[1]]
+    if len(s) == 2 and s[0] in _CN_NUM and s[1] == "十":
+        return _CN_NUM[s[0]] * 10
+    if len(s) == 3 and s[0] in _CN_NUM and s[1] == "十" and s[2] in _CN_NUM:
+        return _CN_NUM[s[0]] * 10 + _CN_NUM[s[2]]
+    return _CN_NUM.get(s) if len(s) == 1 else None
+
+
+def day_markers(nt: str) -> list[tuple[int, int]]:
+    """在（已去掉空白的）原文里找分天标记，返回 [(位置, 第几天)]；由代码识别，不经过模型。"""
+    out = []
+    for m in _DAY_RE.finditer(nt):
+        n = _cn_to_int(m.group(1)) if m.group(1) else int(m.group(2))
+        if n and 1 <= n <= 30:
+            out.append((m.start(), n))
+    return out
+
+
+def day_of(markers: list[tuple[int, int]], pos: int) -> Optional[int]:
+    """pos 之前最近的一个分天标记；前面没有标记就是 None（这个地点不属于任何一天）。"""
+    day = None
+    for p, n in markers:
+        if p <= pos:
+            day = n
+        else:
+            break
+    return day
 
 
 def _norm(s: str) -> str:
@@ -22,6 +63,7 @@ def validate_items(text: str, items: list[dict[str, Any]]) -> tuple[list[dict[st
     ok: list[dict[str, Any]] = []
     rejected: list[dict[str, str]] = []
     seen: set[str] = set()
+    markers = day_markers(nt)
     for raw in items:
         name = _norm(str(raw.get("name", "")))
         quote = _norm(str(raw.get("quote", "")))
@@ -44,8 +86,16 @@ def validate_items(text: str, items: list[dict[str, Any]]) -> tuple[list[dict[st
         clues, bad = [], []
         for c in raw.get("clues") or []:
             (clues if _norm(str(c)) and _norm(str(c)) in nt else bad).append(str(c))
+        pos = nt.find(quote)
+        passage = str(raw.get("passage") or "").strip()
+        if passage and (_norm(passage) not in nt or name not in _norm(passage)):
+            rejected.append({"name": name, "reason": "passage 不在游记原文里，或没有包含名称（必须逐字摘录原文）"})
+            continue
+        passage = passage or str(raw.get("quote", "")).strip()          # 没给段落就用那句原话
+        if len(passage) > MAX_PASSAGE:
+            passage = passage[:MAX_PASSAGE].rstrip() + "…"
         entry = {"name": name, "kind": kind, "quote": str(raw.get("quote", "")).strip(), "clues": clues,
-                 "order": nt.find(quote)}
+                 "order": pos, "passage": passage, "day": day_of(markers, pos)}
         if bad:
             entry["dropped_clues"] = bad          # 不在原文里的线索，丢弃并告知模型
         seen.add(name)

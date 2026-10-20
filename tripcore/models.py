@@ -94,6 +94,10 @@ class Place(BaseModel):
     hours_source: str = Field(default="", description="营业时间的来源：amap / 官网网址 / user；空表示未核实")
     amap_id: str = Field(default="", description="高德 POI ID（生成高德专属地图时需要；由代码按名称+距离匹配，不由模型填写）")
     backups: list[str] = Field(default_factory=list, description="备选景点的 id：这个景点去不成（如没约上）时换成它们")
+    intro: str = Field(default="", description="可展开的介绍：只放来自游记原文的逐字摘录或用户自己写的话，不放模型自己写的内容")
+    intro_source: str = Field(default="", description="介绍的出处，如“游记《西安三日游》（他人说法，未核实）”")
+    source_name: str = Field(default="", description="来自哪篇游记（候选的 source）；空表示不是游记来的")
+    source_day: Optional[int] = Field(default=None, ge=1, le=30, description="游记里这个景点在第几天（从 1 开始，由代码识别原文里的分天标记）")
 
     @model_validator(mode="after")
     def _check_weekdays(self) -> "Place":

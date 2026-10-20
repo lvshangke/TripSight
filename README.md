@@ -13,7 +13,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-52-8A2BE2)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-54-8A2BE2)
 
 <img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
 
@@ -40,7 +40,7 @@ TripSight 把这些问题拆开来解决：
 - **补齐攻略缺的那部分**：酒店、到达/离开的大交通、出行日期和季节都是行程的一部分，直接参与分天、营业时间检查和首末日可玩时间的计算。
 - **个人特色定点融合**：你的偏好被记住并套用；任何一个景点都可以单独换天、移出、锁定、改停留时长，改完自动重新检查，不用推倒重来。
 - **路线不用反复查**：配置高德后一次补全全程每一段的真实路线，再一键生成每天串联好的专属地图。
-- **事实由代码和工具保证，不靠模型编**：**大模型**（通过聊天）只负责听懂意图、提出修改；**tripcore**（确定性代码，通过 MCP 提供 52 个工具）负责排程、检查、查路线、记版本、撤销；**你**确认每一次修改。
+- **事实由代码和工具保证，不靠模型编**：**大模型**（通过聊天）只负责听懂意图、提出修改；**tripcore**（确定性代码，通过 MCP 提供 54 个工具）负责排程、检查、查路线、记版本、撤销；**你**确认每一次修改。
 
 它不是又一个“一键生成攻略”的模板，而是一个**能反复调整、每一步都可核对**的行程工作台。
 
@@ -90,7 +90,7 @@ TripSight 把这些问题拆开来解决：
 | **核查** | 闭馆日、到达时已关门、过了最晚进入、停留超过闭馆、太赶、路上太久、没预约、超预算、住宿太远、天气不适合户外 |
 | **地图与路线** | 高德 / Google Maps / OpenStreetMap；真实路线时间、换乘与步行距离、跨城路段提示、机场车站接驳（含夜间改打车） |
 | **住宿与用餐** | 按每晚/每段推荐住在哪一带（跨城市自动分段）、候选酒店按通勤排序、沿途餐厅搜索、指定店铺就近安排、每天缺几顿饭的提醒 |
-| **攻略转行程** | 粘贴游记/攻略 → 原文逐字核对 → 高德核实坐标 → 你挑选后加入；顺路路线（如 citywalk）可整条作为一项 |
+| **攻略转行程** | 粘贴游记/攻略 → 原文逐字核对 → 提交时自动查高德（已匹配/有歧义/没找到）并附跳转链接 → 你挑选后加入；识别“第N天/Day N”，可对照或照搬游记的分天；每个景点带可展开的游记原文；顺路路线（如 citywalk）可整条作为一项 |
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
@@ -128,6 +128,14 @@ TripSight 把这些问题拆开来解决：
 
 把一篇游记（比如从小红书、公众号复制的正文）整段贴给助手：模型只负责读文字、列清单，**代码负责核对**——每个候选的原话必须逐字出现在原文里且包含地名，线索必须是原文片段，对不上的直接拒收；候选按原文顺序排列并去重。你挑选后，才用地图查坐标，名字相符且不歧义、不与已有景点重合才会加入。游记里的价格、营业时间、“建议上午去”只作为待核实线索，营业时间再用 `fill_hours` 向地图核实。顺路路线（如 citywalk 老菜场→永宁门）可用 `add_route_place` 整条作为一项。
 > 目前的输入是你**粘贴的文字**；仓库里没有抓取小红书的代码。
+
+**提交时自动对应真实地点和链接。** 候选一提交，代码就用地图（有高德或 Google key 时）查一遍，每个景点标出 **已匹配**（附地址和地图链接）、**有歧义**（有同名地点，要你确认）、**没找到**，并附上去小红书、大众点评、马蜂窝看这个景点的跳转链接。这只是标注，景点还没加入行程；一次最多预查 30 个。
+
+**别人的分天行程怎样融合进来。** 代码（不是模型）从原文里识别“第N天 / Day N / D2”标记，每个候选记下它在游记里属于第几天。加入之后有两种用法：
+- **参考式（默认）**：`compare_with_source` 只读，告诉你游记里同一天的景点在我们的行程里是否还在一起；被拆开时给出原因（某天闭馆、相距太远，或排程为了整体路程更顺）。
+- **照搬式**：你明确说“按游记原样排”，`follow_source_days` 才把游记第 N 天的景点放到我们的第 N 天（也可以指定对应关系，比如游记第 1、2 天放我们的第 2、3 天）并锁定，天内顺序仍由排程优化。去不了的（闭馆、营业时间对不上）照放但如实列出，再用我们自己的校验器核查路程、节奏等问题。整个操作是一个版本，可以撤销；已被你锁定的景点不会被动。
+
+**景点的可展开介绍。** 提交时模型要给出游记里讲这个景点的**原文段落**（最多 300 字），代码核对必须逐字出现在原文里，对不上就拒收。加入后工作台里每个景点下面有“▸ 游记里怎么说”，点开是这段原文，并标明“他人说法，未核实”。介绍不由模型自己写，所以每一句都能追溯到出处。
 >
 > **想先去看看别人怎么玩？** 助手可以用 `search_links` 给你小红书、大众点评、马蜂窝的搜索链接（网页工作台里每个景点下面也有“看攻略”入口，每天缺饭的提示旁有“看点评”，酒店行和未选住宿的天有“看酒店价格”，指向携程、大众点评、小红书；酒店价格和日期、房型有关，链接不带日期，点开后自己选日期，看到合适的价格告诉助手，它会记成“用户提供”）。链接由你自己点开、用自己的账号登录，TripSight 不抓取、不碰你的账号；看到合适的攻略，把正文复制回来即可。链接格式没有用真实账号逐一验证，打不开时请告诉我们。
 
@@ -310,11 +318,11 @@ tripcore/
 ├── storage.py      读写 JSON
 ├── amap.py gmaps.py geocode.py region.py coords.py   地图服务（高德 / Google / OSM）与坐标系
 ├── weather.py openmeteo.py   天气
-├── candidates.py routeplace.py links.py   游记候选、路线型景点、跳转链接
+├── candidates.py importplan.py routeplace.py links.py   游记候选与分天识别、游记行程对照/照搬、路线型景点、跳转链接
 ├── checklist.py review.py prefs.py   定稿清单、旅行复盘、长期偏好
 ├── mapview.py gpx.py textview.py     地图页、GPX、手机/微信文字版
 ├── web.py webpage.py   本机网页工作台
-├── mcp_server.py   MCP 服务（52 个工具）
+├── mcp_server.py   MCP 服务（54 个工具）
 └── doctor.py cli.py    自检与命令行
 skills/             给聊天 Agent 的“说明书”（trip-planner、flyai-search）
 scripts/            install_skills.py（把技能装进 nanobot）、merge_nanobot_config.py（登记到 nanobot 配置，先预览）
@@ -378,9 +386,9 @@ DESIGN.md           设计原则、算法说明
 
 ## MCP 服务
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 52 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 54 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
-`suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip`。
+`suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip` `submit_candidates` `adopt_candidates` `compare_with_source` `follow_source_days` 等。
 
 - 多个行程保存在 `~/.tripcore/trips/<名字>/`（当前行程记在 `active.json`）；设置环境变量 `TRIPCORE_FILE` 则只用这一个文件（单文件模式，不能切换/新建行程）。待确认的提案在同目录 `proposals.json`。
 - 所有修改走“提案 → 确认 → 套用”，`undo` 可撤销。
@@ -463,7 +471,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 ## 游记/攻略 → 候选景点（`submit_candidates` / `adopt_candidates`）
 
-用户粘贴游记后，模型只负责读文字、列清单；代码核对：每个候选的原话 `quote` 必须逐字出现在原文里且包含地名，线索 `clues` 也必须是原文片段，对不上的拒收；候选按原文出现先后排序（顺路路线即游览顺序）并去重。候选存在 `~/.tripcore/candidates.json`，用户挑选后 `adopt_candidates` 才用地图查坐标：名字相符且无歧义、与已有景点相距 ≥ 300 米才加入，价格/时间只作“待核实线索”写进备注。餐饮类走 `find_food`。工具：`submit_candidates` `list_candidates` `drop_candidates` `adopt_candidates`。
+用户粘贴游记后，模型只负责读文字、列清单；代码核对：每个候选的原话 `quote` 必须逐字出现在原文里且包含地名，线索 `clues` 也必须是原文片段，对不上的拒收；候选按原文出现先后排序（顺路路线即游览顺序）并去重。每个候选还带游记原文段落 `passage`（同样逐字核对、最多 300 字，作为景点的可展开介绍）和代码识别的游记第几天 `day`；提交时有地图 key 就顺手预查并标注 `match`（matched / ambiguous / not_found）。候选存在 `~/.tripcore/candidates.json`，用户挑选后 `adopt_candidates` 才用地图查坐标：名字相符且无歧义、与已有景点相距 ≥ 300 米才加入，价格/时间只作“待核实线索”写进备注。餐饮类走 `find_food`。加入后景点带 `intro`（游记原文）、`source_name`、`source_day`；`compare_with_source` 对照游记分天与我们的行程（只读），用户明确要求时 `follow_source_days` 按游记分天放置并锁定（一个版本，可撤销）。工具：`submit_candidates` `list_candidates` `drop_candidates` `adopt_candidates`。
 
 ## 路线型景点（`add_route_place`）与排程改动
 

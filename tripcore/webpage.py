@@ -50,6 +50,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .dur{width:54px;font:inherit;font-size:12px;padding:1px 3px;border:1px solid #bbb;border-radius:4px}
 .is{font-size:12px;margin-top:2px;color:#b45309;line-height:1.45}.is.error{color:#b91c1c;font-weight:600}
 .lk{margin-top:3px;font-size:12px;color:#888}.lk a{color:#1a6fe8;text-decoration:none;margin-left:6px}.lk a:hover{text-decoration:underline}
+.intro{margin-top:4px;font-size:12px}.intro summary{cursor:pointer;color:#1a6fe8}.intro .tx{margin-top:3px;padding:5px 7px;background:#f7f7f2;border-radius:4px;color:#555;white-space:pre-wrap;line-height:1.5}.intro small{display:block;margin-top:3px;color:#a60}
 .mealgap{padding:4px 12px;background:#f3f8ee;border-bottom:1px solid #dfe9d4;font-size:12.5px;color:#456}.mealgap button{margin-left:6px;font-size:12px;padding:1px 8px;border-radius:12px}
 .dayiss{padding:5px 12px;background:#fff8ed;border-bottom:1px solid #f1e3cd}
 .editonly{display:none}
@@ -278,6 +279,10 @@ const linkHtml = (kw, kind, label) => {
   return '<span class="lk">' + label + (S.link_sites || []).filter(x => x.kinds.indexOf(kind) >= 0 && x.id !== 'google').map(x => '<a href="' + esc(x.tpl.replace('{q}', encodeURIComponent((q + ' ' + (x.suffix || '')).trim()))) + '" target="_blank" rel="noopener noreferrer">' + esc(x.name) + '</a>').join('') + '</span>';
 };
 const issueHtml = arr => arr.map(x => '<div class="is ' + x.sev + '">' + (x.sev === 'error' ? '⛔ ' : '⚠ ') + esc(x.text) + '</div>').join('');
+function introHtml(pid) {
+  const x = (S.intros || {})[pid]; if (!x) return '';
+  return '<details class="intro"><summary>游记里怎么说' + (x.day ? '（游记第' + x.day + '天）' : '') + '</summary><div class="tx">' + esc(x.text) + '</div><small>' + esc(x.source || '他人说法，未核实') + '。价格、时间等请以官方为准。</small></details>';
+}
 function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   const row = document.createElement('div'), mk = ctx && ctx.m[idx], pl = ctx && ctx.l[idx];
   const sel = () => { if (di !== selDay) { selDay = di; renderAll(); return true; } return false; };
@@ -297,6 +302,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
     row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + (edit ? '<input class="dur" type="number" min="10" max="720" step="15" value="' + e.stay + '"> ' : e.stay + ' ') + '分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
     const pi = S.issues.places[e.pid]; if (pi) row.querySelector('.sub').insertAdjacentHTML('beforeend', issueHtml(pi));
     row.querySelector('.sub').insertAdjacentHTML('beforeend', '<div>' + linkHtml(e.name, 'guide', '看攻略：') + '</div>');
+    row.querySelector('.sub').insertAdjacentHTML('beforeend', introHtml(e.pid));
     if (edit) {
       wireDur(row, e.pid, e.stay);
       row.dataset.pid = e.pid; row.draggable = true;
@@ -306,7 +312,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
       row.ondragend = () => { drag = null; document.querySelectorAll('.drag,.over').forEach(x => x.classList.remove('drag', 'over')); document.querySelectorAll('.ins').forEach(x => x.remove()); };
     }
   }
-  row.onclick = () => { if (sel()) return; if (mk) { map.setView(mk.getLatLng(), Math.max(map.getZoom(), 15)); mk.openPopup(); } };
+  row.onclick = ev => { if (ev && ev.target.closest && ev.target.closest('.intro')) return; if (sel()) return; if (mk) { map.setView(mk.getLatLng(), Math.max(map.getZoom(), 15)); mk.openPopup(); } };
   return row;
 }
 function renderList() {
@@ -339,7 +345,7 @@ function renderUnscheduled(list) {
   const u = document.createElement('div'); u.className = 'day'; u.innerHTML = '<div class="dh">未安排' + (edit ? '（拖到这里表示移出行程）' : '') + (edit ? '<button id="addp" style="margin-left:auto">＋ 加景点</button>' : '') + '</div>';
   if (edit) u.querySelector('#addp').onclick = apOpen;
   S.unscheduled.forEach(it => { const c = document.createElement('div'); c.className = 'it'; c.dataset.pid = it.place_id; c.style.cursor = edit ? 'grab' : 'default';
-    c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>' + (edit ? '<div class="sub">停留 <input class="dur" type="number" min="10" max="720" step="15" value="' + it.duration_min + '"> 分钟</div>' : '');
+    c.innerHTML = '<div class="h"><span class="nm">' + esc(it.name) + '</span><span class="tm" style="min-width:0">' + esc(it.reason || '') + '</span></div>' + (edit ? '<div class="sub">停留 <input class="dur" type="number" min="10" max="720" step="15" value="' + it.duration_min + '"> 分钟</div>' : '') + introHtml(it.place_id);
     if (edit) wireDur(c, it.place_id, it.duration_min);
     if (edit) { c.draggable = true; c.ondragstart = e => { drag = it.place_id; c.classList.add('drag'); e.dataTransfer.setData('text/plain', it.place_id); }; c.ondragend = () => { drag = null; }; } u.appendChild(c); });
   (S.orphan_meals || []).forEach(m => u.insertAdjacentHTML('beforeend', '<div class="it" style="cursor:default"><div class="h"><span class="nm">🍜 ' + esc(m.name) + '</span></div><div class="sub">原来挂在「' + esc(m.after) + '」之后，该景点现在不在行程里（用餐点没有删除）</div></div>'));

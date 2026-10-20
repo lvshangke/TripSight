@@ -136,7 +136,7 @@ def snapshot() -> dict[str, Any]:
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
                     for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
-    return {"title": m.name, "trip": _slug(), "issues": _issues_block(trip), "meal_gaps": {str(k): v for k, v in meal_gaps(trip).items()}, "link_sites": _links.templates(), "city": (ms._load_context() or {}).get("city", ""), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+    return {"title": m.name, "trip": _slug(), "issues": _issues_block(trip), "meal_gaps": {str(k): v for k, v in meal_gaps(trip).items()}, "link_sites": _links.templates(), "intros": {p.id: {"text": p.intro, "source": p.intro_source, "day": p.source_day} for p in trip.places if p.intro}, "city": (ms._load_context() or {}).get("city", ""), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
             "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},
