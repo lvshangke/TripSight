@@ -252,3 +252,39 @@ def test_food_candidate_gets_anchor_hint_for_suggest_food(monkeypatch):
     assert "铁锅炖：是餐饮类" in out and "suggest_food" in out and "哈药六版画博物馆" in out and "不一定是游记里那家" in out
     pid = next(p.id for p in s._load().places if p.name == "哈药六版画博物馆")
     assert pid in out
+
+
+# ---------------- 工作台：每天头部统计与景点营业状态 ----------------
+def test_daycard_stats_and_hours_state(monkeypatch):
+    from tripcore import web
+    from tripcore.daycard import category_label
+    _harbin(monkeypatch)
+    s.add_place("中央大街", 45.7710, 126.6200, duration_min=90, ticket_price=0, category="风景名胜;风景名胜;步行街")
+    s.add_place("红专街早市", 45.7620, 126.6480, duration_min=60, opening_hours="周一至周日 04:00-10:00", hours_source="amap", ticket_price=20)
+    s.schedule_days()
+    snap = web.snapshot()
+    st = snap["day_stats"]["0"]
+    assert st["places"] == 2 and st["date"] == "2026-11-17" and st["weekday"] == "周二"
+    assert st["km"] >= 0 and st["cost"] == 20 and st["cost_known"] and st["minutes"] > 0
+    t = s._load()
+    by = {t.place(pid).name: v for pid, v in snap["stop_info"].items()}
+    assert by["红专街早市"]["state"] == "ok" and by["红专街早市"]["hours"].startswith("04:00–10:00")
+    assert by["中央大街"]["state"] == "unknown" and by["中央大街"]["cat"] == "步行街"
+    assert category_label("风景名胜;公园广场;公园") == "公园" and category_label("") == ""
+
+
+def test_daycard_marks_closed_arrival_as_bad_and_unknown_cost(monkeypatch):
+    from tripcore import web
+    s.new_trip(start_date="2026-11-17", end_date="2026-11-17", city="哈尔滨", name="哈尔滨")
+    s.add_place("中央大街", 45.7710, 126.6200, duration_min=90)
+    s.add_place("早市", 45.7620, 126.6480, duration_min=60, opening_hours="周一至周日 04:00-10:00", hours_source="amap")
+    s.schedule_days()
+    t = s._load()
+    pid = next(p.id for p in t.places if p.name == "中央大街")
+    r = s.propose_change("中央大街放第一个", [{"kind": "move", "place_id": pid, "to_day": 0, "to_position": 0}])
+    s.apply_proposal(r["proposal_id"], r["confirm_code"])
+    snap = web.snapshot()
+    t = s._load()
+    by = {t.place(pid).name: v for pid, v in snap["stop_info"].items()}
+    assert by["早市"]["state"] == "bad"                              # 中央大街在前，早市 10:40 才到，已关门
+    assert snap["day_stats"]["0"]["cost_known"] is False             # 没有任何价格：写“待核实”，不写 ¥0

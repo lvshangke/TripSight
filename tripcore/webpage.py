@@ -73,8 +73,20 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #calinfo{font-size:13px;margin:6px 0;color:#444}
 .day{border:1px dashed transparent;border-radius:6px;margin:6px 0 10px;padding:0}
 .day.over{border-color:#2563eb;background:#eff6ff}
-.dh{font-weight:700;font-size:14px;padding:8px 12px;cursor:pointer;display:flex;gap:6px;align-items:center;background:#fff;border-bottom:1px solid #eee}
+.dh{font-size:14px;padding:8px 12px;cursor:pointer;display:flex;gap:10px;align-items:center;background:#fff;border-bottom:1px solid #eee}
+.dh.view{cursor:default}
 .dh .dot{width:10px;height:10px;border-radius:50%}
+.db{width:44px;flex:none;text-align:center;border-radius:8px;background:#f1f3f8;border-top:3px solid #4363d8;padding:2px 0 3px;line-height:1.15}
+.db small{display:block;font-size:10px;color:#777}.db b{display:block;font-size:19px;color:#223}
+.dt{flex:1;min-width:0}.dt .t{font-weight:700;font-size:14px}.dt .t em{font-style:normal;font-weight:400;font-size:12px;color:#777;margin-left:6px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chip{font-size:11px;font-weight:400;background:#f1f3f8;color:#456;border-radius:10px;padding:1px 8px;white-space:nowrap}
+.chip.warn{background:#fff1dc;color:#a05a00}.chip.err{background:#fde8e8;color:#b02020}.chip.mute{color:#999}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 4px -2px}
+.st,.cat{font-size:11px;border-radius:10px;padding:0 8px;line-height:17px}
+.st.ok{background:#e6f5e9;color:#256b36}.st.warn{background:#fff1dc;color:#a05a00}.st.bad{background:#fde8e8;color:#b02020}.st.unknown{background:#eee;color:#777}
+.cat{background:#eef1fb;color:#3a4a8a}
+.it.stop{border-left:3px solid #4363d8}.it.stop .tm{font-weight:700;color:#222;font-size:14px}
 .dh.cur{background:#eef3ff}
 .it{padding:8px 12px;border-bottom:1px solid #eee;cursor:pointer;background:#fafafa}
 .it:hover{background:#f0f4ff}
@@ -279,6 +291,26 @@ const linkHtml = (kw, kind, label) => {
   return '<span class="lk">' + label + (S.link_sites || []).filter(x => x.kinds.indexOf(kind) >= 0 && x.id !== 'google').map(x => '<a href="' + esc(x.tpl.replace('{q}', encodeURIComponent((q + ' ' + (x.suffix || '')).trim()))) + '" target="_blank" rel="noopener noreferrer">' + esc(x.name) + '</a>').join('') + '</span>';
 };
 const issueHtml = arr => arr.map(x => '<div class="is ' + x.sev + '">' + (x.sev === 'error' ? '⛔ ' : '⚠ ') + esc(x.text) + '</div>').join('');
+function fmtMin(m) { const h = Math.floor(m / 60), r = m % 60; return h ? h + '小时' + (r ? r + '分' : '') : r + '分钟'; }
+function dayHead(d) {
+  const st = (S.day_stats || {})[String(d.index)] || {};
+  const block = st.date ? '<small>' + esc(st.weekday) + '</small><b>' + Number(st.date.slice(8, 10)) + '</b><small>' + Number(st.date.slice(5, 7)) + '月</small>' : '<small>第</small><b>' + (d.index + 1) + '</b><small>天</small>';
+  const chips = [];
+  if (st.places !== undefined) {
+    chips.push('<span class="chip">📍 ' + st.places + ' 个景点</span>');
+    chips.push('<span class="chip" title="' + (st.km_estimated ? '含估算路段，点“更新路线”后更准' : '真实路线') + '">🚶 ' + (st.km_estimated ? '约 ' : '') + st.km + ' km</span>');
+    chips.push(st.cost_known ? '<span class="chip" title="门票 + 已选餐厅人均，按人数；不含交通和未选的餐食">💰 ¥' + st.cost + '</span>' : '<span class="chip mute" title="还没有门票或餐厅价格">💰 待核实</span>');
+    chips.push('<span class="chip' + (st.over ? ' warn' : '') + '" title="游玩 + 路上的总时间' + (st.over ? '，超过了这个节奏的上限' : '') + '">⏱ ' + fmtMin(st.minutes) + '</span>');
+    if (st.errors) chips.push('<span class="chip err" title="必须处理的问题">● ' + st.errors + ' 个问题</span>');
+  }
+  const title = esc(d.label.replace(/ ?\d{4}-\d{2}-\d{2}$/, ''));
+  return '<div class="db" style="border-top-color:' + d.color + '">' + block + '</div><div class="dt"><div class="t">' + title + '</div><div class="chips">' + chips.join('') + '</div></div>';
+}
+function tagsHtml(pid) {
+  const x = (S.stop_info || {})[pid]; if (!x) return '';
+  const txt = {ok: '营业 ' + x.hours, warn: '注意营业时间 ' + x.hours, bad: '营业时间对不上 ' + x.hours, unknown: '营业时间待核实'}[x.state];
+  return '<div class="tags"><span class="st ' + x.state + '" title="营业时间来自地图服务，请以现场为准">' + esc(txt) + '</span>' + (x.cat ? '<span class="cat">' + esc(x.cat) + '</span>' : '') + '</div>';
+}
 function introHtml(pid) {
   const x = (S.intros || {})[pid]; if (!x) return '';
   return '<details class="intro"><summary>游记里怎么说' + (x.day ? '（游记第' + x.day + '天）' : '') + '</summary><div class="tx">' + esc(x.text) + '</div><small>' + esc(x.source || '他人说法，未核实') + '。价格、时间等请以官方为准。</small></details>';
@@ -299,7 +331,9 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
   else if (e.type === 'term') row.innerHTML = '<div class="h"><span class="tm">' + e.time + '</span><span class="nm">' + e.icon + ' ' + esc(e.role) + '：' + esc(e.name) + '</span></div><div class="sub">' + lines + '</div>';
   else if (e.type === 'meal') row.innerHTML = '<div class="h"><span class="tm"></span><span class="nm">🍜 ' + esc(e.name) + '</span></div><div class="sub">' + lines + (e.web ? '<br><a href="' + esc(e.web) + '" target="_blank" rel="noopener noreferrer" style="color:#1a6fe8">地图</a>' : '') + '</div>';
   else {
+    row.classList.add('stop'); row.style.borderLeftColor = d.color;
     row.innerHTML = '<div class="h"><span class="tm">' + e.arrive + '</span><span class="nm">' + e.n + '. ' + esc(e.name) + (edit && lockedOf(e.pid) ? ' 🔒' : '') + '</span>' + (edit ? '<span class="mv"><button data-a="up" title="上移">▲</button><button data-a="dn" title="下移">▼</button></span>' : '') + '</div><div class="sub">停留 ' + (edit ? '<input class="dur" type="number" min="10" max="720" step="15" value="' + e.stay + '"> ' : e.stay + ' ') + '分钟，约 ' + e.leave + ' 离开<br>' + lines + '</div>';
+    row.querySelector('.sub').insertAdjacentHTML('afterbegin', tagsHtml(e.pid));
     const pi = S.issues.places[e.pid]; if (pi) row.querySelector('.sub').insertAdjacentHTML('beforeend', issueHtml(pi));
     row.querySelector('.sub').insertAdjacentHTML('beforeend', '<div>' + linkHtml(e.name, 'guide', '看攻略：') + '</div>');
     row.querySelector('.sub').insertAdjacentHTML('beforeend', introHtml(e.pid));
@@ -322,7 +356,8 @@ function renderList() {
   const days = edit ? S.map.days.map((d, i) => i) : [selDay];
   days.forEach(di => {
     const d = S.map.days[di], box = edit ? document.createElement('div') : list; if (edit) { box.className = 'day'; box.dataset.day = d.index; list.appendChild(box); }
-    if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = '<span class="dot" style="background:' + d.color + '"></span>' + esc(d.label); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
+    if (edit) { const h = document.createElement('div'); h.className = 'dh' + (di === selDay ? ' cur' : ''); h.innerHTML = dayHead(d); h.onclick = () => { selDay = di; renderAll(); }; box.appendChild(h); }
+    if (!edit) { const hd = document.createElement('div'); hd.className = 'dh view'; hd.innerHTML = dayHead(d); box.appendChild(hd); }
     if (!d.closed_loop) { const w = document.createElement('div'); w.className = 'leg'; w.style.cursor = 'default'; w.textContent = d.timeline.some(e => e.type === 'stop') ? (S.map.has_lodging ? '这一天没有从酒店出发再回到酒店的闭环。' : '还没有选定住宿，所以不是从酒店出发的闭环。') : '这一天没有景点。'; const fs = d.timeline.find(e => e.type === 'stop'); if (fs && !S.map.has_lodging) w.insertAdjacentHTML('beforeend', '<div>' + linkHtml(fs.name + ' 附近', 'hotel', '看酒店价格：') + '</div>'); box.appendChild(w); }
     const dayI = S.issues.days[String(d.index)]; if (dayI) { const w2 = document.createElement('div'); w2.className = 'dayiss'; w2.innerHTML = issueHtml(dayI); box.appendChild(w2); }
     const mg = (S.meal_gaps || {})[String(d.index)]; if (mg) { const w3 = document.createElement('div'); w3.className = 'mealgap'; w3.innerHTML = '🍜 还没安排' + mg.join('、') + ' ' + mg.map(m => '<button data-m="' + m + '">找' + m + '</button>').join('') + linkHtml('', 'food', ' 看点评：'); w3.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); $('chat').classList.remove('hide'); syncSp2(); fit(); $('ctext').value = '帮我在第' + (d.index + 1) + '天的景点附近找' + b.dataset.m + '，给我几家对比；我选定后请直接加进行程。'; $('ctext').focus(); }); box.appendChild(w3); }
