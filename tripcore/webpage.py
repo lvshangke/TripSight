@@ -170,6 +170,7 @@ async function load() {
   await loadTrips();
   if (selDay >= S.map.days.length) selDay = 0;
   renderAll();
+  syncChat();
 }
 async function loadTrips() {
   try {
@@ -426,7 +427,17 @@ $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revi
 // ---- 聊天 + 自动刷新 ----
 const msgs = $('cmsgs'); let busy = false;
 function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
-let chatUp = null;
+let chatUp = null, chatTrip;            // chatTrip：聊天栏现在显示的是哪个行程的记录（undefined = 还没加载）
+async function syncChat() {
+  if (busy || !S || chatTrip === (S.trip || null)) return;
+  const want = S.trip || null; chatTrip = want;
+  try {
+    const r = await api('chat_history'); if (busy || (S.trip || null) !== want) { chatTrip = undefined; return; }
+    msgs.innerHTML = '';
+    r.messages.forEach(m => { bubble(m.role === 'user' ? 'u' : 'a', m.text); if (m.partial) bubble('e', '（这条回复当时可能不完整）'); });
+    chatUp = null; chatStatus();
+  } catch (e) { chatTrip = undefined; }
+}
 function chatMark(up, msg) {
   const el = $('cstat'); el.textContent = up ? '● 已连接' : '● 未连接'; el.className = up ? 'ok' : '';
   if (!up && msg && chatUp !== false) bubble('e', msg);
@@ -435,7 +446,7 @@ function chatMark(up, msg) {
 async function chatStatus() { try { const r = await api('chat_status'); chatMark(r.connected, r.message); return r.connected; } catch (e) { chatMark(false, '没连上工作台服务。'); return false; } }
 async function send() {
   const text = $('ctext').value.trim(); if (!text || busy) return;
-  busy = true; $('csend').disabled = true; const rev0 = S ? S.revision : null, trip0 = S ? S.trip : null; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
+  busy = true; $('csend').disabled = true; $('trip').disabled = true; const rev0 = S ? S.revision : null, trip0 = S ? S.trip : null; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
   try {
     const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text})});
     if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); if (r.status >= 500) chatMark(false); }
@@ -449,7 +460,7 @@ async function send() {
       if (!done) { const w = document.createElement('div'); w.className = 'm e'; w.textContent = '回复可能不完整（连接中断或超时）。agent 已经做完的操作不会撤销，请看看行程再决定。'; msgs.appendChild(w); }
     }
   } catch (e) { out.className = 'm e'; out.textContent = '请求失败：' + e.message; }
-  busy = false; $('csend').disabled = false; await load();
+  busy = false; $('csend').disabled = false; $('trip').disabled = false; await load();
   if (S && S.days.length && S.trip === trip0 && S.revision !== rev0) await refineRoutes(null);      // 助手改了行程：自动补查还没有真实路线的路段（已查过的不会重查）
 }
 $('csend').onclick = send; $('ctext').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };

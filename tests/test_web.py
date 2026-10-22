@@ -669,3 +669,58 @@ def test_snapshot_issues_for_places_and_days(server):
     pi = iss["places"][pids[1]]
     assert any(x["sev"] == "error" and "已关门" in x["text"] and not x["text"].startswith(("第", "「")) for x in pi)
     assert all(set(x) == {"sev", "text"} for v in list(iss["places"].values()) + list(iss["days"].values()) for x in v)
+
+
+# ---- 聊天记录和会话：每个行程各自一份 ----
+def test_chat_is_saved_and_listed_in_single_file_mode(server, nano):
+    assert call(server, "/tok/api/chat_history")[1]["messages"] == []
+    raw_post(server, "/tok/api/chat", {"message": "加一个景点"})
+    h = call(server, "/tok/api/chat_history")[1]
+    assert [(m["role"], m["text"]) for m in h["messages"]] == [("user", "加一个景点"), ("assistant", "你好")]
+    assert not any(m.get("partial") for m in h["messages"])
+    assert "你好" not in json.dumps(state(server), ensure_ascii=False)                   # 聊天记录不在行程快照里
+
+
+def test_each_trip_has_own_session_and_history(multi, nano):
+    raw_post(multi, "/tok/api/chat", {"message": "乙里的问题"})
+    sess_b = _FakeNano.seen[-1][1]["session_id"]
+    assert sess_b.startswith("tripsight-") and sess_b != "tripsight-workbench" and "乙" not in sess_b
+    assert [m["text"] for m in call(multi, "/tok/api/chat_history")[1]["messages"]] == ["乙里的问题", "你好"]
+    slug_a = next(t["slug"] for t in call(multi, "/tok/api/trips")[1]["trips"] if t["name"] == "甲行程")
+    call(multi, "/tok/api/switch", {"slug": slug_a})
+    assert call(multi, "/tok/api/chat_history")[1]["messages"] == []                    # 切到甲：看不到乙的记录
+    raw_post(multi, "/tok/api/chat", {"message": "甲里的问题"})
+    sess_a = _FakeNano.seen[-1][1]["session_id"]
+    assert sess_a != sess_b                                                              # 助手那边也是各自的会话
+    assert [m["text"] for m in call(multi, "/tok/api/chat_history")[1]["messages"]] == ["甲里的问题", "你好"]
+    slug_b = next(t["slug"] for t in call(multi, "/tok/api/trips")[1]["trips"] if t["name"] == "乙行程")
+    call(multi, "/tok/api/switch", {"slug": slug_b})
+    assert [m["text"] for m in call(multi, "/tok/api/chat_history")[1]["messages"]] == ["乙里的问题", "你好"]
+    raw_post(multi, "/tok/api/chat", {"message": "再问乙"})
+    assert _FakeNano.seen[-1][1]["session_id"] == sess_b                                 # 回到乙，会话号稳定
+
+
+def test_chat_history_is_capped_and_ignores_garbage(server, tmp_path):
+    p = web._chat_file()
+    for i in range(web.MAX_HISTORY + 20):
+        web._append_chat(p, "user", f"第{i}条")
+    msgs = web._read_chat(p)
+    assert len(msgs) == web.MAX_HISTORY and msgs[-1]["text"] == f"第{web.MAX_HISTORY + 19}条"
+    p.write_text("不是 json", encoding="utf-8")
+    assert web._read_chat(p) == []
+    p.write_text(json.dumps([{"role": "system", "text": "x"}, {"role": "user", "text": 5}, {"role": "user", "text": "ok"}]), encoding="utf-8")
+    assert [m["text"] for m in web._read_chat(p)] == ["ok"]
+    web._append_chat(p, "assistant", "   ")                                              # 空回复不记录
+    assert len(web._read_chat(p)) == 1
+
+
+def test_chat_failure_does_not_save_user_message(server, monkeypatch):
+    monkeypatch.setenv("NANOBOT_API_URL", "http://127.0.0.1:9")
+    assert raw_post(server, "/tok/api/chat", {"message": "没送达"})[0] == 502
+    assert call(server, "/tok/api/chat_history")[1]["messages"] == []
+
+
+def test_page_syncs_chat_on_trip_switch():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert "syncChat" in h and "chat_history" in h and "$('trip').disabled = true" in h

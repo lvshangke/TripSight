@@ -53,7 +53,7 @@ python scripts/install_skills.py --check    # 检查已安装的是否和仓库�
 
 ## 6. 运行时数据在哪
 
-`~/.tripcore/`：`trip.json`（行程）、`proposals.json`（待确认的提案）、`candidates.json`（游记候选）、`map.html`、`gpx/`、`amap_calls.log`（高德调用记录，不含 key）。环境变量 `TRIPCORE_FILE` 可改行程文件位置。
+`~/.tripcore/`：`trip.json`（行程）、`proposals.json`（待确认的提案）、`candidates.json`（游记候选）、`chat.json`（工作台聊天记录，每个行程一份）、`map.html`、`gpx/`、`amap_calls.log`（高德调用记录，不含 key）。环境变量 `TRIPCORE_FILE` 可改行程文件位置。
 
 ## 7. 可选：用微信和它聊天
 
@@ -85,6 +85,7 @@ nanobot 自带 `weixin` 渠道（二维码登录的个人微信，长轮询，�
 2. 如果你给接口设了 key，启动工作台前设置环境变量 `NANOBOT_API_KEY`；接口地址不是默认值时设置 `NANOBOT_API_URL`（只允许 127.0.0.1 / localhost）。
 3. 没启动接口时聊天栏显示“未连接”，其他功能（拖拽、日期、撤销）不受影响。
 注意：接口单次回复默认最多等 120 秒；超时或中断不会撤销 agent 已经做完的动作，聊天栏会提示“回复可能不完整”。
+聊天按行程分开：每个行程有自己的助手会话，聊天记录存在该行程目录的 `chat.json`（最近 200 条，不在 `trip.json` 里，不影响版本和撤销）；切换行程时聊天栏跟着换成那个行程的记录，助手回复中不能切换。只有从工作台聊天栏发的对话会记在这里，微信等其他渠道的对话在 nanobot 自己的会话里。
 
 ## 改 skill 时
 

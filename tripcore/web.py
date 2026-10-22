@@ -235,6 +235,9 @@ def dates(body: dict) -> dict[str, Any]:
 NANOBOT_DEFAULT = "http://127.0.0.1:8900"
 CHAT_SESSION = "tripsight-workbench"
 MAX_CHAT = 4000
+MAX_HISTORY = 200            # 每个行程最多保留多少条聊天记录
+MAX_STORED = 8000            # 单条记录最多存多少字
+_chat_lock = threading.Lock()
 _LOOPBACK = ("127.0.0.1", "localhost", "::1")
 
 
@@ -250,6 +253,48 @@ def _slug() -> Optional[str]:
     if ms._single_file_mode():
         return None
     return ws.active_slug(ms._root_dir())
+
+
+def _session_id() -> str:
+    """每个行程一个独立的 nanobot 会话（行程名转成哈希，避免中文名带来麻烦）；单文件模式沿用固定会话。"""
+    slug = _slug()
+    return CHAT_SESSION if slug is None else "tripsight-" + hashlib.sha1(slug.encode("utf-8")).hexdigest()[:10]
+
+
+def _chat_file() -> Path:
+    """这个行程的聊天记录：放在行程目录里、不在 trip.json 里，所以不影响版本号、撤销和行程快照。"""
+    return ms.trip_path().with_name("chat.json")
+
+
+def _read_chat(path: Path) -> list[dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [m for m in data if isinstance(m, dict) and m.get("role") in ("user", "assistant") and isinstance(m.get("text"), str)] if isinstance(data, list) else []
+
+
+def _append_chat(path: Path, role: str, text: str, partial: bool = False) -> None:
+    if not text.strip():
+        return
+    with _chat_lock:
+        msgs = _read_chat(path)
+        item: dict[str, Any] = {"role": role, "text": text[:MAX_STORED], "ts": int(time.time())}
+        if partial:
+            item["partial"] = True
+        msgs.append(item)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(msgs[-MAX_HISTORY:], ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        except OSError:
+            pass                                           # 记录失败不影响聊天本身
+
+
+def chat_history() -> dict[str, Any]:
+    """页面加载或切换行程时用：当前行程的聊天记录（只含从工作台聊天栏发的对话）。"""
+    return {"trip": _slug(), "messages": _read_chat(_chat_file())}
 
 
 def new_trip(body: dict) -> dict[str, Any]:
@@ -413,7 +458,7 @@ def code_version() -> str:
 CODE_VERSION = code_version()
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "version": lambda: {"version": CODE_VERSION}}
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
 
 
@@ -512,7 +557,8 @@ def make_handler(token: str, state: dict):
             key = os.environ.get("NANOBOT_API_KEY", "").strip()
             if key:
                 headers["Authorization"] = "Bearer " + key
-            payload = json.dumps({"messages": [{"role": "user", "content": msg}], "session_id": CHAT_SESSION, "stream": True})
+            cfile, sid = _chat_file(), _session_id()          # 先定下是哪个行程：回复中途即使切换了行程，也记在原来那个里
+            payload = json.dumps({"messages": [{"role": "user", "content": msg}], "session_id": sid, "stream": True})
             try:
                 conn = http.client.HTTPConnection(host, port, timeout=130)
                 conn.request("POST", "/v1/chat/completions", payload.encode("utf-8"), headers)
@@ -526,6 +572,8 @@ def make_handler(token: str, state: dict):
                 hint = "nanobot 接口需要 key：启动工作台前设置环境变量 NANOBOT_API_KEY。" if resp.status == 401 else f"nanobot 返回了错误（HTTP {resp.status}）。"
                 self._json(502, {"error": hint})
                 return
+            _append_chat(cfile, "user", msg)
+            got, finished = [], False
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -536,6 +584,15 @@ def make_handler(token: str, state: dict):
                     line = resp.readline()
                     if not line:
                         break
+                    if line.startswith(b"data:"):
+                        data = line[5:].strip()
+                        if data == b"[DONE]":
+                            finished = True
+                        else:
+                            try:
+                                got.append(((json.loads(data).get("choices") or [{}])[0].get("delta") or {}).get("content") or "")
+                            except (ValueError, AttributeError, TypeError):
+                                pass
                     self.wfile.write(line)
                     self.wfile.flush()
                     state["last"] = time.time()
@@ -543,6 +600,7 @@ def make_handler(token: str, state: dict):
                 pass                                           # 页面断开或 nanobot 中途结束：页面按“没收到 [DONE]”处理
             finally:
                 conn.close()
+                _append_chat(cfile, "assistant", "".join(got), partial=not finished)
 
         def _run(self, fn, write: bool = False) -> None:
             try:
