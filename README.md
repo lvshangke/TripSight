@@ -15,9 +15,20 @@
 ![Tests](https://img.shields.io/badge/tests-408%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-56-8A2BE2)
 
-<img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
+> **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
 
-<sub>网页工作台：左侧按天的行程（高德真实路线、营业时间、问题提示、看攻略/看点评/看酒店价格链接），中间地图，右侧聊天助手。</sub>
+<table>
+<tr>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="420"></td>
+<td align="center" valign="top"><img src="docs/images/share-demo.png" alt="可分享的行程长图（默认不含酒店和花费）" width="300"></td>
+</tr>
+<tr>
+<td align="center"><sub>网页工作台：每天的统计、营业状态，拖动调整并即时检查</sub></td>
+<td align="center"><sub>一键导出可发微信的长图（酒店和花费默认不公开）</sub></td>
+</tr>
+</table>
+
+<sub>演示用的是仓库自带的北京示例数据，营业时间为演示用示例值。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
 
 </div>
 
@@ -44,7 +55,7 @@ TripSight 把这些问题拆开来解决：
 
 它不是又一个“一键生成攻略”的模板，而是一个**能反复调整、每一步都可核对**的行程工作台。
 
-> ✅ 高德路线、营业时间、坐标核实等功能，作者已使用真实高德 key 测试，可用。Google Maps、微信渠道等其他接入目前主要用假服务做了自动化测试（375 个），真实环境验证有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
+> ✅ 高德路线、营业时间、坐标核实等功能，作者已使用真实高德 key 测试，可用。Google Maps、微信渠道等其他接入目前主要用假服务做了自动化测试，真实环境验证有限；价格、营业时间、天气均为参考值，出行前请以官方信息为准。助手**不会**订票、订酒店或付款。
 
 ## 💡 为什么是 TripSight
 

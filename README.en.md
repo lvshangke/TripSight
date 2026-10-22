@@ -14,9 +14,20 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 ![Tests](https://img.shields.io/badge/tests-408%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-56-8A2BE2)
 
-<img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
+> **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
-<sub>The web workbench: day-by-day itinerary with real Amap routes, opening hours, problem hints and research links (left), map (middle), chat assistant (right).</sub>
+<table>
+<tr>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="420"></td>
+<td align="center" valign="top"><img src="docs/images/share-demo.png" alt="Shareable itinerary image (hotel and costs hidden by default)" width="300"></td>
+</tr>
+<tr>
+<td align="center"><sub>Web workbench: per-day stats and opening-hours state; drag to edit with instant checks</sub></td>
+<td align="center"><sub>One-click shareable long image (hotel and costs hidden by default)</sub></td>
+</tr>
+</table>
+
+<sub>The demo uses the bundled Beijing sample data; opening hours are sample values for illustration. The real workbench has three panes: itinerary (left), Amap map (middle), chat assistant (right).</sub>
 
 </div>
 
@@ -43,7 +54,7 @@ TripSight attacks these one by one:
 
 It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
-> ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (375 automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
+> ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
 
 ## 💡 Why TripSight
 
