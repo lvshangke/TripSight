@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
+image = ["playwright>=1.40"]     # 可选：export_share 生成长图
 
 [project.scripts]
 tripcore = "tripcore.cli:main"

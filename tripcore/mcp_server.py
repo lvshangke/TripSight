@@ -33,6 +33,7 @@ from .gpx import build_gpx
 from .mapview import build_map_data, build_map_html, day_marker_links, marker_link
 from . import importplan as _importplan
 from . import links as _links
+from . import share as _share
 from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
 from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -1072,6 +1073,41 @@ def export_text(day: Optional[int] = None, links: bool = True) -> str:
     if bad:
         raise ToolError("外发检查没通过，没有输出：" + "；".join(bad) + "。请检查景点备注/名称里是否混入了不该外发的内容。")
     return text
+
+
+def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True) -> str:
+    """生成可分享的行程成品：单文件 HTML（手机直接打开）和长图 PNG（微信里最方便发）。
+    内容是按天的卡片：日期块、景点数/路程/用时、每站时间和营业时间、两站之间的交通、天气，每站有地图链接。
+    默认**不公开酒店和花费**，因为分享出去之前该由用户决定：show_lodging=true 才带酒店名（和从酒店出发/回酒店的路段），
+    show_costs=true 才带门票、餐饮人均和住宿估价。必须先问用户要不要公开，用户没说就用默认。
+    航班/车次号不会出现，页面不带任何 key，也不嵌地图；生成前有外发检查。
+    长图需要可选依赖 playwright；没装就只出 HTML 并如实告诉用户。需要先 schedule_days。
+    拿到路径后用 message 工具把文件（优先 PNG）作为附件发给用户；这是此刻的快照，行程改了要重新生成。"""
+    trip = _load()
+    if trip.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    import re as _re
+    stem = _re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]+", "_", trip.meta.name).strip("_") or "trip"
+    folder = trip_path().with_name("share")
+    html_path, png_path = folder / f"{stem}-share.html", folder / f"{stem}-share.png"
+    try:
+        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs)
+    except ValueError as e:
+        raise ToolError(str(e))
+    bad = _share.guard_html(html)
+    if bad:
+        raise ToolError("外发检查没通过，没有生成：" + "；".join(bad) + "。请检查景点名称/备注里是否混入了不该外发的内容。")
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        html_path.write_text(html, encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"写入分享页失败：{e}")
+    shown = "、".join(x for x, on in (("酒店", show_lodging), ("花费", show_costs)) if on) or "不含酒店和花费"
+    msg = f"分享页已生成（{shown}）：{html_path}"
+    if image:
+        why = _share.render_png(html_path, png_path)
+        msg += f"\n长图：{png_path}" if why is None else f"\n没有生成长图：{why}。HTML 照常可用。"
+    return msg + "\n这是此刻的快照，行程改了要重新生成。"
 
 
 def export_gpx(day: Optional[int] = None) -> str:
@@ -2290,7 +2326,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
