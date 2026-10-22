@@ -28,9 +28,9 @@ def test_respects_pace_limits(beijing):
     for day in t.plan.days:
         st = day_stats(t, day)
         assert len(st.places) <= limits.max_places
-        # 单个景点独占一天时允许超过游览上限，其余情况不得超过
+        # 单个景点独占一天时允许超限；其余情况“游览 + 路上”不得超过当天总时间上限
         if len(st.places) > 1:
-            assert st.visit_min <= limits.max_visit_minutes
+            assert st.total_min <= limits.max_total_minutes
 
 
 def test_must_go_places_are_scheduled(beijing):
@@ -237,3 +237,73 @@ def test_scheduling_is_deterministic_with_hours():
                      opening_hours="周一至周日 09:00-12:00" if i % 2 else "周一至周日 13:00-18:00") for i in range(6)]
     t = _day_trip(ps, days=2)
     assert _order(t) == _order(t)
+
+
+# ---- 总时间容量 / 塞回未安排 / 轻松版 ----------------------------------------
+
+def _hz_trip(**kw):
+    """类杭州：西湖片区三个顺路景点（时长较长）+ 远处两个景点。"""
+    places = [
+        make_place("xihu", lat=30.2590, lon=120.1450, duration_min=180, priority=5),
+        make_place("leifeng", lat=30.2310, lon=120.1490, duration_min=120, priority=4),
+        make_place("jingci", lat=30.2290, lon=120.1430, duration_min=60, priority=3),
+        make_place("jiuxi", lat=30.1960, lon=120.1090, duration_min=120, priority=3),
+        make_place("songcheng", lat=30.1700, lon=120.1000, duration_min=240, priority=3),
+    ]
+    return make_trip(places, num_days=2, pace=Pace.NORMAL)
+
+
+def test_total_time_rule_keeps_nearby_long_day_together():
+    t = schedule(_hz_trip())
+    for day in t.plan.days:
+        st = day_stats(t, day)
+        if len(st.places) > 1:
+            assert st.total_min <= PACE_LIMITS[Pace.NORMAL].max_total_minutes
+    # 西湖和雷峰塔离得近，应在同一天
+    where = {it.place_id: d.index for d in t.plan.days for it in d.items}
+    assert where["xihu"] == where["leifeng"]
+
+
+def test_unscheduled_places_are_filled_back_when_room_exists():
+    plan = build_plan(_hz_trip(), comfort=1.0)
+    placed = {it.place_id for d in plan.days for it in d.items}
+    left = {u.place_id for u in plan.unscheduled}
+    assert placed | left == {"xihu", "leifeng", "jingci", "jiuxi", "songcheng"}
+    # 没有任何一个落下的景点还能放进某一天（否则就该被塞回去）
+    t = schedule(_hz_trip())
+    for pid in left:
+        for day in t.plan.days:
+            st = day_stats(t, day)
+            assert len(st.places) >= PACE_LIMITS[Pace.NORMAL].max_places or \
+                st.total_min + t.place(pid).duration_min > PACE_LIMITS[Pace.NORMAL].max_total_minutes
+
+
+def test_relaxed_schedule_is_lighter_and_never_exceeds_comfort_limit():
+    from tripcore.scheduler import RELAXED_COMFORT
+    t = schedule(_hz_trip(), comfort=RELAXED_COMFORT)
+    cap = int(PACE_LIMITS[Pace.NORMAL].max_total_minutes * RELAXED_COMFORT)
+    for day in t.plan.days:
+        st = day_stats(t, day)
+        if len(st.places) > 1:
+            assert st.total_min <= cap
+    normal = schedule(_hz_trip())
+    n_relaxed = sum(len(d.items) for d in t.plan.days)
+    n_normal = sum(len(d.items) for d in normal.plan.days)
+    assert n_relaxed <= n_normal
+
+
+def test_locked_items_untouched_by_fill_and_relaxed():
+    t = schedule(_hz_trip())
+    first = t.plan.days[0].items[0].place_id
+    from tripcore.state import commit
+    def lock(tt):
+        for d in tt.plan.days:
+            for it in d.items:
+                if it.place_id == first:
+                    it.locked = True
+    t = commit(t, lock)
+    before = next(d.index for d in t.plan.days for it in d.items if it.place_id == first)
+    from tripcore.scheduler import RELAXED_COMFORT
+    for c in (1.0, RELAXED_COMFORT):
+        n = schedule(t, keep_locked=True, comfort=c)
+        assert any(it.place_id == first and d.index == before for d in n.plan.days for it in d.items)

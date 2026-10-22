@@ -46,7 +46,7 @@ def test_invariants_hold_on_random_trips(seed):
         # 只有“必去景点放不下被迫塞入”时才允许超限
         if not must and len(members) > 1:
             assert len(members) <= limits.max_places
-            assert sum(p.duration_min for p in members) <= limits.max_visit_minutes
+            assert sum(p.duration_min for p in members) <= limits.max_total_minutes  # 游览本身必须在总时间内（再加路上时间由调度器保证）
 
 
 def test_repeat_is_deterministic_on_random_input():

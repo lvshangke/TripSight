@@ -11,8 +11,8 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-390%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-54-8A2BE2)
+![Tests](https://img.shields.io/badge/tests-402%20passing-brightgreen)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-55-8A2BE2)
 
 <img src="docs/images/workbench.png" alt="TripSight workbench" width="900">
 
@@ -39,7 +39,7 @@ TripSight attacks these one by one:
 - **It fills in what guides leave out:** hotel, arrival/departure transport, dates and season are part of the trip and feed into day assignment, opening-hours checks and first/last-day playable time.
 - **Personal touches merge in place:** your preferences are remembered, and any single stop can be moved to another day, removed, locked or re-timed, with automatic re-checking — no starting over.
 - **No more repeated route look-ups:** with Amap configured, real routes for every leg are filled in at once, and one click generates a chained personal map for each day.
-- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 54 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
+- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 55 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
 
 It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
@@ -68,7 +68,10 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
   - Arrangements you confirmed and locked stay put by default and only the rest is rearranged; to start over completely, say "re-plan including locked ones".
   - After re-planning, the "Update routes" button in the workbench (or `refine_routes`) fills the new legs with real Amap routes.
   - It never re-plans on its own: you ask for it, so you can compare before and after, and every re-plan is one version you can undo.
-  - Places that do not fit in a day are listed under "unscheduled" with the reason (over daily capacity, etc.); add days, raise the pace, or swap something out.- **Know what it will cost.** Tickets, your chosen restaurants and lodging are estimated per person count and shown **per day**; flight, train and hotel reference prices are read-only lookups with source and date. When nothing is found it says "to be verified" instead of inventing a number, and it warns when you exceed your budget or lodging cap.
+  - Places that do not fit in a day are listed under "unscheduled" with the reason (over daily capacity, etc.); add days, raise the pace, or swap something out.
+  - A day fits when visit time plus that day's actual travel time stays within the pace limit. If neither you nor a guide gives a visit duration, the assistant estimates one from common sense and tells you it is an estimate; edit it any time.
+  - After scheduling, if places were dropped or a day is packed, the assistant can dry-run a **relaxed version** (each day uses only 80% of the limit), compare it with the current plan, and apply it only if you agree (undoable).
+- **Know what it will cost.** Tickets, your chosen restaurants and lodging are estimated per person count and shown **per day**; flight, train and hotel reference prices are read-only lookups with source and date. When nothing is found it says "to be verified" instead of inventing a number, and it warns when you exceed your budget or lodging cap.
 - **Check the weather before you go.** Once dates are set, `get_weather` fetches each day (Amap in China; Open-Meteo, free and keyless, for dates Amap lacks or abroad). Outdoor stops are flagged on bad-weather days so you can decide whether to swap days.
 - **Review it when you are back.** Record what each stop was really like and what you actually spent; `show_review` puts **plan next to actual** and suggests preferences worth keeping (for example: many skipped stops suggest a more relaxed pace next time; notes saying "too tiring" suggest a lower walking limit). You decide what to remember, and the next trip applies it automatically.
 - **One click to chain every route of the journey.** Once the plan is settled:
@@ -92,7 +95,7 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
 | **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
-| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 390 automated tests |
+| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 402 automated tests |
 
 ## 🔍 Feature details
 

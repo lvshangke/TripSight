@@ -393,27 +393,43 @@ def _improve(
     anchor: Optional[Point],
     mode: str,
     max_rounds: int = 6,
+    pool: Optional[list[Place]] = None,
 ) -> list[list[Place]]:
     """反复尝试“移动一个景点到别的天”或“和别的天交换一个景点”，
     只要总交通分钟明显减少、并且不违反容量/闭馆/锁定规则，就采纳。
     规则：不会把某一天掏空；被锁定的条目不会被动。
+    容量按“游览 + 这一天实际排出来的路上时间”不超过节奏上限判断（和检查器的“太赶”是同一个标准）；
+    一开始分配景点时路线还没定，只能先用游览时长的粗略上限（×0.8），所以这里放宽到真实的总时间。
+    pool：没排进去的景点（按优先级排好）。每一轮先尝试把它们放进某一天：个数和总时间都不超限、
+    交通增加最少的那天；放进去的会从 pool 里删掉。
     """
     n = len(members)
     members = [list(m) for m in members]
     locked_ids = {p.id for m in locked_members for p in m}
     cache: dict[tuple, int] = {}
+    tcache: dict[tuple, int] = {}
+
+    def seq_of(i: int, mem: list[Place]) -> tuple[list[Place], Optional[_Ctx]]:
+        fixed = locked_members[i]
+        fixed_ids = {p.id for p in fixed}
+        new = [p for p in mem if p.id not in fixed_ids]
+        c = _ctx(trip, i, mem)
+        return order_day(fixed, new, anchor, mode, c), c
 
     def cost(i: int, mem: list[Place]) -> int:
         if not mem:
             return 0
         key = (i, tuple(sorted(p.id for p in mem)))
         if key not in cache:
-            fixed = locked_members[i]
-            fixed_ids = {p.id for p in fixed}
-            new = [p for p in mem if p.id not in fixed_ids]
-            c = _ctx(trip, i, mem)
-            cache[key] = _seq_cost(order_day(fixed, new, anchor, mode, c), anchor, mode, c)
+            seq, c = seq_of(i, mem)
+            cache[key] = _seq_cost(seq, anchor, mode, c)
         return cache[key]
+
+    def travel(i: int, mem: list[Place]) -> int:
+        key = (i, tuple(sorted(p.id for p in mem)))
+        if key not in tcache:
+            tcache[key] = _route_minutes(seq_of(i, mem)[0], anchor, mode)
+        return tcache[key]
 
     def ok(i: int, mem: list[Place]) -> bool:
         if any(_blocked(trip, p, i) for p in mem):
@@ -424,10 +440,27 @@ def _improve(
             return True
         if len(mem) > limits[i].max_places:
             return False
-        return sum(p.duration_min for p in mem) <= limits[i].max_visit_minutes
+        return sum(p.duration_min for p in mem) + travel(i, mem) <= limits[i].max_total_minutes
+
+    def fill() -> bool:
+        placed = False
+        for p in list(pool or []):
+            best: Optional[tuple[int, int]] = None
+            for j in range(n):
+                new_j = members[j] + [p]
+                if not ok(j, new_j):
+                    continue
+                d = cost(j, new_j) - cost(j, members[j])
+                if best is None or (d, j) < best:
+                    best = (d, j)
+            if best is not None:
+                members[best[1]].append(p)
+                pool.remove(p)          # type: ignore[union-attr]
+                placed = True
+        return placed
 
     for _ in range(max_rounds):
-        changed = False
+        changed = fill() if pool else False
         for i in range(n):
             for p in sorted(members[i], key=lambda x: x.id):
                 if p.id in locked_ids or p not in members[i]:
@@ -473,10 +506,16 @@ def _improve(
 # 对外入口
 # ---------------------------------------------------------------------------
 
-def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
-    """根据当前景点池生成一份新行程（不修改 trip，只返回 Plan）。"""
+RELAXED_COMFORT = 0.8      # “轻松版”：每天“游览 + 路上”不超过节奏上限的 80%
+
+
+def build_plan(trip: Trip, keep_locked: bool = True, comfort: float = 1.0) -> Plan:
+    """根据当前景点池生成一份新行程（不修改 trip，只返回 Plan）。
+    comfort < 1 时每天的容量按比例缩小（轻松版，如 RELAXED_COMFORT）。"""
     n_days = trip.meta.num_days
     limits = day_limits(trip)
+    if comfort < 1.0:
+        limits = [PaceLimits(l.max_places, int(l.max_total_minutes * comfort)) for l in limits]
     blocked = frozenset(i for i, l in enumerate(limits) if l.max_places == 0)
     lodging = trip.lodging_for_day(0)
     anchor: Optional[Point] = (lodging.lat, lodging.lon) if lodging else None
@@ -524,7 +563,11 @@ def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
                 centers[i] = _mean([_pt(p) for p in m])
 
     # 4.5 局部优化：跨天移动/交换景点，减少总交通时间
-    members = _improve(trip, members, locked_members, limits, anchor, mode)
+    pool = sorted((p for p in candidates if p.id in {u.place_id for u in unscheduled}),
+                  key=lambda p: (not p.must_go, -p.priority, p.name, p.id))
+    members = _improve(trip, members, locked_members, limits, anchor, mode, pool=pool)
+    left = {p.id for p in pool}
+    unscheduled = [u for u in unscheduled if u.place_id in left]
 
     # 5. 天内排序
     days: list[DayPlan] = []
@@ -539,9 +582,9 @@ def build_plan(trip: Trip, keep_locked: bool = True) -> Plan:
     return Plan(days=days, unscheduled=unscheduled)
 
 
-def schedule(trip: Trip, keep_locked: bool = True) -> Trip:
+def schedule(trip: Trip, keep_locked: bool = True, comfort: float = 1.0) -> Trip:
     """生成行程并写入一个新版本的 Trip（可撤销）。已安排的景点状态会变为 planned。"""
-    plan = build_plan(trip, keep_locked=keep_locked)
+    plan = build_plan(trip, keep_locked=keep_locked, comfort=comfort)
 
     def mutate(t: Trip) -> None:
         t.plan = plan

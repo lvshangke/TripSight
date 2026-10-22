@@ -1,6 +1,6 @@
 # 安装与接入 nanobot
 
-tripcore 本身是一个 MCP 服务（54 个工具）。要在聊天里使用它，需要一个能连 MCP 的 Agent；本项目用 [nanobot](https://github.com/HKUDS/nanobot)（MIT 协议）。**nanobot 不在本仓库里**，请自己安装；本仓库只提供接入需要的 skill、配置样例和脚本。
+tripcore 本身是一个 MCP 服务（55 个工具）。要在聊天里使用它，需要一个能连 MCP 的 Agent；本项目用 [nanobot](https://github.com/HKUDS/nanobot)（MIT 协议）。**nanobot 不在本仓库里**，请自己安装；本仓库只提供接入需要的 skill、配置样例和脚本。
 
 测试过的版本：nanobot 0.3.5，Python 3.10–3.12，mcp 1.x。
 

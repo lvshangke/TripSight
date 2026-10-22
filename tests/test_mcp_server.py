@@ -108,7 +108,7 @@ def test_exact_dates_set_num_days():
 def test_server_registers_all_tools():
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 54
+    assert len(names) == 55
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -1172,3 +1172,15 @@ def test_show_trip_header_has_dates_travelers_city():
     assert "日期未定" in head and "1 人" in head and "目的地未填" in head
     s.new_trip("范围", 3, earliest_start="2026-12-01", latest_end="2026-12-20")
     assert "大致 2026-12-01 至 2026-12-20 之间" in s.show_trip().splitlines()[0]
+
+
+def test_relaxed_alternative_is_read_only_and_applies_on_request():
+    _setup_trip()
+    s.add_lodging("酒店A", 39.91, 116.40, price_min=300, price_max=500, choose=True)
+    s.schedule_days()
+    rev = s._load().revision
+    r = s.relaxed_alternative()
+    assert set(r) == {"current", "relaxed", "dropped", "added_back"}
+    assert s._load().revision == rev            # 只读：不产生新版本
+    out = s.schedule_days(relaxed=True)
+    assert "轻松版" in out and s._load().revision == rev + 1

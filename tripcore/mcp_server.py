@@ -58,7 +58,7 @@ from .proposals import (
     make_proposal,
 )
 from .routeplace import entry, exit_
-from .scheduler import schedule
+from .scheduler import RELAXED_COMFORT, schedule
 from .state import NothingToUndo, commit
 from .state import undo as _undo
 from .storage import load_trip, save_trip
@@ -1499,19 +1499,49 @@ def _recommend(options: dict[str, Any], prefs) -> tuple[Optional[str], str]:
     return None, "没有查到任何路线"
 
 
-def schedule_days(keep_locked: bool = True) -> str:
-    """自动把入围景点分到各天并排好顺序（确定性算法，已锁定的条目不会动）。"""
+def schedule_days(keep_locked: bool = True, relaxed: bool = False) -> str:
+    """自动把入围景点分到各天并排好顺序（确定性算法，已锁定的条目不会动）。
+    每天的容量按“游览时间 + 当天实际路上时间”不超过节奏上限来算；放不下的景点会尽量塞回别的天，实在放不下才列入“未能安排”。
+    relaxed=true 是轻松版：每天总时间只用上限的 80%，会排得更松、可能多落下几个景点。
+    排完后可先用 relaxed_alternative 给用户看轻松版和当前版的差别，用户想要再用 relaxed=true 应用。"""
     trip = _load()
     if not trip.places:
         raise ToolError("还没有景点，请先 add_place。")
-    new = schedule(trip, keep_locked=keep_locked)
+    new = schedule(trip, keep_locked=keep_locked, comfort=RELAXED_COMFORT if relaxed else 1.0)
     _save(new)
-    msg = f"已分天（版本 {new.revision}）。"
+    msg = f"已分天（{'轻松版，' if relaxed else ''}版本 {new.revision}）。"
     assert new.plan is not None
     if new.plan.unscheduled:
         names = "、".join(f"{trip.place(u.place_id).name}（{u.reason}）" for u in new.plan.unscheduled)
         msg += f"\n未能安排：{names}"
     return msg + "\n" + _render(new)
+
+
+def relaxed_alternative(keep_locked: bool = True) -> dict[str, Any]:
+    """只读：试算一份“轻松版”分天（每天总时间 ≤ 上限的 80%），和当前行程对比，不修改任何数据。
+    返回 {"current": 每天的景点/游览分钟/路上分钟/总分钟, "relaxed": 同上, "dropped": 轻松版里排不下的景点名,
+    "added_back": 轻松版里多出来的景点名}。用户同意后再调用 schedule_days(relaxed=true) 应用（可 undo）。
+    路上时间是我们自己的估算，不是高德实时路线；应用后可用 refine_routes 取真实路线。"""
+    trip = _load()
+    if not trip.places:
+        raise ToolError("还没有景点，请先 add_place。")
+
+    def rows(t: Trip) -> list[dict[str, Any]]:
+        out = []
+        for d in (t.plan.days if t.plan else []):
+            st = day_stats(t, d)
+            out.append({"day": d.index + 1, "places": [p.name for p in st.places],
+                        "visit_min": st.visit_min, "travel_min": st.travel_min, "total_min": st.total_min})
+        return out
+
+    alt = schedule(trip, keep_locked=keep_locked, comfort=RELAXED_COMFORT)
+    cur_ids = {it.place_id for d in (trip.plan.days if trip.plan else []) for it in d.items}
+    alt_ids = {it.place_id for d in (alt.plan.days if alt.plan else []) for it in d.items}
+    return {
+        "current": rows(trip), "relaxed": rows(alt),
+        "dropped": [trip.place(i).name for i in sorted(cur_ids - alt_ids)],
+        "added_back": [trip.place(i).name for i in sorted(alt_ids - cur_ids)],
+    }
 
 
 def check_plan() -> dict[str, Any]:
@@ -2260,7 +2290,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
