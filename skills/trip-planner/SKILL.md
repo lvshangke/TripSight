@@ -34,7 +34,7 @@ always: true
 
 ## 工具一览
 
-new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip / archive_trip / record_review / record_actual_cost / show_review / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / relaxed_alternative / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
+new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip / archive_trip / record_review / record_actual_cost / show_review / draft_travelogue / check_travelogue / remember_preference / list_preferences / forget_preference / set_stays / clear_stays / add_place / update_place / remove_place / add_lodging / lookup_coords / refine_routes / set_transport_prefs / set_leg_mode / compare_transport / schedule_days / relaxed_alternative / check_plan / suggest_lodging / propose_change / apply_proposal / undo / show_trip
 
 ## 长期偏好（跨行程、跨会话）
 - 用户**明确**说出长期偏好时（“我不爱走路”“我一般喜欢地铁”“以后住宿别超过400”“我不吃辣”），调用 `remember_preference`，并用一句话告诉用户记了什么、可以随时让你忘掉。value 只能用工具说明里列出的键，不确定就只写 text。
@@ -183,9 +183,9 @@ new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip 
 - 各行程的提案、候选景点、地图文件互相独立；偏好是所有行程共用的。
 
 ## 行程回顾（旅行结束后）
-- 用户说“旅行结束了/回顾一下”时：先 `show_review` 看哪些还没记录，再一次性问用户“哪些去了、哪些没去、花了多少”，不要逐个追问细节。
-- 用户说的每个景点情况用 `record_review`，每笔花费用 `record_actual_cost`。只记用户说的，不确定就问，绝不替用户编金额或评分。
+- 用户说“旅行结束了/回顾一下”时：先 `show_review` 看哪些还没记录，再一次性问用户“哪些去了、哪些没去、花了多少”，不要逐个追问细节。用户说的每个景点情况用 `record_review`，每笔花费用 `record_actual_cost`。只记用户说的，不确定就问，绝不替用户编金额或评分。
 - `show_review` 末尾的偏好建议只是展示；用户明确说“记下来”再用 `remember_preference` 写入，并告诉用户记了什么。
+- 用户想“写游记/小红书/朋友圈文案”时：先 `draft_travelogue` 拿事实骨架（默认不含酒店和花费，要不要公开先问用户），“未记录”的景点先问用户去没去、感觉如何，再写；只用骨架里的事实，没记录的感受、花费、实际时间写“待补充”，不要编，别人游记里的介绍不是用户的经历。写完用 `check_travelogue` 自查，有问题就改文字，不要为了通过检查去编记录；感受和形容无法核实，交给用户自己读、自己改。
 
 ## 境外行程（Google Maps）
 - 目的地在境外（含港澳台）时，创建行程后用 `set_provider("google")`；国内行程不用管，默认高德。用户说“这个行程用高德/Google”也用它。

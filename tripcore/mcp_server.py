@@ -34,6 +34,7 @@ from .mapview import build_map_data, build_map_html, day_marker_links, marker_li
 from . import importplan as _importplan
 from . import links as _links
 from . import share as _share
+from . import travelogue as _tl
 from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
 from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -1267,6 +1268,31 @@ def record_actual_cost(category: str, amount: float, note: str = "") -> str:
     return f"已记下{cat} {amount:g} 元，{cat}累计 {total:g} 元。"
 
 
+def draft_travelogue(style: str = "通用", show_lodging: bool = False, show_costs: bool = False) -> dict[str, Any]:
+    """只读：把写游记需要的**事实骨架**整理出来（按天的景点、去了/没去/未记录、评分和备注、计划时间），自己写游记前先调用它。
+    事实只来自行程和用户用 record_review / record_actual_cost 记下的话；别人游记里的景点介绍不是用户的经历，不会出现。
+    写作规则：只用骨架里的事实；status 为“未记录”的景点先问用户去没去、感觉如何，再写；“没去”的不要写成去过；
+    没有记录的感受、花费、实际时间不要编，写“待补充”；计划时间不是实际时间。style：通用 / 小红书 / 朋友圈（只影响写法提示）。
+    默认不含酒店和花费（要发出去的内容，由用户决定）：show_lodging / show_costs 用户同意才开。写完用 check_travelogue 自查。"""
+    trip = _load()
+    try:
+        return _tl.build_facts(trip, _rv.load(_review_path()), style, show_lodging, show_costs)
+    except ValueError as e:
+        raise ToolError(str(e) + "，请先 schedule_days。")
+
+
+def check_travelogue(text: str, show_costs: bool = False) -> dict[str, Any]:
+    """只读：检查写好的游记草稿里**能确定**的问题——提到了没去/没记录的景点、金额或时间在记录里找不到、出现酒店名。
+    返回 {"problems": [...], "note": ...}。没问题不代表文字都对：感受和形容无法核实，请原样交给用户读、由用户改。
+    有问题就改草稿再查，不要为了通过检查去编记录。"""
+    trip = _load()
+    bad = _guard_text(text)
+    if bad:
+        raise ToolError("文字里" + "；".join(bad) + "，不能放进游记。")
+    probs = _tl.check(trip, _rv.load(_review_path()), text, show_costs)
+    return {"problems": probs, "note": "只检查能确定的部分；感受和形容无法核实，请用户自己读一遍。"}
+
+
 def show_review() -> str:
     """只读：回顾报告（计划 vs 实际：景点去了几个、各类花费偏差、评分备注），并按固定规则给出可写入长期偏好的建议。
     没记录的项目显示“未记录”。建议只是展示：用户明确说“记下来”后，才用 remember_preference 写入。"""
@@ -2326,7 +2352,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
