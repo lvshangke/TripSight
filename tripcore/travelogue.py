@@ -14,11 +14,36 @@ from .models import Trip
 from .review import COST_NAMES, STATUS_NAMES
 from .timeline import day_visits
 
-STYLE_HINTS = {
-    "通用": "按天写，每天一两段；先写去了哪、什么感受（只用用户的备注和评分），再写小提示。",
-    "小红书": "标题一句抓人的话，正文分短段，可用少量 emoji；结尾放 3~5 个话题标签。不要写没记录的花费和感受。",
-    "朋友圈": "三五句话的短文，配图说明按天一句即可，不要罗列全部景点。",
+TEMPLATES = {
+    "通用": {
+        "tone": "平实的日记体，第一人称。",
+        "sections": ["开头一两句（时间、地点、和谁去，只用已有事实）", "每天一段：去了哪、记录过的感受", "小提示（只用你记录过的备注）", "结尾一句"],
+        "length": "每天 80~150 字",
+    },
+    "小红书": {
+        "tone": "轻松、口语化，可用少量 emoji；不夸大，不写没记录的感受。",
+        "sections": ["标题：一句话，点出地点和天数", "开头一句：这趟的整体感觉（只用评分和备注）", "每天一小段，带天数小标题",
+                     "避雷/小提示（只用备注里有的）", "结尾一句", "话题标签（见 suggested_tags）"],
+        "length": "标题尽量简短；正文分短段，每段 2~4 句。平台字数限制会变，发布前以平台为准",
+    },
+    "朋友圈": {
+        "tone": "随手分享的口吻。",
+        "sections": ["三五句话概括这趟", "配图说明：每天一句"],
+        "length": "总共 100 字左右，不要罗列全部景点",
+    },
 }
+
+
+def suggested_tags(trip: Trip, review: dict[str, Any], city: str = "") -> list[str]:
+    """话题标签只用事实：目的地城市和“去了”的景点名，最多 5 个；不加热门标签。"""
+    tags: list[str] = []
+    if city:
+        tags += [f"#{city}", f"#{city}旅行"]
+    rv = review.get("places", {})
+    for p in trip.places:
+        if rv.get(p.id, {}).get("status") == "visited" and len(tags) < 5:
+            tags.append(f"#{p.name}")
+    return tags[:5]
 
 
 def _hm(m: int) -> str:
@@ -26,7 +51,8 @@ def _hm(m: int) -> str:
 
 
 def build_facts(trip: Trip, review: dict[str, Any], style: str = "通用",
-                show_lodging: bool = False, show_costs: bool = False) -> dict[str, Any]:
+                show_lodging: bool = False, show_costs: bool = False,
+                photos: list[dict[str, Any]] | None = None, city: str = "") -> dict[str, Any]:
     if trip.plan is None:
         raise ValueError("还没有分天")
     rv_places = review.get("places", {})
@@ -54,15 +80,26 @@ def build_facts(trip: Trip, review: dict[str, Any], style: str = "通用",
                 stop["note"] = r["note"]
             if show_costs and p.ticket_price:
                 stop["ticket_price_ref"] = p.ticket_price
+            ph = [{"id": x["id"], "caption": x.get("caption", "")} for x in (photos or []) if x.get("place_id") == p.id]
+            if ph:
+                stop["photos"] = ph
             stops.append(stop)
-        days.append({"day": day.index + 1, "date": d.isoformat() if d else "", "stops": stops})
+        entry: dict[str, Any] = {"day": day.index + 1, "date": d.isoformat() if d else "", "stops": stops}
+        dph = [{"id": x["id"], "caption": x.get("caption", "")} for x in (photos or []) if x.get("day") == day.index + 1]
+        if dph:
+            entry["photos"] = dph
+        days.append(entry)
     facts: dict[str, Any] = {
-        "title": trip.meta.name, "style_hint": STYLE_HINTS.get(style, STYLE_HINTS["通用"]),
+        "title": trip.meta.name, "style": style if style in TEMPLATES else "通用",
+        "template": TEMPLATES.get(style, TEMPLATES["通用"]),
         "days": days, "unrecorded": unrecorded, "skipped": skipped,
         "rules": ["只能使用这里的事实；没有记录的感受、花费、时间一律不写或写“待补充”。",
                   "“未记录”的景点先问用户去没去、感觉如何，再写。", "不要写“没去”的景点当作去过。",
-                  "计划时间不是实际时间，不要写成“几点到了”。"],
+                  "计划时间不是实际时间，不要写成“几点到了”。",
+                  "照片只能引用 photos 里有的（写成“配图：说明”即可），不要描述照片里看不到的内容。"],
     }
+    if style == "小红书":
+        facts["suggested_tags"] = suggested_tags(trip, review, city)
     if show_costs:
         facts["actual_costs"] = {COST_NAMES[k]: v["amount"] for k, v in review.get("costs", {}).items()}
     if show_lodging:

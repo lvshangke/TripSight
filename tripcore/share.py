@@ -41,6 +41,7 @@ h1{font-size:22px;margin:4px 0 2px}.sub{color:var(--mute);font-size:13px;margin-
 .sb .ln{color:var(--mute);font-size:12.5px}.sb a{color:#2e86ab;font-size:12.5px;text-decoration:none}
 .leg{margin:0 14px 0 48px;padding:2px 0 2px 10px;border-left:2px dashed var(--line);color:var(--mute);font-size:12.5px}
 .meal,.hot,.term{padding:6px 14px 6px 48px;color:var(--mute);font-size:13px}
+.ph{display:block;width:100%;border-radius:10px;margin:6px 0 2px}.cap{color:var(--mute);font-size:12px;margin-bottom:4px}
 .foot{color:var(--mute);font-size:12px;margin-top:22px;text-align:center}.foot a{color:inherit}
 """
 
@@ -69,7 +70,12 @@ def _keep_leg(tl: list[dict], i: int, show_lodging: bool) -> bool:
     return side(range(i - 1, -1, -1)) == "stop" and side(range(i + 1, len(tl))) == "stop"
 
 
-def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, show_costs: bool) -> str:
+def _photos(items: list[dict]) -> str:
+    return "".join(f'<img class="ph" src="{x["uri"]}" alt="{_e(x["caption"])}">' + (f'<div class="cap">{_e(x["caption"])}</div>' if x["caption"] else "") for x in items)
+
+
+def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, show_costs: bool,
+              by_place: dict | None = None, by_day: dict | None = None) -> str:
     idx = d["index"]
     date_ = trip.day_date(idx)
     if date_:
@@ -109,15 +115,20 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
             ln = "".join(f'<div class="ln">{_e(x)}</div>' for x in lines)
             link = f'<a href="{_e(e["web"])}">在地图中打开</a>' if e.get("web") else ""
             out.append(f'<div class="stop"><div class="n">{e["n"]}</div><div class="sb"><div class="nm">{_e(e["name"])}</div>'
-                       f'<div class="tm">{_e(e["arrive"])}–{_e(e["leave"])} · 停留 {e["stay"]} 分钟</div>{ln}{link}</div></div>')
+                       f'<div class="tm">{_e(e["arrive"])}–{_e(e["leave"])} · 停留 {e["stay"]} 分钟</div>{ln}{link}'
+                       f'{_photos((by_place or {}).get(e["pid"], []))}</div></div>')
         elif t == "meal":
             lines = [x for x in e["lines"] if show_costs or not x.startswith("人均")]
             out.append(f'<div class="meal">🍜 用餐：{_e(e["name"])}' + (f'（{_e("；".join(lines))}）' if lines else "") + "</div>")
+    if by_day and by_day.get(idx + 1):
+        out.append(f'<div class="meal">{_photos(by_day[idx + 1])}</div>')
     out.append("</section>")
     return "".join(out)
 
 
-def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = False) -> str:
+def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = False,
+                     photos: Optional[tuple[dict, dict]] = None) -> str:
+    """photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
     if trip.plan is None:
         raise ValueError("还没有分天")
     days = build_map_data(trip)["days"]
@@ -135,7 +146,8 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
         ce = estimate_cost(trip)
         if show_lodging and ce.nights and ce.lodging:
             summary.append(f"住宿约 ¥{ce.lodging:.0f}（{ce.nights} 晚）")
-    body = "".join(_day_html(trip, d, _COLORS[d["index"] % len(_COLORS)], stats.get(str(d["index"]), {}), show_lodging, show_costs)
+    body = "".join(_day_html(trip, d, _COLORS[d["index"] % len(_COLORS)], stats.get(str(d["index"]), {}), show_lodging, show_costs,
+                                 photos[0] if photos else None, photos[1] if photos else None)
                    for d in days)
     return ("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -154,7 +166,7 @@ def render_png(html_path: Path, png_path: Path, width: int = 430) -> Optional[st
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        return "没有安装 playwright（pip install 'tripcore[image]' && python -m playwright install chromium）"
+        return "没有安装 playwright（pip install playwright && python -m playwright install chromium）"
     try:
         with sync_playwright() as p:
             b = p.chromium.launch()

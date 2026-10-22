@@ -11,8 +11,8 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-415%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-58-8A2BE2)
+![Tests](https://img.shields.io/badge/tests-422%20passing-brightgreen)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 > **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
@@ -50,7 +50,7 @@ TripSight attacks these one by one:
 - **It fills in what guides leave out:** hotel, arrival/departure transport, dates and season are part of the trip and feed into day assignment, opening-hours checks and first/last-day playable time.
 - **Personal touches merge in place:** your preferences are remembered, and any single stop can be moved to another day, removed, locked or re-timed, with automatic re-checking — no starting over.
 - **No more repeated route look-ups:** with Amap configured, real routes for every leg are filled in at once, and one click generates a chained personal map for each day.
-- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 58 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
+- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 60 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
 
 It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
@@ -86,6 +86,8 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
 - **Check the weather before you go.** Once dates are set, `get_weather` fetches each day (Amap in China; Open-Meteo, free and keyless, for dates Amap lacks or abroad). Outdoor stops are flagged on bad-weather days so you can decide whether to swap days.
 - **Review it when you are back.** Record what each stop was really like and what you actually spent; `show_review` puts **plan next to actual** and suggests preferences worth keeping (for example: many skipped stops suggest a more relaxed pace next time; notes saying "too tiring" suggest a lower walking limit). You decide what to remember, and the next trip applies it automatically.
   - After the review you can **draft a travelogue**: `draft_travelogue` collects only facts you recorded (visited / skipped, ratings, notes), hotel and costs hidden by default; `check_travelogue` flags places you skipped or never recorded, amounts and times that do not match your records, and hotel names. Feelings and descriptions cannot be verified, so you read and edit them yourself.
+  - Writing templates: `style` can be **Xiaohongshu / Moments / general**, returning a section structure, tone and length hints; Xiaohongshu hashtags come only from facts (destination city + places you visited, at most 5) — no trending-tag padding.
+  - **Trip photos**: `add_photo` attaches your own photos to a stop or a day. They are re-encoded with Pillow, **EXIF location removed** and downsized (without Pillow it refuses to save rather than copy a geotagged file); it never fetches images from the web. The share image/page shows photos under their stops only with `show_photos`, off by default.
 - **One click to chain every route of the journey.** Once the plan is settled:
   - `refine_routes` (the "update routes" button in the workbench) fills in real routes for every leg of every day;
   - `create_amap_map` turns each day's loop (hotel → sights → meals → hotel) into an Amap app personal-map link (or one merged map);
@@ -108,7 +110,7 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
 | **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
-| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 415 automated tests |
+| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 422 automated tests |
 
 ## 🔍 Feature details
 

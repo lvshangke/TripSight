@@ -12,8 +12,8 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-415%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-58-8A2BE2)
+![Tests](https://img.shields.io/badge/tests-422%20passing-brightgreen)
+![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
 
@@ -51,7 +51,7 @@ TripSight 把这些问题拆开来解决：
 - **补齐攻略缺的那部分**：酒店、到达/离开的大交通、出行日期和季节都是行程的一部分，直接参与分天、营业时间检查和首末日可玩时间的计算。
 - **个人特色定点融合**：你的偏好被记住并套用；任何一个景点都可以单独换天、移出、锁定、改停留时长，改完自动重新检查，不用推倒重来。
 - **路线不用反复查**：配置高德后一次补全全程每一段的真实路线，再一键生成每天串联好的专属地图。
-- **事实由代码和工具保证，不靠模型编**：**大模型**（通过聊天）只负责听懂意图、提出修改；**tripcore**（确定性代码，通过 MCP 提供 58 个工具）负责排程、检查、查路线、记版本、撤销；**你**确认每一次修改。
+- **事实由代码和工具保证，不靠模型编**：**大模型**（通过聊天）只负责听懂意图、提出修改；**tripcore**（确定性代码，通过 MCP 提供 60 个工具）负责排程、检查、查路线、记版本、撤销；**你**确认每一次修改。
 
 它不是又一个“一键生成攻略”的模板，而是一个**能反复调整、每一步都可核对**的行程工作台。
 
@@ -87,6 +87,8 @@ TripSight 把这些问题拆开来解决：
 - **出发前先看天气。** 日期定下后 `get_weather` 查每天的天气（国内用高德，高德没有的日期或境外用 Open-Meteo，免费、无需 key）；户外景点遇到坏天气会被标出来，让你决定要不要换天。
 - **回来之后能复盘。** 旅行结束记下每个景点的实际情况和各类实际花费，`show_review` 把**计划和实际**摆在一起，给出可写进偏好的建议（比如没去的景点多，就建议下次把节奏设为悠闲；备注提到太累，就建议调低步行上限），记不记由你决定，下一次规划会自动套用。
   - 复盘之后还能**写游记草稿**：`draft_travelogue` 只整理你记录过的事实（去了/没去、评分、备注），默认不含酒店和花费；写完 `check_travelogue` 会抓出“提到没去的景点、对不上记录的金额和时间、出现酒店名”。感受和形容无法核实，由你自己读、自己改。
+  - 写作模板：`style` 可选**小红书 / 朋友圈 / 通用**，返回段落结构、语气和长度提示；小红书的话题标签只由事实生成（目的地城市 + 你去了的景点，最多 5 个），不凑热门标签。
+  - **旅途照片**：`add_photo` 把你自己拍的照片挂在某个景点或某一天，存入时用 Pillow 重新编码，**去掉 EXIF 定位**并缩小（没装 Pillow 就拒绝保存，绝不原样存带定位的文件）；不会去网上找图。分享长图/网页加 `show_photos` 才会把照片放在对应景点下面，默认不带。
 - **一键串联全程所有路线。** 行程定稿后：
   - `refine_routes`（网页里的“更新路线”按钮）一次性补全每一天所有路段的真实路线；
   - `create_amap_map` 把每天“酒店 → 景点 → 用餐 → 酒店”的闭环直接生成高德 App 专属地图链接（也可合成一张）；
@@ -118,7 +120,7 @@ TripSight 把这些问题拆开来解决：
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、415 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、422 个自动化测试 |
 
 ---
 
@@ -346,7 +348,7 @@ tripcore/
 ├── checklist.py review.py prefs.py   定稿清单、旅行复盘、长期偏好
 ├── mapview.py gpx.py textview.py     地图页、GPX、手机/微信文字版
 ├── web.py webpage.py   本机网页工作台
-├── mcp_server.py   MCP 服务（58 个工具）
+├── mcp_server.py   MCP 服务（60 个工具）
 └── doctor.py cli.py    自检与命令行
 skills/             给聊天 Agent 的“说明书”（trip-planner、flyai-search）
 scripts/            install_skills.py（把技能装进 nanobot）、merge_nanobot_config.py（登记到 nanobot 配置，先预览）
@@ -410,7 +412,7 @@ DESIGN.md           设计原则、算法说明
 
 ## MCP 服务
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 58 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 60 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip` `submit_candidates` `adopt_candidates` `compare_with_source` `follow_source_days` 等。
 

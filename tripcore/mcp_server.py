@@ -35,6 +35,7 @@ from . import importplan as _importplan
 from . import links as _links
 from . import share as _share
 from . import travelogue as _tl
+from . import photos as _ph
 from .lodging import day_trips, suggest_stay_segments, rank_lodgings, suggest_stay_area
 from .metrics import day_budgets, day_stats, estimate_cost, leg_key, leg_mode
 from .connections import day_window, is_night, leave_by, ready_time, terminal_depart_time, terminal_point, transfer_minutes, transfer_target
@@ -1076,11 +1077,11 @@ def export_text(day: Optional[int] = None, links: bool = True) -> str:
     return text
 
 
-def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True) -> str:
+def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True, show_photos: bool = False) -> str:
     """生成可分享的行程成品：单文件 HTML（手机直接打开）和长图 PNG（微信里最方便发）。
     内容是按天的卡片：日期块、景点数/路程/用时、每站时间和营业时间、两站之间的交通、天气，每站有地图链接。
     默认**不公开酒店和花费**，因为分享出去之前该由用户决定：show_lodging=true 才带酒店名（和从酒店出发/回酒店的路段），
-    show_costs=true 才带门票、餐饮人均和住宿估价。必须先问用户要不要公开，用户没说就用默认。
+    show_costs=true 才带门票、餐饮人均和住宿估价，show_photos=true 才把用户用 add_photo 挂上的照片放在各站下面（照片已去掉定位信息，但画面里可能有人脸或隐私，所以默认不带）。必须先问用户要不要公开，用户没说就用默认。
     航班/车次号不会出现，页面不带任何 key，也不嵌地图；生成前有外发检查。
     长图需要可选依赖 playwright；没装就只出 HTML 并如实告诉用户。需要先 schedule_days。
     拿到路径后用 message 工具把文件（优先 PNG）作为附件发给用户；这是此刻的快照，行程改了要重新生成。"""
@@ -1092,7 +1093,8 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
     folder = trip_path().with_name("share")
     html_path, png_path = folder / f"{stem}-share.html", folder / f"{stem}-share.png"
     try:
-        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs)
+        photos = _ph.for_share(_photo_dir(), _ph.load(_photo_index())) if show_photos else None
+        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs, photos=photos)
     except ValueError as e:
         raise ToolError(str(e))
     bad = _share.guard_html(html)
@@ -1103,7 +1105,7 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
         html_path.write_text(html, encoding="utf-8")
     except OSError as e:
         raise ToolError(f"写入分享页失败：{e}")
-    shown = "、".join(x for x, on in (("酒店", show_lodging), ("花费", show_costs)) if on) or "不含酒店和花费"
+    shown = "、".join(x for x, on in (("酒店", show_lodging), ("花费", show_costs), ("照片", show_photos)) if on) or "不含酒店、花费和照片"
     msg = f"分享页已生成（{shown}）：{html_path}"
     if image:
         why = _share.render_png(html_path, png_path)
@@ -1268,15 +1270,57 @@ def record_actual_cost(category: str, amount: float, note: str = "") -> str:
     return f"已记下{cat} {amount:g} 元，{cat}累计 {total:g} 元。"
 
 
+def _photo_dir() -> Path:
+    return trip_path().with_name("photos")
+
+
+def _photo_index() -> Path:
+    return trip_path().with_name("photos.json")
+
+
+def add_photo(path: str, place: str = "", day: Optional[int] = None, caption: str = "") -> str:
+    """把用户自己拍的一张照片挂到某个景点（place：景点名或 id）或某一天（day 从 1 起），二选一。path 是用户电脑上的图片路径（jpg/png/webp，≤20MB）。
+    存入时会重新编码、去掉拍摄定位等元数据并缩小；没有安装 Pillow 就拒绝保存。只用用户给的照片，不要自己去网上找图；
+    说明 caption 只写用户说的话，不要替照片编内容。照片不会自动公开：export_share 要 show_photos=true、游记里只引用编号和说明。"""
+    trip = _load()
+    pid = _find_place_ref(trip, place).id if place.strip() else None
+    if day is not None and not (1 <= day <= trip.meta.num_days):
+        raise ToolError(f"没有第 {day} 天（行程共 {trip.meta.num_days} 天）")
+    bad = _guard_text(caption or "")
+    if bad:
+        raise ToolError("说明里" + "；".join(bad))
+    items = _ph.load(_photo_index())
+    try:
+        rec = _ph.add(_photo_dir(), items, path, pid, day, caption)
+        _ph.save(_photo_index(), items)
+    except _ph.PhotoError as e:
+        raise ToolError(f"没有保存：{e}")
+    where = f"「{trip.place(pid).name}」" if pid else f"第 {day} 天"
+    return f"已把照片（编号 {rec['id']}）挂在{where}，已去掉定位信息。默认不会公开，分享时要你同意。"
+
+
+def remove_photo(photo_id: str) -> str:
+    """删除一张照片（编号来自 add_photo 或 draft_travelogue）。只删本机保存的副本，不动用户的原图。"""
+    _load()
+    items = _ph.load(_photo_index())
+    try:
+        _ph.remove(_photo_dir(), items, photo_id.strip())
+    except _ph.PhotoError as e:
+        raise ToolError(str(e))
+    _ph.save(_photo_index(), items)
+    return "已删除。"
+
+
 def draft_travelogue(style: str = "通用", show_lodging: bool = False, show_costs: bool = False) -> dict[str, Any]:
     """只读：把写游记需要的**事实骨架**整理出来（按天的景点、去了/没去/未记录、评分和备注、计划时间），自己写游记前先调用它。
     事实只来自行程和用户用 record_review / record_actual_cost 记下的话；别人游记里的景点介绍不是用户的经历，不会出现。
     写作规则：只用骨架里的事实；status 为“未记录”的景点先问用户去没去、感觉如何，再写；“没去”的不要写成去过；
-    没有记录的感受、花费、实际时间不要编，写“待补充”；计划时间不是实际时间。style：通用 / 小红书 / 朋友圈（只影响写法提示）。
+    没有记录的感受、花费、实际时间不要编，写“待补充”；计划时间不是实际时间。style：通用 / 小红书 / 朋友圈，返回对应的结构模板（段落、语气、长度提示），小红书还会给只由事实生成的话题标签 suggested_tags；用户挂过的照片会列在对应景点/天下面（只有编号和说明）。
     默认不含酒店和花费（要发出去的内容，由用户决定）：show_lodging / show_costs 用户同意才开。写完用 check_travelogue 自查。"""
     trip = _load()
     try:
-        return _tl.build_facts(trip, _rv.load(_review_path()), style, show_lodging, show_costs)
+        return _tl.build_facts(trip, _rv.load(_review_path()), style, show_lodging, show_costs,
+                               _ph.load(_photo_index()), (_load_context() or {}).get("city", ""))
     except ValueError as e:
         raise ToolError(str(e) + "，请先 schedule_days。")
 
@@ -2352,7 +2396,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
-image = ["playwright>=1.40"]     # 可选：export_share 生成长图
+image = ["playwright>=1.40", "pillow>=10"]     # 可选：export_share 长图（playwright）、照片去定位（pillow）
 
 [project.scripts]
 tripcore = "tripcore.cli:main"
