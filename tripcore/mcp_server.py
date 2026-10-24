@@ -1077,8 +1077,27 @@ def export_text(day: Optional[int] = None, links: bool = True) -> str:
     return text
 
 
+def _make_basemap(trip: Any) -> tuple[Any, str]:
+    """只在用户要求时才建：国内行程 + 有 AMAP_KEY。返回 (Basemap 或 None, 说明)。"""
+    from .amap import AmapClient
+    from .basemap import Basemap
+    if trip_region(trip) != "cn":
+        return None, "境外行程不支持高德底图"
+    client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+    if client is None:
+        return None, "没有 AMAP_KEY（在你自己的配置里设置，不要发给我）"
+    return Basemap(client, trip_path().with_name("share") / "basemap-cache"), ""
+
+
+def _basemap_report(bm: Any, note: str) -> str:
+    if bm is None:
+        return f"没有加底图：{note}。路线图照常（无底图）。"
+    msg = f"底图：向高德请求了 {bm.requests} 张静态图（缓存命中 {bm.hits} 张）"
+    return msg + (f"；有 {len(bm.failures)} 类失败：{'；'.join(bm.failures)}，对应的图已退回无底图" if bm.failures else "") + "。"
+
+
 def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True, show_photos: bool = False,
-                 theme: str = "default", gif: bool = False) -> str:
+                 theme: str = "default", gif: bool = False, basemap: bool = False) -> str:
     """生成可分享的行程成品：单文件 HTML（手机直接打开）和长图 PNG（微信里最方便发）。
     内容是按天的卡片：日期块、景点数/路程/用时、每站时间和营业时间、两站之间的交通、天气，每站有地图链接。
     默认**不公开酒店和花费**，因为分享出去之前该由用户决定：show_lodging=true 才带酒店名（和从酒店出发/回酒店的路段），
@@ -1086,6 +1105,8 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
     航班/车次号不会出现，页面不带任何 key，也不嵌地图；生成前有外发检查。
     theme 是版面风格：default 默认、magazine 杂志编辑、cream 奶油温柔、journal 手账贴纸、botanical 植物清新、ink 新中式墨韵、dopamine 多巴胺、swiss 瑞士极简（都是浅色底，只换配色和字体）。
     页面顶部有路线图（SVG，每天一种颜色，不带街道底图，不联网），每天的卡片里还有当天的放大路线图；网页里点“播放路线”会按天画出来。
+    basemap=true 给路线图加高德街道底图（默认关闭）：会联网，用用户自己的 AMAP_KEY，只把“中心点、缩放、图片大小”发给高德，不发景点/酒店名和路线；
+    图片内嵌进页面，别人打开不需要联网；范围内的酒店名可能出现在底图上，所以要先问用户。只支持国内行程；失败会如实说明并照常生成无底图版本。
     gif=true 把这个“按天画出来”的动画录成 GIF（需要 playwright 和 Pillow）。
     长图需要可选依赖 playwright（没装 Chromium 会自动试本机的 Chrome）；没装就只出 HTML 并如实告诉用户。需要先 schedule_days。
     拿到路径后用 message 工具把文件（优先 PNG）作为附件发给用户；这是此刻的快照，行程改了要重新生成。"""
@@ -1096,9 +1117,12 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
     stem = _re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]+", "_", trip.meta.name).strip("_") or "trip"
     folder = trip_path().with_name("share")
     html_path, png_path = folder / f"{stem}-share.html", folder / f"{stem}-share.png"
+    bm, bm_note = None, ""
+    if basemap:
+        bm, bm_note = _make_basemap(trip)
     try:
         photos = _ph.for_share(_photo_dir(), _ph.load(_photo_index())) if show_photos else None
-        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs, photos=photos, theme=theme)
+        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs, photos=photos, theme=theme, basemap=bm)
     except ValueError as e:
         raise ToolError(str(e))
     bad = _share.guard_html(html)
@@ -1111,6 +1135,8 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
         raise ToolError(f"写入分享页失败：{e}")
     shown = "、".join(x for x, on in (("酒店", show_lodging), ("花费", show_costs), ("照片", show_photos)) if on) or "不含酒店、花费和照片"
     msg = f"分享页已生成（{shown}）：{html_path}"
+    if basemap:
+        msg += "\n" + _basemap_report(bm, bm_note)
     if image:
         why = _share.render_png(html_path, png_path)
         msg += f"\n长图：{png_path}" if why is None else f"\n没有生成长图：{why}。HTML 照常可用。"

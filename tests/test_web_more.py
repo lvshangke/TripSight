@@ -99,3 +99,11 @@ def test_travelogue_routes(server):
     code, r = call(server, "/tok/api/travelogue_check", {"text": "乙很棒，花了99元"})
     assert code == 200 and r["problems"]
     assert call(server, "/tok/api/travelogue_check", {"text": "  "})[0] == 400
+
+
+def test_share_preview_basemap_needs_key_and_is_off_by_default(server, monkeypatch):
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    code, r = call(server, "/tok/api/share_preview", {})
+    assert code == 200 and r["key_ok"] is False and "<image" not in r["html"]
+    code, r = call(server, "/tok/api/share_preview", {"basemap": True})
+    assert code == 400 and "AMAP_KEY" in r["error"]

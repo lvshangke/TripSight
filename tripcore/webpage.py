@@ -163,7 +163,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="note"></div>
 <div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="log">游记</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
-<label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
+<label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
 <button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><div id="sh_err"></div>
@@ -546,12 +546,14 @@ function moShow(tab) {
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
   if (tab === 'share') shareRefresh(); else if (tab === 'log') logGen(); else toolsLoad();
 }
-const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value});
+const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 async function shareRefresh() {
   $('sh_err').textContent = '';
   try {
     const r = await api('share_preview', shareOpts()); shareHtml = r.html; $('sh_frame').srcdoc = r.html;
     if (r.themes && !$('sh_t').options.length) r.themes.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('sh_t').appendChild(o); });
+    $('sh_b').disabled = !r.key_ok; if (!r.key_ok) $('sh_b').checked = false;
+    $('sh_bn').textContent = !r.key_ok ? '没有检测到 AMAP_KEY：在你自己的终端里设置后重启工作台，这个选项才能用。' : (r.bm_note ? '部分底图没取到：' + r.bm_note + '（对应的图已退回无底图）' : '默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。');
     $('sh_gif').disabled = !r.gif_ok; $('sh_gif').title = r.gif_ok ? '把路线图按天画出来的过程录成 GIF' : '需要先安装 Playwright 和 Pillow';
     $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
     $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
@@ -639,7 +641,7 @@ function photoRow(row, pid) {
 }
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
-['sh_l', 'sh_c', 'sh_p', 'sh_t'].forEach(id => $(id).onchange = shareRefresh);
+['sh_l', 'sh_c', 'sh_p', 'sh_t', 'sh_b'].forEach(id => $(id).onchange = shareRefresh);
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };
 $('sh_gif').onclick = async () => { $('sh_err').textContent = '正在录制路线动画（几秒钟）…'; $('sh_gif').disabled = true; try { const r = await api('share_gif', shareOpts()); dl(r.gif, '路线动画.gif'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_gif').disabled = false; };
 $('sh_png').onclick = async () => { $('sh_err').textContent = '正在生成长图…'; $('sh_png').disabled = true; try { const r = await api('share_image', shareOpts()); dl(r.png, '行程分享.png'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_png').disabled = false; };

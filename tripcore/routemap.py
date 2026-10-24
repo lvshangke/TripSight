@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 import math
 from html import escape
-from typing import Any, Callable
+from typing import Any, Callable, Optional
+
+from . import basemap as _bm
 
 W = 360.0
 PAD = 18.0
@@ -111,12 +113,18 @@ def _collect(days, keep, show_lodging):
     return legs_raw, marks_raw, order
 
 
-def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H):
+def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H, base: Optional[_bm.Basemap] = None):
     """返回 (legs_svg, marks_svg, 投影)；没有点返回 None。"""
     pts_all = [p for _, pts, _ in legs_raw for p in pts] + [(m[2], m[3]) for m in marks_raw]
     if not pts_all:
         return None
     pr = _Proj(pts_all, max_h)
+    img = None
+    if base is not None:
+        view = _bm.choose_view(pts_all, W, pr.h, PAD)
+        img = base.fetch(view)
+        if img:
+            pr = _bm.Projection(view)
     legs_svg, marks_svg = [], []
     for step, (di, kind, idx) in enumerate(order):
         col = colors[di % len(colors)]
@@ -134,33 +142,39 @@ def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H):
             else:
                 marks_svg.append(f'<g data-s="{step}" data-d="{di}" style="{tr};--c:{col}"><circle cx="{x:.1f}" cy="{y:.1f}" r="7.5"/>'
                                  f'<text x="{x:.1f}" y="{y + 3.3:.1f}">{n}</text></g>')
-    return legs_svg, marks_svg, pr
+    return legs_svg, marks_svg, pr, img
 
 
-def build_day(day: dict[str, Any], color: str, keep: Callable[[list[dict], int], bool], show_lodging: bool = False) -> str:
+def _image(img: Optional[str], pr) -> str:
+    return f'<image href="{img}" x="0" y="0" width="{W:.0f}" height="{pr.h:.1f}" preserveAspectRatio="none"/>' if img else ""
+
+
+def build_day(day: dict[str, Any], color: str, keep: Callable[[list[dict], int], bool], show_lodging: bool = False,
+              base: Optional[_bm.Basemap] = None) -> str:
     """每天一张按当天范围放大的静态小图；少于 2 个点（没有路段可画）就不画。"""
     legs_raw, marks_raw, order = _collect([day], keep, show_lodging)
     if not legs_raw or len(marks_raw) < 2:
         return ""
-    drawn = _draw(legs_raw, marks_raw, order, [color] * (day["index"] + 1), max_h=300.0)
+    drawn = _draw(legs_raw, marks_raw, order, [color] * (day["index"] + 1), max_h=300.0, base=base)
     if drawn is None:
         return ""
-    legs_svg, marks_svg, pr = drawn
-    return (f'<div class="dmap"><svg class="rsvg" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="当天路线图">'
-            f'<g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g></svg></div>')
+    legs_svg, marks_svg, pr, img = drawn
+    return (f'<div class="dmap"><svg class="rsvg{" bm" if img else ""}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="当天路线图">{_image(img, pr)}'
+            f'<g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g></svg>{"<div class=bmc>底图 © 高德地图</div>" if img else ""}</div>')
 
 
-def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[dict], int], bool], show_lodging: bool = False) -> str:
+def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[dict], int], bool], show_lodging: bool = False,
+          base: Optional[_bm.Basemap] = None) -> str:
     """返回总览路线图的 HTML 片段（含样式和脚本）；没有任何可画的点就返回空串。"""
     legs_raw, marks_raw, order = _collect(days, keep, show_lodging)
-    drawn = _draw(legs_raw, marks_raw, order, colors)
+    drawn = _draw(legs_raw, marks_raw, order, colors, base=base)
     if drawn is None:
         return ""
-    legs_svg, marks_svg, pr = drawn
+    legs_svg, marks_svg, pr, img = drawn
     used = sorted({o[0] for o in order})
     vbs: dict[int, list[float]] = {}
     ratio = W / pr.h
-    for di in used:
+    for di in ([] if img else used):
         xy = [pr.xy(la, lo) for dd, pts, _ in legs_raw if dd == di for la, lo in pts] + [pr.xy(m[2], m[3]) for m in marks_raw if m[0] == di]
         x0, x1, y0, y1 = min(x for x, _ in xy), max(x for x, _ in xy), min(y for _, y in xy), max(y for _, y in xy)
         w, h = max((x1 - x0) * 1.35, 60.0), max((y1 - y0) * 1.35, 60.0 / ratio)
@@ -178,9 +192,9 @@ def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[di
            ".rsvg{width:100%;height:auto;display:block}.rsvg .rl path{fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 .8px rgba(0,0,0,.4))}"
            ".rsvg .rl path.r{stroke-width:3.4}.rsvg .rl path.g{stroke-width:1.8;opacity:.75}.rsvg .rs circle{fill:var(--c);stroke:#fff;stroke-width:1.5}"
            ".rsvg .rs text{font:700 9px sans-serif;text-anchor:middle;fill:var(--on)}.rsvg .rs text.hm{fill:#fff;font-size:8px}#rm_d{font:700 13px sans-serif;fill:var(--mute)}"
-           ".rmw{position:relative}#rm_n{position:absolute;left:8px;top:6px;font:700 15px sans-serif;color:var(--ink);background:var(--chip);border-radius:999px;padding:0 10px}#rm_n:empty{display:none}.rmn{font-size:11.5px;color:var(--mute);margin-top:4px}.dmap{padding:6px 14px 0}.dmap .rsvg{max-height:340px}</style>")
-    svg = (f'<svg class="rsvg" id="rmap" data-vb="{_e(json.dumps(vbs))}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="路线图">'
+           ".rsvg.bm .rl path{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff)}.bmc{font-size:11px;color:var(--mute);text-align:right;margin-top:2px}.rmw{position:relative}#rm_n{position:absolute;left:8px;top:6px;font:700 15px sans-serif;color:var(--ink);background:var(--chip);border-radius:999px;padding:0 10px}#rm_n:empty{display:none}.rmn{font-size:11.5px;color:var(--mute);margin-top:4px}.dmap{padding:6px 14px 0}.dmap .rsvg{max-height:340px}</style>")
+    svg = (f'<svg class="rsvg{" bm" if img else ""}" id="rmap" data-vb="{_e(json.dumps(vbs))}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="路线图">{_image(img, pr)}'
            f'<text id="rm_d" x="10" y="18">共 {len(used)} 天</text><g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g></svg>')
     return (css + '<section class="rmap"><div class="rmh"><b>路线图</b><button id="rm_b" type="button">▶ 播放路线</button></div>'
-            f'<div class="rmh" style="margin:0 0 4px">{legend}</div><div class="rmw">{svg}<div id="rm_n"></div></div><div class="rmn">{_e(note)}；只画路线和景点，不含街道底图。</div></section>'
+            f'<div class="rmh" style="margin:0 0 4px">{legend}</div><div class="rmw">{svg}<div id="rm_n"></div></div><div class="rmn">{_e(note)}；{"底图 © 高德地图，已内嵌在页面里。" if img else "只画路线和景点，不含街道底图。"}</div></section>'
             f"<script>{_JS}</script>")

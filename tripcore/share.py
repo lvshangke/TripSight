@@ -154,7 +154,7 @@ def _photos(items: list[dict]) -> str:
 
 
 def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, show_costs: bool,
-              by_place: dict | None = None, by_day: dict | None = None, route_map: bool = True) -> str:
+              by_place: dict | None = None, by_day: dict | None = None, route_map: bool = True, basemap=None) -> str:
     idx = d["index"]
     date_ = trip.day_date(idx)
     if date_:
@@ -175,7 +175,7 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
         out.append(f'<div class="wx">🌤 {_e(fmt_snap(w))}</div>')
     tl = d["timeline"]
     if route_map:
-        out.append(_routemap.build_day(d, color, lambda t_, i_: _keep_leg(t_, i_, show_lodging), show_lodging))
+        out.append(_routemap.build_day(d, color, lambda t_, i_: _keep_leg(t_, i_, show_lodging), show_lodging, basemap))
     for i, e in enumerate(tl):
         t = e["type"]
         if t == "conn":
@@ -209,8 +209,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
 
 def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = False,
                      photos: Optional[tuple[dict, dict]] = None, theme: str = "default",
-                     route_map: bool = True) -> str:
-    """theme：见 THEMES。photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
+                     route_map: bool = True, basemap=None) -> str:
+    """basemap：basemap.Basemap 或 None；给了才联网取高德底图（默认不取）。theme：见 THEMES。photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
     if trip.plan is None:
         raise ValueError("还没有分天")
     days = build_map_data(trip)["days"]
@@ -229,9 +229,9 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
         if show_lodging and ce.nights and ce.lodging:
             summary.append(f"住宿约 ¥{ce.lodging:.0f}（{ce.nights} 晚）")
     colors = _theme(theme)["colors"]
-    rmap = _routemap.build(days, colors, lambda tl, i: _keep_leg(tl, i, show_lodging), show_lodging) if route_map else ""
+    rmap = _routemap.build(days, colors, lambda tl, i: _keep_leg(tl, i, show_lodging), show_lodging, basemap) if route_map else ""
     body = "".join(_day_html(trip, d, colors[d["index"] % len(colors)], stats.get(str(d["index"]), {}), show_lodging, show_costs,
-                                 photos[0] if photos else None, photos[1] if photos else None, route_map)
+                                 photos[0] if photos else None, photos[1] if photos else None, route_map, basemap)
                    for d in days)
     return ("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"

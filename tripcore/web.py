@@ -467,16 +467,26 @@ def tools() -> dict[str, Any]:
     return {"total": len(_tc.CATALOG), "blocks": _tc.catalog_rows(), "promises": _tc.PROMISES}
 
 
+_BM_NOTE = {"text": ""}
+
+
 def _share_html(body: dict) -> str:
     trip = ms._load()
     if trip.plan is None:
         raise HttpError(400, "还没有分天，先排好行程再分享。")
     photos = _ph.for_share(ms._photo_dir(), _ph.load(ms._photo_index())) if body.get("photos") else None
+    bm = None
+    if body.get("basemap"):
+        bm, why = ms._make_basemap(trip)
+        if bm is None:
+            raise HttpError(400, "没有加底图：" + why)
     try:
         html = _share.build_share_html(trip, show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")), photos=photos,
-                                       theme=str(body.get("theme") or "default"), route_map=body.get("route_map", True) is not False)
+                                       theme=str(body.get("theme") or "default"), route_map=body.get("route_map", True) is not False, basemap=bm)
     except ValueError as e:
         raise HttpError(400, str(e))
+    if bm is not None and bm.failures:
+        _BM_NOTE["text"] = "；".join(bm.failures)
     bad = _share.guard_html(html)
     if bad:
         raise HttpError(400, "外发检查没通过：" + "；".join(bad) + "。请检查景点名称/备注里是否混入了不该外发的内容。")
@@ -485,7 +495,9 @@ def _share_html(body: dict) -> str:
 
 def share_preview(body: dict) -> dict[str, Any]:
     import importlib.util
-    return {"html": _share_html(body), "png_ok": importlib.util.find_spec("playwright") is not None,
+    _BM_NOTE["text"] = ""
+    html = _share_html(body)
+    return {"html": html, "bm_note": _BM_NOTE["text"], "key_ok": bool(os.environ.get("AMAP_KEY", "").strip()), "png_ok": importlib.util.find_spec("playwright") is not None,
             "photo_count": len(_ph.load(ms._photo_index())),
             "gif_ok": importlib.util.find_spec("playwright") is not None and importlib.util.find_spec("PIL") is not None,
             "themes": [{"id": k, "label": v["label"]} for k, v in _share.THEMES.items()]}

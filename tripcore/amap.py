@@ -199,6 +199,42 @@ class AmapClient:
             raise AmapError(f"高德返回错误：{info or data.get('infocode', '未知')}")
         raise AmapError("高德请求多次失败")
 
+    def _get_raw(self, path: str, params: dict[str, Any]) -> bytes:
+        """取二进制（地图图片）。出错时高德返回 JSON，这里转成 AmapError。"""
+        url = f"{BASE_URL}{path}?{urllib.parse.urlencode({**params, 'key': self._key})}"
+        if self._opener is None:
+            wait = _MIN_INTERVAL_S - (time.monotonic() - self._last)
+            if wait > 0:
+                time.sleep(wait)
+        try:
+            if self._opener is not None:
+                data = self._opener(url)
+            else:
+                with urllib.request.urlopen(url, timeout=self._timeout) as resp:
+                    data = resp.read()
+        except Exception as e:
+            self._audit(path, params, f"网络失败 {type(e).__name__}")
+            raise AmapError(f"高德请求失败：{type(e).__name__}") from None
+        finally:
+            self._last = time.monotonic()
+        if isinstance(data, (bytes, bytearray)) and data[:1] == b"{":
+            try:
+                data = json.loads(bytes(data).decode("utf-8"))
+            except ValueError:
+                pass
+        if isinstance(data, dict):
+            info = str(data.get("info", "") or data.get("infocode", "未知"))
+            self._audit(path, params, f"错误 {info}")
+            raise AmapError(f"高德返回错误：{info}")
+        self._audit(path, params, "OK")
+        return bytes(data)
+
+    def static_map(self, lat: float, lon: float, zoom: int, width: int, height: int) -> bytes:
+        """静态地图底图（不带标注和路线）。lat/lon 是 GCJ-02（和高德一致，不要转换）；只把中心点、缩放、图片大小发给高德。"""
+        w, h = max(1, min(int(width), 1024)), max(1, min(int(height), 1024))
+        return self._get_raw("/v3/staticmap", {"location": f"{lon:.6f},{lat:.6f}", "zoom": max(1, min(int(zoom), 17)),
+                                               "size": f"{w}*{h}", "scale": 1})
+
     # ---- 地点 ----
     def search_places(self, query: str, city: Optional[str] = None, limit: int = 5) -> list[PlaceHit]:
         params: dict[str, Any] = {
