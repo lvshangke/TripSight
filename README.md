@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a
 <p><b>规划与检查</b></p>
 <table>
 <tr>
-<td width="33%" valign="top">
+<td width="33%" valign="left">
 <strong>拖动检查</strong><br>
 <sub>把故宫拖到周一，代码立刻指出闭馆和超出节奏；你确认前不生效。</sub><br><br>
 <img src="docs/images/demo.gif" width="100%" alt="拖动检查">
@@ -96,8 +96,6 @@ https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a
 <sub>网页版每个景点可点开高德地图；长图适合直接发微信。</sub><br><br>
 <img src="docs/images/feat-export.gif" width="100%" alt="一键导出">
 </td>
-</tr>
-<tr>
 <td width="25%" valign="top">
 <strong>游记生成</strong><br>
 <sub>只用你记录过的事实写骨架，写完自查没去、没记录、金额对不上的地方。</sub><br><br>
