@@ -21,27 +21,26 @@ from .weather import fmt_snap
 _COLORS = ["#e4572e", "#2e86ab", "#3a9d5d", "#9b5de5", "#f2a541", "#17a398", "#d1495b", "#6c757d"]
 _REPO = "https://github.com/lvshangke/TripSight"
 
-_CSS = """
-:root{--bg:#f6f4ef;--card:#fff;--ink:#1f2328;--mute:#6b7280;--line:#e7e3da;--chip:#f0ede5}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#15171a;--card:#1f2226;--ink:#e8e8e6;--mute:#9aa0a6;--line:#2c3036;--chip:#2a2e33}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+_BASE_CSS = """
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1f2328;--mute:#6b7280;--line:#e7e3da;--chip:#f0ede5;--link:#2e86ab;--on:#fff;--r:14px;--rb:10px;--shadow:0 1px 3px rgba(0,0,0,.06);--font:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;--hfont:var(--font);--hw:700;--hs:22px;--bw:5px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font)}
 .wrap{max-width:560px;margin:0 auto;padding:20px 16px 36px}
-h1{font-size:22px;margin:4px 0 2px}.sub{color:var(--mute);font-size:13px;margin-bottom:14px}
+h1{font-family:var(--hfont);font-weight:var(--hw);font-size:var(--hs);margin:4px 0 2px}.sub{color:var(--mute);font-size:13px;margin-bottom:14px}
 .sum{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
 .chip{background:var(--chip);border-radius:999px;padding:2px 10px;font-size:12.5px;color:var(--mute);white-space:nowrap}
-.day{background:var(--card);border-radius:14px;margin:14px 0;overflow:hidden;border-left:5px solid var(--c);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.day{background:var(--card);border-radius:var(--r);margin:14px 0;overflow:hidden;border-left:var(--bw) solid var(--c);box-shadow:var(--shadow)}
 .dh{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
-.dd{min-width:54px;text-align:center;border-radius:10px;background:var(--c);color:#fff;padding:4px 6px;line-height:1.15}
+.dd{min-width:54px;text-align:center;border-radius:var(--rb);background:var(--c);color:var(--on);padding:4px 6px;line-height:1.15}
 .dd b{display:block;font-size:20px}.dd span{font-size:11.5px;opacity:.92}
 .dt{flex:1}.dt strong{font-size:16px}.dt .sum{margin:4px 0 0}
 .wx{padding:6px 14px;color:var(--mute);font-size:13px;border-bottom:1px solid var(--line)}
 .stop{display:flex;gap:10px;padding:10px 14px}
-.n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--c);color:#fff;font-size:13px;text-align:center;line-height:24px;margin-top:2px}
+.n{flex:none;width:24px;height:24px;border-radius:var(--rn,50%);background:var(--c);color:var(--on);font-size:13px;text-align:center;line-height:24px;margin-top:2px}
 .sb{flex:1;min-width:0}.sb .nm{font-weight:600}.sb .tm{color:var(--mute);font-size:13px}
-.sb .ln{color:var(--mute);font-size:12.5px}.sb a{color:#2e86ab;font-size:12.5px;text-decoration:none}
+.sb .ln{color:var(--mute);font-size:12.5px}.sb a{color:var(--link);font-size:12.5px;text-decoration:none}
 .leg{margin:0 14px 0 48px;padding:2px 0 2px 10px;border-left:2px dashed var(--line);color:var(--mute);font-size:12.5px}
 .meal,.hot,.term{padding:6px 14px 6px 48px;color:var(--mute);font-size:13px}
-.ph{display:block;width:100%;border-radius:10px;margin:6px 0 2px}.cap{color:var(--mute);font-size:12px;margin-bottom:4px}
+.ph{display:block;width:100%;border-radius:var(--rb);margin:6px 0 2px}.cap{color:var(--mute);font-size:12px;margin-bottom:4px}
 .ph{cursor:zoom-in}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:9}#lb.on{display:flex}
 #lb img{max-width:96vw;max-height:84vh;border-radius:6px}#lb div{color:#eee;font-size:13px;margin-top:10px;padding:0 16px;text-align:center}
 #lb button{position:absolute;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:22px}
@@ -49,6 +48,76 @@ h1{font-size:22px;margin:4px 0 2px}.sub{color:var(--mute);font-size:13px;margin-
 .foot{color:var(--mute);font-size:12px;margin-top:22px;text-align:center}.foot a{color:inherit}
 """
 
+
+
+
+_SERIF = '"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong",Georgia,serif'
+
+# 风格借鉴自 Easel 的风格库（https://github.com/ZJU-REAL/Easel，Apache-2.0）的思路，配色和 CSS 为本项目自写。
+# 全部是浅色底；只改颜色、字体、圆角、边线，不改页面结构，也不改“默认不公开酒店/花费”等规则。
+THEMES: dict[str, dict] = {
+    "default": {"label": "默认", "vars": "", "colors": _COLORS, "extra": ""},
+    "magazine": {
+        "label": "杂志编辑",
+        "vars": f"--bg:#f3f0e8;--card:transparent;--ink:#16251b;--mute:#68625a;--line:#cfc8b8;--chip:#e8e3d6;--link:#315d93;--r:3px;--rb:3px;--shadow:none;--font:{_SERIF};--hw:500;--hs:28px;--bw:0px",
+        "colors": ["#315d93", "#9b5a2e", "#2f5d50", "#7a4a6b", "#8a6d2b", "#3d6b73", "#9b3d3d", "#5e5a52"],
+        "extra": ".day{border-top:2px solid var(--ink);border-radius:0;margin:22px 0}.dh{border-bottom:1px solid var(--line)}.dd{background:transparent;color:var(--c);border:1px solid var(--c)}"
+                 ".sub{font-style:italic;letter-spacing:.04em}.chip{border-radius:2px}.n{background:transparent;color:var(--c);border:1px solid var(--c)}",
+    },
+    "cream": {
+        "label": "奶油温柔",
+        "vars": "--bg:#faf6ef;--card:#fffdf8;--ink:#7a6a5c;--mute:#a09282;--line:#ede4d3;--chip:#ede4d3;--link:#8a7a5a;--r:24px;--rb:16px;--shadow:0 4px 18px rgba(122,106,92,.10);--hw:600;--bw:0px",
+        "colors": ["#7f927c", "#6f8a96", "#b08683", "#8a7790", "#ad9660", "#6f918a", "#a8796b", "#8b857a"],
+        "extra": ".day{margin:18px 0}.chip{background:#f3ebdc}.leg{border-left-style:dotted}",
+    },
+    "journal": {
+        "label": "手账贴纸",
+        "vars": "--bg:#fbf7f0;--card:#fffefb;--ink:#4a4036;--mute:#85796b;--line:#d9cdb8;--chip:#f3e9d2;--link:#6a7fa5;--on:#4a4036;--r:6px;--rb:4px;--shadow:2px 3px 0 rgba(120,100,70,.12);--bw:0px;--hs:24px",
+        "colors": ["#f3d9a4", "#b8d8c8", "#e8c4c4", "#bcd3e8", "#e3d2ef", "#f6c9a0", "#cbe1a8", "#d8d2c4"],
+        "extra": ".day{border:2px dashed var(--line);position:relative;overflow:visible}.day::before{content:\"\";position:absolute;top:-10px;left:22px;width:74px;height:20px;background:var(--c);opacity:.9;transform:rotate(-3deg);clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)}"
+                 ".dd{transform:rotate(-2deg);box-shadow:1px 2px 0 rgba(0,0,0,.12)}.chip{transform:rotate(-1deg);border:1px dashed var(--line)}.n{border:1px solid rgba(74,64,54,.25)}.dh{border-bottom:1px dashed var(--line)}.leg{border-left:2px dotted var(--line)}",
+    },
+    "botanical": {
+        "label": "植物清新",
+        "vars": "--bg:#f6f4ee;--card:#fcfbf7;--ink:#2f3b2c;--mute:#6b7866;--line:#dfe3d4;--chip:#e9eddf;--link:#5a7f4f;--r:12px;--rb:8px;--shadow:none;--hw:500;--bw:4px",
+        "colors": ["#6b8a64", "#b87444", "#4f7f80", "#8f8a3f", "#7d6a93", "#a85f5f", "#5a7f4f", "#857656"],
+        "extra": ".day{border:1px solid var(--line);border-left:4px solid var(--c)}.dd{background:transparent;color:var(--c);border:1px solid var(--c)}.chip{background:transparent;border:1px solid var(--line)}",
+    },
+    "ink": {
+        "label": "新中式墨韵",
+        "vars": f"--bg:#f3efe4;--card:#f8f4ea;--ink:#1a1a1a;--mute:#6b6357;--line:#d9d0bd;--chip:#ece5d3;--link:#a8322d;--r:2px;--rb:2px;--rn:2px;--shadow:none;--font:{_SERIF};--hw:700;--hs:26px;--bw:3px",
+        "colors": ["#a8322d", "#3a3a3a", "#3f5560", "#8a5a2f", "#476b5a", "#8f7440", "#6a4f6e", "#6b6357"],
+        "extra": "h1{border-bottom:2px solid #a8322d;padding-bottom:6px;display:inline-block}.dd{border-radius:2px}.chip{border-radius:2px}.day{border-top:1px solid var(--line)}.n{font-weight:700}",
+    },
+    "dopamine": {
+        "label": "多巴胺",
+        "vars": "--bg:#ffd500;--card:#fff;--ink:#0a0a0a;--mute:#333;--line:#0a0a0a;--chip:#fff;--link:#002fa7;--r:12px;--rb:8px;--shadow:4px 4px 0 #0a0a0a;--hw:900;--hs:30px;--bw:0px",
+        "colors": ["#e6007e", "#002fa7", "#0a8f3c", "#e8530e", "#6b21d8", "#007c8a", "#d1103d", "#0a0a0a"],
+        "extra": ".day{border:3px solid #0a0a0a}.chip{border:2px solid #0a0a0a;color:#0a0a0a;font-weight:700}.dd{border:2px solid #0a0a0a}.n{border:2px solid #0a0a0a}.sub{color:#0a0a0a;font-weight:600}.foot,.foot a{color:#0a0a0a}.leg{border-left:2px dashed #0a0a0a}",
+    },
+    "swiss": {
+        "label": "瑞士极简",
+        "vars": "--bg:#fafaf8;--card:#fff;--ink:#0a0a0a;--mute:#737373;--line:#d8d8d4;--chip:#f0f0ec;--link:#002fa7;--r:0px;--rb:0px;--rn:0px;--shadow:none;--hw:300;--hs:34px;--bw:0px",
+        "colors": ["#002fa7"] * 8,
+        "extra": ".day{border:1px solid var(--line);border-top:3px solid #002fa7}.chip{border-radius:0}.dd{background:transparent;color:#002fa7;border:1px solid #002fa7}.n{background:#002fa7}.sub{letter-spacing:.12em;text-transform:uppercase;font-size:12px}",
+    },
+}
+
+
+def theme_names() -> list[str]:
+    return list(THEMES)
+
+
+def _theme(name: str) -> dict:
+    t = THEMES.get(name or "default")
+    if t is None:
+        raise ValueError(f"没有这个风格：{name}。可选：" + "、".join(f"{k}（{v['label']}）" for k, v in THEMES.items()))
+    return t
+
+
+def _css(theme: str) -> str:
+    t = _theme(theme)
+    return _BASE_CSS + (f":root{{{t['vars']}}}\n" if t["vars"] else "") + t["extra"] + "\n"
 
 _LIGHTBOX = (
     '<div id="lb"><img alt=""><div></div><button class="p">‹</button><button class="n">›</button><button class="x">×</button></div><script>(function(){var b=document.getElementById(\'lb\'),im=b.querySelector(\'img\'),cp=b.querySelector(\'div\'),L=[],i=0;function show(){var e=L[i];im.src=e.src;cp.textContent=(L.length>1?(i+1)+\'/\'+L.length+\' \':\'\')+(e.alt||\'\');b.querySelector(\'.p\').style.display=b.querySelector(\'.n\').style.display=L.length>1?\'\':\'none\';b.className=\'on\'}document.addEventListener(\'click\',function(ev){var t=ev.target;if(t.classList&&t.classList.contains(\'ph\')){L=Array.prototype.slice.call((t.closest(\'.sb\')||t.parentNode).querySelectorAll(\'img.ph\'));i=L.indexOf(t);show()}else if(t===b||t.classList.contains(\'x\')){b.className=\'\'}else if(t.classList.contains(\'p\')){i=(i+L.length-1)%L.length;show()}else if(t.classList.contains(\'n\')){i=(i+1)%L.length;show()}});document.addEventListener(\'keydown\',function(e){if(b.className!==\'on\')return;if(e.key===\'Escape\')b.className=\'\';else if(e.key===\'ArrowLeft\')b.querySelector(\'.p\').click();else if(e.key===\'ArrowRight\')b.querySelector(\'.n\').click()})})();</script>'
@@ -136,8 +205,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
 
 
 def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = False,
-                     photos: Optional[tuple[dict, dict]] = None) -> str:
-    """photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
+                     photos: Optional[tuple[dict, dict]] = None, theme: str = "default") -> str:
+    """theme：见 THEMES。photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
     if trip.plan is None:
         raise ValueError("还没有分天")
     days = build_map_data(trip)["days"]
@@ -155,12 +224,13 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
         ce = estimate_cost(trip)
         if show_lodging and ce.nights and ce.lodging:
             summary.append(f"住宿约 ¥{ce.lodging:.0f}（{ce.nights} 晚）")
-    body = "".join(_day_html(trip, d, _COLORS[d["index"] % len(_COLORS)], stats.get(str(d["index"]), {}), show_lodging, show_costs,
+    colors = _theme(theme)["colors"]
+    body = "".join(_day_html(trip, d, colors[d["index"] % len(colors)], stats.get(str(d["index"]), {}), show_lodging, show_costs,
                                  photos[0] if photos else None, photos[1] if photos else None)
                    for d in days)
     return ("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            f"<title>{_e(trip.meta.name)}</title><style>{_CSS}</style></head><body><div class=\"wrap\">"
+            f"<title>{_e(trip.meta.name)}</title><style>{_css(theme)}</style></head><body><div class=\"wrap\">"
             f"<h1>{_e(trip.meta.name)}</h1><div class=\"sub\">{_e(span)}</div>{_chips(summary)}{body}"
             f"<div class=\"foot\">营业时间等信息来自高德，标“待核实”的出行前请再确认；路程标“估算”的是直线估算，不是实时路线。<br>"
             f"由 <a href=\"{_REPO}\">TripSight</a> 生成</div></div>"

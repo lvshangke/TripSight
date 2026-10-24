@@ -78,3 +78,22 @@ def test_guard_blocks_local_paths(monkeypatch):
     s.schedule_days()
     with pytest.raises(s.ToolError):
         s.export_share()
+
+
+def test_all_themes_render_light_and_pass_guard():
+    _trip()
+    for name in share.theme_names():
+        out = s.export_share(theme=name)
+        html = open(out.split("：", 1)[1].split("\n")[0], encoding="utf-8").read()
+        assert "prefers-color-scheme" not in html and not share.guard_html(html) and HOTEL not in html
+        assert "<title>分享测试</title>" in html
+    a = share.build_share_html(s._load(), theme="magazine")
+    b = share.build_share_html(s._load(), theme="dopamine")
+    assert a != b and "#ffd500" in b and "#f3f0e8" in a
+
+
+def test_unknown_theme_is_refused_with_choices():
+    _trip()
+    with pytest.raises(Exception) as e:
+        s.export_share(theme="neon")
+    assert "magazine" in str(e.value) and "没有这个风格" in str(e.value)

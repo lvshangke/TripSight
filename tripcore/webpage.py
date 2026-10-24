@@ -163,7 +163,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="note"></div>
 <div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="log">游记</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
-<label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
+<label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
 <button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><div id="sh_err"></div>
@@ -546,11 +546,12 @@ function moShow(tab) {
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
   if (tab === 'share') shareRefresh(); else if (tab === 'log') logGen(); else toolsLoad();
 }
-const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked});
+const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value});
 async function shareRefresh() {
   $('sh_err').textContent = '';
   try {
     const r = await api('share_preview', shareOpts()); shareHtml = r.html; $('sh_frame').srcdoc = r.html;
+    if (r.themes && !$('sh_t').options.length) r.themes.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('sh_t').appendChild(o); });
     $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
     $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
     $('sh_pn').textContent = r.photo_count ? '已有 ' + r.photo_count + ' 张，放在对应景点下面' : '还没有照片：在“编辑”模式下给景点添加';
@@ -637,7 +638,7 @@ function photoRow(row, pid) {
 }
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
-['sh_l', 'sh_c', 'sh_p'].forEach(id => $(id).onchange = shareRefresh);
+['sh_l', 'sh_c', 'sh_p', 'sh_t'].forEach(id => $(id).onchange = shareRefresh);
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };
 $('sh_png').onclick = async () => { $('sh_err').textContent = '正在生成长图…'; $('sh_png').disabled = true; try { const r = await api('share_image', shareOpts()); dl(r.png, '行程分享.png'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_png').disabled = false; };
 $('lg_go').onclick = logGen; $('lg_style').onchange = logGen; $('lg_l').onchange = logGen; $('lg_c').onchange = logGen;

@@ -64,6 +64,8 @@ def test_photo_upload_strips_exif_lists_and_removes(server, tmp_path):
     assert r["html"].count("data:image/jpeg;base64,") == 1 and r["photo_count"] == 1
     assert 'id="lb"' in r["html"]                                    # 带照片时才内联放大查看器
     assert 'id="lb"' not in call(server, "/tok/api/share_preview", {})[1]["html"]
+    assert len(r["themes"]) == 8 and "#ffd500" in call(server, "/tok/api/share_preview", {"theme": "dopamine"})[1]["html"]
+    assert call(server, "/tok/api/share_preview", {"theme": "neon"})[0] == 400
     assert call(server, "/tok/api/photo_remove", {"id": lst["photos"][0]["id"]})[0] == 200
     assert call(server, "/tok/api/photos")[1]["photos"] == [] and not list((tmp_path / "photos").glob("*.jpg"))
 

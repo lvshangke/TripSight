@@ -1077,12 +1077,14 @@ def export_text(day: Optional[int] = None, links: bool = True) -> str:
     return text
 
 
-def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True, show_photos: bool = False) -> str:
+def export_share(show_lodging: bool = False, show_costs: bool = False, image: bool = True, show_photos: bool = False,
+                 theme: str = "default") -> str:
     """生成可分享的行程成品：单文件 HTML（手机直接打开）和长图 PNG（微信里最方便发）。
     内容是按天的卡片：日期块、景点数/路程/用时、每站时间和营业时间、两站之间的交通、天气，每站有地图链接。
     默认**不公开酒店和花费**，因为分享出去之前该由用户决定：show_lodging=true 才带酒店名（和从酒店出发/回酒店的路段），
     show_costs=true 才带门票、餐饮人均和住宿估价，show_photos=true 才把用户用 add_photo 挂上的照片放在各站下面（照片已去掉定位信息，但画面里可能有人脸或隐私，所以默认不带）。必须先问用户要不要公开，用户没说就用默认。
     航班/车次号不会出现，页面不带任何 key，也不嵌地图；生成前有外发检查。
+    theme 是版面风格：default 默认、magazine 杂志编辑、cream 奶油温柔、journal 手账贴纸、botanical 植物清新、ink 新中式墨韵、dopamine 多巴胺、swiss 瑞士极简（都是浅色底，只换配色和字体）。
     长图需要可选依赖 playwright；没装就只出 HTML 并如实告诉用户。需要先 schedule_days。
     拿到路径后用 message 工具把文件（优先 PNG）作为附件发给用户；这是此刻的快照，行程改了要重新生成。"""
     trip = _load()
@@ -1094,7 +1096,7 @@ def export_share(show_lodging: bool = False, show_costs: bool = False, image: bo
     html_path, png_path = folder / f"{stem}-share.html", folder / f"{stem}-share.png"
     try:
         photos = _ph.for_share(_photo_dir(), _ph.load(_photo_index())) if show_photos else None
-        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs, photos=photos)
+        html = _share.build_share_html(trip, show_lodging=show_lodging, show_costs=show_costs, photos=photos, theme=theme)
     except ValueError as e:
         raise ToolError(str(e))
     bad = _share.guard_html(html)

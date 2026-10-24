@@ -473,7 +473,8 @@ def _share_html(body: dict) -> str:
         raise HttpError(400, "还没有分天，先排好行程再分享。")
     photos = _ph.for_share(ms._photo_dir(), _ph.load(ms._photo_index())) if body.get("photos") else None
     try:
-        html = _share.build_share_html(trip, show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")), photos=photos)
+        html = _share.build_share_html(trip, show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")), photos=photos,
+                                       theme=str(body.get("theme") or "default"))
     except ValueError as e:
         raise HttpError(400, str(e))
     bad = _share.guard_html(html)
@@ -485,7 +486,8 @@ def _share_html(body: dict) -> str:
 def share_preview(body: dict) -> dict[str, Any]:
     import importlib.util
     return {"html": _share_html(body), "png_ok": importlib.util.find_spec("playwright") is not None,
-            "photo_count": len(_ph.load(ms._photo_index()))}
+            "photo_count": len(_ph.load(ms._photo_index())),
+            "themes": [{"id": k, "label": v["label"]} for k, v in _share.THEMES.items()]}
 
 
 def share_image(body: dict) -> dict[str, Any]:
