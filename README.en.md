@@ -38,16 +38,9 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 <sub>Demos use the bundled Beijing sample, a Suzhou sample trip and Xi’an Muslim Quarter (photo taken by the author); weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
 ---
 
-## 😩 Pain points of guides and existing tools
-
-Following someone else's guide usually breaks down on a few things:
-
-1. **Other people's guides are incomplete.** A guide tells you *what to see*, not your whole trip: **where you sleep, when you arrive and leave**, and **which season** you travel in. Those are exactly what decide how much time the first day has, what fits on the last day, whether a place is open and whether the weather suits it. Copying a guide verbatim often means finding out on site that you are too late, it is closed, or the hotel is too far.
-2. **Personal touches are hard to merge.** The small shop you want to visit, a friend's tip, the pace your family needs, your dislike of walking — none of it is in the guide, and squeezing it in by hand means re-ordering everything and re-calculating every leg.
-3. **Looking up how to get between sights is repetitive.** Walk, transit or taxi for every pair of stops, one by one in a map app, again after every change.
-4. **Itineraries generated directly by an LLM are unreliable.** It confidently makes things up — a sight that is long closed, two places two hours apart called "nearby" — and fixing one thing can break the rest.
-
 ## ✨ What is TripSight
+
+Following someone else's guide usually breaks down on a few things: it leaves out your hotel, arrival/departure times and season; your own places are hard to merge in; every leg between stops has to be looked up again after each change; and an itinerary generated directly by an LLM confidently makes things up (a sight that is long closed, two places two hours apart called "nearby").
 
 TripSight attacks these one by one:
 
@@ -56,18 +49,13 @@ TripSight attacks these one by one:
 - **Personal touches merge in place:** your preferences are remembered, and any single stop can be moved to another day, removed, locked or re-timed, with automatic re-checking — no starting over.
 - **No more repeated route look-ups:** with Amap configured, real routes for every leg are filled in at once, and one click generates a chained personal map for each day.
 - **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 60 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
+- **Opening hours take part in scheduling**, not just in after-the-fact warnings: closed days and impossible time slots are avoided, and places that cannot fit are listed with the reason.
+- **Every step is confirmable and undoable:** changes are proposals applied only after you confirm; `undo` works repeatedly.
+- **Not tied to one model, and your data stays on your machine:** it is an MCP server, so any MCP-capable chat agent can use it (the repo ships setup for [nanobot](https://github.com/HKUDS/nanobot)); trips are local JSON files, the workbench listens on `127.0.0.1` only, and keys live in your own config.
 
 It is not another "one-click guide generator" but a workbench where the plan can be adjusted again and again and checked at every step.
 
 > ✅ Amap routes, opening hours and coordinate verification have been tested by the author with a real Amap key and work. Other integrations (Google Maps, the WeChat channel, …) are mainly tested against fake services (automated tests); real-environment verification is limited. Prices, hours and weather are reference values — verify with official sources before you travel. The assistant never books or pays.
-
-## 💡 Why TripSight
-
-- **Facts are never invented.** Coordinates, hours, routes and weather come only from map services and tools; when something cannot be determined the tool says "unverified" instead of guessing.
-- **Opening hours take part in scheduling**, not just in after-the-fact warnings: closed days and impossible time slots are avoided, and places that cannot fit are listed with the reason.
-- **Every step is confirmable and undoable.** Changes are proposals applied only after you reply with a confirmation code; confirmed items are locked so re-planning never shuffles them; `undo` works repeatedly.
-- **Not tied to one model or platform.** It is an MCP server, so any MCP-capable chat agent can use it; the repo ships setup for [nanobot](https://github.com/HKUDS/nanobot).
-- **Your data stays on your machine.** Trips are local JSON files, the workbench listens on `127.0.0.1` only, keys live in your own config, and `tripcore doctor` only prints "configured / not configured".
 
 ## 🖼️ At a glance
 
@@ -87,7 +75,8 @@ It is not another "one-click guide generator" but a workbench where the plan can
 
 <sub>The trips shown are the author's own test trips; opening hours come from Amap; basemap © Amap.</sub>
 
-## 🌟 Full-configuration experience
+<details>
+<summary><b>🌟 Full-configuration experience (click to expand)</b></summary>
 
 Connect an Amap key, the nanobot chat agent and the read-only price skills (`python -m tripcore doctor` tells you what is missing) and you get this way of working:
 
@@ -120,6 +109,8 @@ Connect an Amap key, the nanobot chat agent and the read-only price skills (`pyt
   On the road you just open the link and follow it — no more looking up each leg again.
 
 > "Full configuration" means all keys and read-only skills are set up. The Amap part has been tested by the author with a real key; real-service testing of Google Maps, the WeChat channel and others is still limited. Verify key details yourself before you go.
+
+</details>
 
 ## 🧩 Capabilities
 
@@ -156,28 +147,36 @@ Python 3.10 or newer is required.
 
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-./setup.sh                     # one step: venv + install + nanobot check + register + skills + self-check
-                               # (asks before touching your nanobot config; never installs nanobot or writes keys)
+./setup.sh      # one step: venv + install + nanobot check + register + skills + self-check
+                # (asks before touching your nanobot config; never installs nanobot or writes keys)
+tripcore doctor # read-only self-check (never prints key values)
+tripcore demo   # full demo on the sample data, no keys needed
+```
 
-# or manually:
+**Use it in chat:** follow [docs/SETUP.md](docs/SETUP.md) (Chinese) to connect nanobot, run `nanobot`, then just say where you want to go. When you want to drag things around, see the map or export, tell the assistant **"open the workbench"** — it returns a URL with a one-time token; open it in a browser on the same computer.
+
+**Workbench only:** no chat needed — `tripcore web --open`.
+
+Keep Amap / Google keys in your own local configuration; never commit them.
+
+<details>
+<summary>Manual install, tests and Docker</summary>
+
+```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"        # provides the `tripcore` and `tripcore-mcp` commands
-
-tripcore doctor                # read-only self-check (never prints key values)
-tripcore demo                  # full demo on the sample data
-tripcore web --open            # local web workbench
 python -m pytest -q            # run the tests
 ```
 
-To use it through chat, follow [docs/SETUP.md](docs/SETUP.md) (Chinese) to connect nanobot. Keep Amap / Google keys in your own local configuration; never commit them.
-
-**Docker (optional, not yet verified in a real environment):** the `Dockerfile` runs the CLI and the MCP server. The workbench deliberately listens on 127.0.0.1 only, so it is not in the image.
+**Docker (optional, not yet verified in a real environment):** the `Dockerfile` runs the CLI and the MCP server. The workbench deliberately listens on 127.0.0.1 only and is not containerised.
 
 ```bash
 docker build -t tripsight .
 docker run --rm tripsight python -m tripcore demo
 docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 ```
+
+</details>
 
 ## 🏗️ Architecture
 
