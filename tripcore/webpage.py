@@ -114,6 +114,9 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #cmsgs{flex:1;overflow:auto;padding:8px 10px;font-size:13px}
 .m{margin:6px 0;padding:6px 9px;border-radius:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
 .m.u{background:#dbeafe;margin-left:30px}.m.a{background:#f3f4f6;margin-right:20px}.m.e{background:#fee2e2;color:#991b1b}
+.m.md{white-space:normal}.m.md p{margin:4px 0}.m.md ul,.m.md ol{margin:4px 0;padding-left:20px}.m.md li{margin:1px 0}
+.m.md table{border-collapse:collapse;font-size:12px;display:block;overflow-x:auto;margin:4px 0}.m.md th,.m.md td{border:1px solid #d1d5db;padding:2px 6px;text-align:left}.m.md th{background:#e5e7eb}
+.m.md blockquote{margin:4px 0;padding:2px 8px;border-left:3px solid #9ca3af;color:#4b5563}.m.md hr{border:0;border-top:1px solid #d1d5db;margin:6px 0}.m.md code{background:#e5e7eb;border-radius:3px;padding:0 3px}
 #chips{padding:4px 8px;display:flex;gap:4px;flex-wrap:wrap}#chips button{font-size:12px;padding:2px 8px;border-radius:12px}
 #cin{display:flex;gap:6px;padding:8px;border-top:1px solid #ddd}#cin textarea{flex:1;resize:none;font:inherit;font-size:13px;padding:4px 6px}
 @media (max-width:760px){.sp{display:none}#side{width:auto}#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column-reverse}#side{height:50%;border-right:0;border-top:1px solid #ddd}#map{height:50%;flex:none}#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
@@ -477,7 +480,33 @@ $('cancel').onclick = closePrev; function closePrev() { pending = null; $('prev'
 $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revision}); say('已撤销。'); } catch (e) { say(e.message, true); } closePrev(); load(); };
 // ---- 聊天 + 自动刷新 ----
 const msgs = $('cmsgs'); let busy = false;
-function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
+// 助手回复里的 Markdown：先整体转义，再只渲染加粗、行内代码、列表、表格、引用、分隔线；图片和链接不渲染（不会向外部地址发请求）
+function mdInline(t) { return esc(t).replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>'); }
+function md(src) {
+  const L = String(src).replace(/\r/g, '').split('\n'), out = []; let i = 0;
+  const isRow = l => /^\s*\|.*\|\s*$/.test(l), isUl = l => /^\s*[-*]\s+/.test(l), isOl = l => /^\s*\d+[.)]\s+/.test(l);
+  const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+  while (i < L.length) {
+    const l = L[i];
+    if (isRow(l) && i + 1 < L.length && /^\s*\|?\s*:?-{2,}/.test(L[i + 1])) {
+      const head = cells(l), rows = []; i += 2; while (i < L.length && isRow(L[i])) { rows.push(cells(L[i])); i++; }
+      out.push('<table><thead><tr>' + head.map(c => '<th>' + mdInline(c) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + mdInline(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table>'); continue; }
+    if (isUl(l) || isOl(l)) { const ord = isOl(l), test = ord ? isOl : isUl, items = [];
+      while (i < L.length && test(L[i])) { items.push(L[i].replace(ord ? /^\s*\d+[.)]\s+/ : /^\s*[-*]\s+/, '')); i++; }
+      out.push((ord ? '<ol>' : '<ul>') + items.map(x => '<li>' + mdInline(x) + '</li>').join('') + (ord ? '</ol>' : '</ul>')); continue; }
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
+    if (/^\s*>/.test(l)) { const q = []; while (i < L.length && /^\s*>/.test(L[i])) { q.push(L[i].replace(/^\s*>\s?/, '')); i++; } out.push('<blockquote>' + q.map(mdInline).join('<br>') + '</blockquote>'); continue; }
+    const h = l.match(/^\s*#{1,4}\s+(.*)$/); if (h) { out.push('<p><b>' + mdInline(h[1]) + '</b></p>'); i++; continue; }
+    if (!l.trim()) { i++; continue; }
+    const p = [];
+    while (i < L.length && L[i].trim() && !isRow(L[i]) && !isUl(L[i]) && !isOl(L[i]) && !/^\s*(-{3,}|\*{3,}|>|#{1,4}\s)/.test(L[i])) { p.push(L[i]); i++; }
+    if (!p.length) { p.push(L[i]); i++; }
+    out.push('<p>' + p.map(mdInline).join('<br>') + '</p>');
+  }
+  return out.join('');
+}
+function setMsg(el, text) { if (el.classList.contains('a')) { el.classList.add('md'); el.innerHTML = md(text); } else el.textContent = text; }
+function bubble(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; setMsg(d, text); msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
 let chatUp = null, chatTrip;            // chatTrip：聊天栏现在显示的是哪个行程的记录（undefined = 还没加载）
 async function syncChat() {
   if (busy || !S || chatTrip === (S.trip || null)) return;
@@ -506,7 +535,7 @@ async function send() {
       for (;;) { const {value, done: end} = await rd.read(); if (end) break; buf += dec.decode(value, {stream: true}); let i;
         while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
           if (!line.startsWith('data:')) continue; const d = line.slice(5).trim(); if (d === '[DONE]') { done = true; continue; }
-          try { const t = (JSON.parse(d).choices || [{}])[0].delta; if (t && t.content) { got += t.content; out.textContent = got; msgs.scrollTop = msgs.scrollHeight; } } catch (e) {} } }
+          try { const t = (JSON.parse(d).choices || [{}])[0].delta; if (t && t.content) { got += t.content; setMsg(out, got); msgs.scrollTop = msgs.scrollHeight; } } catch (e) {} } }
       if (!got) out.textContent = '（没有收到回复）';
       if (!done) { const w = document.createElement('div'); w.className = 'm e'; w.textContent = '回复可能不完整（连接中断或超时）。agent 已经做完的操作不会撤销，请看看行程再决定。'; msgs.appendChild(w); }
     }
