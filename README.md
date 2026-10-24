@@ -41,14 +41,20 @@
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="点击跳转" width="190"><br><sub>攻略搜索、高德导航、点评</sub></td>
 </tr>
 </table>
-<p><b>回来之后与扩展</b></p>
+<p><b>回程之后：一键分享发布</b></p>
 <table>
 <tr>
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="游记生成" width="190"><br><sub>只写你记录过的事实，草稿自查</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-photos.gif" alt="上传照片" width="190"><br><sub>西安回民街：上传、点开看、分享页带上照片</sub></td>
+</tr>
+</table>
+<p><b>全部能力</b></p>
+<table>
+<tr>
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-tools.gif" alt="60 个工具" width="190"><br><sub>一览并可搜索，每个都有示例说法</sub></td>
 </tr>
 </table>
-<sub>演示用北京、苏州示例行程；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
+<sub>演示用北京、苏州示例行程和西安回民街（照片为作者自己拍摄）；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
 
 </div>
 

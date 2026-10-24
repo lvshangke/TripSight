@@ -40,14 +40,20 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="Click-through" width="190"><br><sub>Guides, Amap navigation, reviews</sub></td>
 </tr>
 </table>
-<p><b>After the trip, and beyond</b></p>
+<p><b>After the trip: share and publish in one click</b></p>
 <table>
 <tr>
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="Travelogue" width="190"><br><sub>Only facts you recorded; draft check</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-photos.gif" alt="Photos" width="190"><br><sub>Xi’an Muslim Quarter: upload, open, ship with the share page</sub></td>
+</tr>
+</table>
+<p><b>Everything it can do</b></p>
+<table>
+<tr>
 <td align="center" valign="top" width="25%"><img src="docs/images/feat-tools.gif" alt="60 tools" width="190"><br><sub>Browse and search, each with a sample phrase</sub></td>
 </tr>
 </table>
-<sub>Demos use the bundled Beijing and a Suzhou sample trip; weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
+<sub>Demos use the bundled Beijing sample, a Suzhou sample trip and Xi’an Muslim Quarter (photo taken by the author); weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
 
 </div>
 
