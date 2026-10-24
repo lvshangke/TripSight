@@ -11,8 +11,10 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-449%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
+
+<a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight: the LLM only proposes; code schedules and checks"></a>
 
 > **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
@@ -63,6 +65,18 @@ It is not another "one-click guide generator" but a workbench where the plan can
 - **Every step is confirmable and undoable.** Changes are proposals applied only after you reply with a confirmation code; confirmed items are locked so re-planning never shuffles them; `undo` works repeatedly.
 - **Not tied to one model or platform.** It is an MCP server, so any MCP-capable chat agent can use it; the repo ships setup for [nanobot](https://github.com/HKUDS/nanobot).
 - **Your data stays on your machine.** Trips are local JSON files, the workbench listens on `127.0.0.1` only, keys live in your own config, and `tripcore doctor` only prints "configured / not configured".
+
+## 🖼️ At a glance
+
+**8 share themes, one click.** The same itinerary in a different look to send to friends; all light backgrounds, hotels and costs are hidden by default.
+
+<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 share themes: different days of Xi'an, Kyoto, Hangzhou and Harbin"></a>
+
+**Route map over the Amap basemap.** The share page includes an inline SVG route map and can export a route-animation GIF. You can optionally overlay the Amap basemap (needs your own `AMAP_KEY`; the page stays a single file). Each day zooms to its own extent with a scale bar.
+
+<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="Route map over the Amap basemap: overview and per-day maps"></a>
+
+<sub>The trips shown are the author's own test trips; opening hours come from Amap; basemap © Amap.</sub>
 
 ## 🌟 Full-configuration experience
 

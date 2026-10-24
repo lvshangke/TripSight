@@ -12,8 +12,10 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-449%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
+
+<a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成"></a>
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
 
@@ -64,6 +66,18 @@ TripSight 把这些问题拆开来解决：
 - **每一步可确认、可撤销**：所有修改先成为“提案”，你回复确认码才生效；确认过的安排自动锁定，重排不会打乱；`undo` 可连续撤销。
 - **不绑定某个模型或平台**：以 MCP 工具的形式提供，任何支持 MCP 的聊天 Agent 都能接；仓库附带 [nanobot](https://github.com/HKUDS/nanobot) 的接入配置和技能说明。
 - **数据留在你自己电脑上**：行程是本机的 JSON 文件；网页工作台只监听 `127.0.0.1`；API key 只放在你自己的配置里，`tripcore doctor` 只显示“已配置/未配置”。
+
+## 🖼️ 效果一览
+
+**8 种分享风格，一键切换。** 同一份行程换个样子发给朋友；都是浅色底，酒店和花费默认不公开，勾选才带。
+
+<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格：西安、京都、杭州、哈尔滨的不同天"></a>
+
+**路线图叠在高德底图上。** 分享页自带内联 SVG 路线图，可导出路线动画 GIF；可选联网叠加高德底图（用你自己的 `AMAP_KEY`，页面仍是单文件）。每天按自己的范围缩放并带比例尺：第 1 天景点集中就放大，第 2 天范围大就缩小。
+
+<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="路线图叠在高德底图上：总览和每天的小图"></a>
+
+<sub>图中行程是作者自己的测试行程（西安、京都、杭州、哈尔滨），营业时间来自高德；底图 © 高德地图。</sub>
 
 ## 🌟 满配效果：一份只属于你的、可核对的行程
 
@@ -471,6 +485,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 ## 营业时间展示与天气
 
+- 工作台时间线和分享页只显示旅行日期当天适用的那一条营业时间（解析不了或没定日期时显示原文前 40 字）。
 - `show_trip` 每个景点下显示营业时间、来源、预约与备选；有具体日期时按星期判断当天时段，可能闭馆会标 ⚠，无法判断标“待核实”。
 - `get_weather`：国内先用高德天气（约未来 4 天），高德没有的日期或境外目的地改用 Open-Meteo（免费、无需 key、最长约 16 天，只发送目的地的经纬度）；每天按当天景点的重心确定天气位置（相距 10 km 内的天合并），所以市区和山上等多个地点的行程各查各的，预报里标明是哪一带；多地点时优先用 Open-Meteo（按坐标，含海拔），查不到才用高德并注明只能按城市查。每天的预报标明来源和查询日期。没有具体日期或日期超出所有来源范围时直接说明，不编造。查到的预报会按日期缓存（记录查询日期，不算一次修改），`show_trip` 显示天气，`check_plan` 对遇到雨雪/高温的户外景点给出 `WEATHER_OUTDOOR` 提醒；室内外由高德类别或 `outdoor` 字段决定，未知的不提醒。
 - 指定过出行方式的路段（`set_leg_mode`），`refine_routes` 严格按指定方式查询，不会因距离近改成步行。
