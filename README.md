@@ -19,9 +19,21 @@
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
 
+<p><b>核心功能</b>　<sub>点击视频观看完整演示（1600 宽，含地图）</sub></p>
 
+<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="760" controls></video>
 
-<p><b>核心功能</b>　<sub>点击封面观看完整动图</sub></p>
+<sub><b>聊天排行程</b>：加景点、排程、提案确认、选餐厅和住宿、真实路线</sub>
+
+<br><br>
+
+<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="760" controls></video>
+
+<sub><b>粘贴攻略</b>：逐条核对、列成候选、挑选后加入</sub>
+
+<br><br>
+
+<!-- <p><b>核心功能</b>　<sub>点击封面观看完整动图</sub></p>
 
 https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b
 
@@ -29,7 +41,7 @@ https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a
 <a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-plan.gif"><img src="docs/images/chat-plan-cover.jpg" alt="聊天排行程" width="760"></a><br><sub><b>聊天排行程</b>：加景点、排程、提案确认、选餐厅和住宿、真实路线</sub>
 <br><br>
 <a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-paste.gif"><img src="docs/images/chat-paste-cover.jpg" alt="粘贴攻略" width="760"></a><br><sub><b>粘贴攻略</b>：逐条核对、列成候选、挑选后加入</sub>
-<br><br>
+<br><br> -->
 <!-- 视频：把 MP4 上传到 GitHub 后，把得到的 user-attachments 链接单独一行写在这里，即可替换上面的封面。 -->
 <p><b>规划与检查</b></p>
 <table>
