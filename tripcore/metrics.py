@@ -39,7 +39,7 @@ def intercity_hint(distance_km: float, mode: str = "") -> str:
     if distance_km <= INTERCITY_KM or mode == "drive":      # 已经是驾车的不用提示
         return ""
     return (f"跨城路段（约 {distance_km:g} km）：高德的公交方案可能是普速慢车，不一定是最合适的；"
-            "建议用 flyai 的 search-train 查高铁车次，或改成驾车/打车（set_leg_mode），请和用户确认")
+            "建议用 flyai 的 search-train 查高铁车次，或改成驾车/打车，请和用户确认")
 
 
 def day_places(trip: Trip, day: DayPlan) -> list[Place]:

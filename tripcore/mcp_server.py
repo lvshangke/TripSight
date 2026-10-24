@@ -520,7 +520,7 @@ def _route_note(r: Any, prefs: Any = None) -> str:
         limit_km = prefs.walk_max_min / 60 * 5          # 按步行约 5 km/h 折算
         if mw > limit_km * 1.2:
             bits.append(f"⚠ 其中一段要连续步行约 {mw:g} km，超过你设的单段步行上限（{prefs.walk_max_min} 分钟）"
-                        + ("；你接受打车，可以考虑改成打车（set_leg_mode）" if getattr(prefs, "taxi_ok", False) else ""))
+                        + ("；你接受打车，可以考虑改成打车" if getattr(prefs, "taxi_ok", False) else ""))
     return "，".join(b for b in bits if b)
 
 

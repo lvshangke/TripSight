@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 .geocode_cache.json
 *.tmp
+tripsight.egg-info/
