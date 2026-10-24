@@ -12,7 +12,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-451%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-452%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成"></a>
@@ -21,15 +21,20 @@
 
 <table>
 <tr>
-<td rowspan="2" align="center" valign="top" width="200"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="200"><br><sub>网页工作台：拖动调整，即时检查</sub></td>
-<td align="center" valign="top"><img src="docs/images/chat-plan.gif" alt="聊天排行程" width="600"><br><sub>聊天排行程：加景点、排程、提案确认、选餐厅和住宿、真实路线（<a href="docs/videos/chat-plan.mp4">高清视频</a>）</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="拖动检查" width="200"><br><sub>拖动景点，代码立刻检查</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="真实路线" width="200"><br><sub>估算虚线 → 高德真实路线</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="闭馆提示" width="200"><br><sub>营业时间、最晚进入、闭馆预览</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="分享风格" width="200"><br><sub>同一份行程，一键换风格</sub></td>
 </tr>
 <tr>
-<td align="center" valign="top"><img src="docs/images/chat-paste.gif" alt="粘贴攻略" width="600"><br><sub>粘贴游记：逐条核对、列成候选、挑选后加入（<a href="docs/videos/chat-paste.mp4">高清视频</a>）</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="天气提示" width="200"><br><sub>真实预报；没有预报的天不编造</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="游记生成" width="200"><br><sub>只写你记录过的事实，草稿自查</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="点击跳转" width="200"><br><sub>攻略搜索、高德导航、点评</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="一键导出" width="200"><br><sub>网页可点地图，长图发微信</sub></td>
 </tr>
 </table>
 
-<sub>演示用的是仓库自带的北京示例数据，营业时间为演示用示例值。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
+<sub>演示用北京、苏州示例行程；天气是真实预报，游记里的记录是演示用示例数据。两段完整的聊天录屏见下面的「效果一览」（<a href="docs/videos/chat-plan.mp4">聊天排行程</a>、<a href="docs/videos/chat-paste.mp4">粘贴攻略</a>）。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
 
 </div>
 

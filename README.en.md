@@ -11,7 +11,7 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-451%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-452%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight: the LLM only proposes; code schedules and checks"></a>
@@ -20,15 +20,20 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 <table>
 <tr>
-<td rowspan="2" align="center" valign="top" width="200"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="200"><br><sub>Web workbench: drag to edit, instant checks</sub></td>
-<td align="center" valign="top"><img src="docs/images/chat-plan.gif" alt="Plan by chatting" width="600"><br><sub>Plan by chatting: add stops, schedule, confirm proposals, pick food and lodging, real routes (<a href="docs/videos/chat-plan.mp4">HD video</a>)</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="Drag & check" width="200"><br><sub>Drag a stop, code checks instantly</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="Real routes" width="200"><br><sub>Estimated dashes → real Amap routes</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="Closed-day check" width="200"><br><sub>Hours, last entry, closed-day preview</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="Share themes" width="200"><br><sub>One itinerary, one-click restyle</sub></td>
 </tr>
 <tr>
-<td align="center" valign="top"><img src="docs/images/chat-paste.gif" alt="Paste a guide" width="600"><br><sub>Paste a guide: check each item, list candidates, pick and add (<a href="docs/videos/chat-paste.mp4">HD video</a>)</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="Weather" width="200"><br><sub>Real forecast; no forecast, no invention</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="Travelogue" width="200"><br><sub>Only facts you recorded; draft check</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="Click-through" width="200"><br><sub>Guides, Amap navigation, reviews</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="One-click export" width="200"><br><sub>Web page opens maps; long image for chat</sub></td>
 </tr>
 </table>
 
-<sub>The demo uses the bundled Beijing sample data; opening hours are sample values for illustration. The real workbench has three panes: itinerary (left), Amap map (middle), chat assistant (right).</sub>
+<sub>Demos use the bundled Beijing and a Suzhou sample trip; weather is a real forecast, travelogue records are sample data. Two full chat recordings are under “At a glance” below (<a href="docs/videos/chat-plan.mp4">plan by chatting</a>, <a href="docs/videos/chat-paste.mp4">paste a guide</a>). The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
 
 </div>
 
