@@ -86,24 +86,24 @@ https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a
 <p><b>回程之后：一键分享发布</b></p>
 <table>
 <tr>
-<td width="50%" valign="top">
+<td width="25%" valign="top">
 <strong>8 种分享风格</strong><br>
 <sub>同一份行程换风格；酒店和花费默认不公开。</sub><br><br>
 <img src="docs/images/feat-themes.gif" width="100%" alt="分享风格">
 </td>
-<td width="50%" valign="top">
+<td width="25%" valign="top">
 <strong>一键导出</strong><br>
 <sub>网页版每个景点可点开高德地图；长图适合直接发微信。</sub><br><br>
 <img src="docs/images/feat-export.gif" width="100%" alt="一键导出">
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
+<td width="25%" valign="top">
 <strong>游记生成</strong><br>
 <sub>只用你记录过的事实写骨架，写完自查没去、没记录、金额对不上的地方。</sub><br><br>
 <img src="docs/images/feat-travelogue.gif" width="100%" alt="游记生成">
 </td>
-<td width="50%" valign="top">
+<td width="25%" valign="top">
 <strong>上传照片</strong><br>
 <sub>景点上传照片（保存时去掉定位信息），点开大图，分享页带上照片。</sub><br><br>
 <img src="docs/images/feat-photos.gif" width="100%" alt="上传照片">
