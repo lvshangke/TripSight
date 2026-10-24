@@ -43,14 +43,7 @@
 
 
 <p><b>核心功能</b></p>
-<table>
-<tr>
-<td width="50%" valign="top"><strong>聊天排行程</strong><br><br>
-<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="400" controls></video></td>
-<td width="50%" valign="top"><strong>粘贴攻略</strong><br><br>
-<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="400" controls></video></td>
-</tr>
-</table>
+
 
 <p><b>规划与检查</b></p>
 <p><img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="真实路线"></p>
@@ -107,6 +100,14 @@ TripSight 把这些问题拆开来解决：
 **聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。
 
 **粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。
+<table>
+<tr>
+<td width="50%" valign="top"><strong>聊天排行程</strong><br><br>
+<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="400" controls></video></td>
+<td width="50%" valign="top"><strong>粘贴攻略</strong><br><br>
+<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="400" controls></video></td>
+</tr>
+</table>
 
 <sub>以上对话和行程是真实运行的记录（助手的回复没有改写），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
 
