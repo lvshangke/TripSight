@@ -125,3 +125,27 @@ def test_day_maps_show_scale_bar_and_extent():
     assert 'class="sc"' in h and "当天范围约" in h and 'data-ext="' in h
     bar_label = h.split('class="st">', 1)[1].split("<", 1)[0]
     assert bar_label.endswith(" m") or bar_label.endswith(" km")
+
+
+def _sc_x(html: str) -> float:
+    return float(html.split('class="sc"><rect x="', 1)[1].split('"', 1)[0])
+
+
+def _day_with(points):
+    tl = []
+    for n, (la, lo) in enumerate(points, 1):
+        tl.append({"type": "stop", "n": n, "pos": [la, lo]})
+        if n < len(points):
+            tl.append({"type": "leg", "a": list(points[n - 1]), "b": list(points[n]), "real": False})
+    return {"index": 0, "timeline": tl}
+
+
+def test_scale_bar_moves_away_from_stops():
+    from tripcore import routemap
+    keep = lambda tl, i: True
+    # 第一个点在最左下角：比例尺不能再压住它
+    crowded = routemap.build_day(_day_with([(31.000, 120.000), (31.020, 120.030), (31.030, 120.000)]), "#e4572e", keep)
+    # 左下角没有点：比例尺留在左下
+    free = routemap.build_day(_day_with([(31.000, 120.030), (31.020, 120.000), (31.030, 120.030)]), "#e4572e", keep)
+    assert _sc_x(free) < 20
+    assert _sc_x(crowded) > 100

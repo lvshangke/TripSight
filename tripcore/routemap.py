@@ -63,7 +63,7 @@ def _fmt_ext(wm: float, hm: float) -> str:
 
 
 def _scalebar(pr) -> str:
-    """左下角比例尺：选一个好读的长度，画成 30~110 个视图单位长。"""
+    """比例尺：选一个好读的长度，画成 30~110 个视图单位长；放在不压住景点的角落（优先左下，其次右下、右上）。"""
     mpu = getattr(pr, "mpu", 0) or 0
     if mpu <= 0:
         return ""
@@ -75,7 +75,18 @@ def _scalebar(pr) -> str:
     if best is None:
         return ""
     m, u = best
-    x0, y = 12.0, pr.h - 12.0
+    occ_marks = getattr(pr, "occ_marks", [])
+    occ_path = getattr(pr, "occ_path", [])
+    ytop = [pr.h - 12.0, pr.h - 12.0, 26.0]                                   # 三个候选的基线 y
+    xs = [12.0, W - 12.0 - u, W - 12.0 - u]                                   # 三个候选的起点 x
+    pick, score = 0, None
+    for i, (x0, y) in enumerate(zip(xs, ytop)):
+        bx0, bx1, by0, by1 = x0 - 6 - 8, x0 + u + 6 + 8, y - 14 - 8, y + 8 + 8   # 方框外再留一个圆点的半径
+        sc = sum(1 for (px, py) in occ_marks if bx0 <= px <= bx1 and by0 <= py <= by1) * 1000 + \
+            sum(1 for (px, py) in occ_path if bx0 <= px <= bx1 and by0 <= py <= by1)
+        if score is None or sc < score:
+            pick, score = i, sc
+    x0, y = xs[pick], ytop[pick]
     return (f'<g class="sc"><rect x="{x0 - 6:.1f}" y="{y - 14:.1f}" width="{u + 12:.1f}" height="22" rx="3" fill="#fff" opacity=".72"/>'
             f'<path d="M{x0:.1f} {y - 4:.1f} V{y:.1f} H{x0 + u:.1f} V{y - 4:.1f}" fill="none" stroke="#333" stroke-width="1.4"/>'
             f'<text x="{x0:.1f}" y="{y - 6:.1f}" class="st">{_fmt_len(m)}</text></g>')
@@ -166,15 +177,18 @@ def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H, base: Option
         if img:
             pr = _bm.Projection(view)
     legs_svg, marks_svg = [], []
+    occ_marks, occ_path = [], []
     for step, (di, kind, idx) in enumerate(order):
         col = colors[di % len(colors)]
         if kind == "leg":
             _, pts, real = legs_raw[idx]
             xy = _thin([pr.xy(la, lo) for la, lo in pts])
+            occ_path.extend(xy)
             legs_svg.append(f'<path data-s="{step}" data-d="{di}" class="{"r" if real else "g"}" style="stroke:{col}" d="{_d(xy)}"/>')
         else:
             _, n, la, lo, hotel = marks_raw[idx]
             x, y = pr.xy(la, lo)
+            occ_marks.append((x, y))
             tr = f"transform-origin:{x:.1f}px {y:.1f}px"
             if hotel:
                 marks_svg.append(f'<g data-s="{step}" data-d="{di}" style="{tr}"><rect x="{x - 5:.1f}" y="{y - 5:.1f}" width="10" height="10" rx="2" fill="var(--ink)"/>'
@@ -182,6 +196,7 @@ def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H, base: Option
             else:
                 marks_svg.append(f'<g data-s="{step}" data-d="{di}" style="{tr};--c:{col}"><circle cx="{x:.1f}" cy="{y:.1f}" r="7.5"/>'
                                  f'<text x="{x:.1f}" y="{y + 3.3:.1f}">{n}</text></g>')
+    pr.occ_marks, pr.occ_path = occ_marks, occ_path
     pr.ext = _extent(pts_all)
     return legs_svg, marks_svg, pr, img
 
