@@ -117,9 +117,32 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #chips{padding:4px 8px;display:flex;gap:4px;flex-wrap:wrap}#chips button{font-size:12px;padding:2px 8px;border-radius:12px}
 #cin{display:flex;gap:6px;padding:8px;border-top:1px solid #ddd}#cin textarea{flex:1;resize:none;font:inherit;font-size:13px;padding:4px 6px}
 @media (max-width:760px){.sp{display:none}#side{width:auto}#note{left:0;max-width:100vw;bottom:auto;top:0}#app{flex-direction:column-reverse}#side{height:50%;border-right:0;border-top:1px solid #ddd}#map{height:50%;flex:none}#chat{position:fixed;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%;z-index:2000;border-top:2px solid #2563eb}}
+
+#mo{position:fixed;inset:0;background:#0006;z-index:3500;display:none;align-items:center;justify-content:center}
+#mo.on{display:flex}
+#mo .box{background:#fff;border-radius:10px;width:min(960px,96vw);height:min(86vh,780px);display:flex;flex-direction:column;box-shadow:0 8px 30px #0005;font-size:14px}
+#mo .top{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #ddd}
+#mo .tabs{display:flex;gap:4px;flex:1}#mo .tabs button.on{background:#2563eb;color:#fff;border-color:transparent}
+#mo .pane{display:none;flex:1;min-height:0;overflow:auto;padding:12px 16px}#mo .pane.on{display:block}
+#mo #pane_share.on{display:flex;gap:16px}
+#pane_share .ctl{width:250px;flex:none}#pane_share .ctl label{display:block;margin:6px 0}#pane_share .ctl .sm{font-size:12px;color:#777;margin:0 0 6px 22px}
+#pane_share .ctl button{margin:4px 6px 4px 0}
+#pane_share .ph{flex:1;display:flex;justify-content:center;min-width:0}
+#sh_frame{width:min(430px,100%);height:100%;border:1px solid #ccc;border-radius:12px;background:#f6f4ef}
+#sh_err{color:#b91c1c;font-size:13px;min-height:18px;margin-top:6px}
+.warn{background:#fff8ed;border:1px solid #f1e3cd;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:13px;color:#8a4b00}
+.lgday{margin:8px 0;padding:6px 8px;border:1px solid #eee;border-radius:8px}.lgstop{margin:3px 0 0 6px;font-size:13px}
+.st{display:inline-block;font-size:11px;padding:0 6px;border-radius:10px;color:#fff}.st.ok{background:#3a9d5d}.st.skip{background:#888}.st.chg{background:#d98e04}.st.no{background:#c2410c}
+#pane_log textarea{width:100%;height:110px;font:inherit;font-size:13px;box-sizing:border-box;margin-top:6px}
+#pane_tools h4{margin:14px 0 4px;font-size:14px}.tool{padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.tool code{font-weight:700}.tool a{color:#1a6fe8;text-decoration:none;font-size:12.5px}.tlnote{color:#777;font-size:12.5px}
+.kd{font-size:11px;padding:0 6px;border-radius:10px;border:1px solid}.kd.read{color:#2e7d32;border-color:#2e7d32}.kd.export{color:#1565c0;border-color:#1565c0}.kd.change{color:#b45309;border-color:#b45309}
+.phr{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center}.pht{position:relative;display:inline-block}
+.pht img{width:44px;height:44px;object-fit:cover;border-radius:4px;display:block}.pht button{position:absolute;top:-5px;right:-5px;width:16px;height:16px;line-height:12px;padding:0;border-radius:50%;font-size:11px}
+.addph{font-size:12px;border:1px dashed #999;border-radius:4px;padding:2px 8px;cursor:pointer;color:#1a6fe8}
 </style></head><body>
 <div id="app"><div id="side">
-<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button></header>
+<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
 <div id="tabs"></div>
@@ -133,6 +156,23 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="帮我在第【几】天的景点附近找午餐，给我几家对比；我选定后请直接加进行程。">找午餐</button><button data-t="帮我在第【几】天的景点附近找晚餐，给我几家对比；我选定后请直接加进行程。">找晚餐</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
+<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="log">游记</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
+<div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
+<label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
+<label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
+<label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
+<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><div id="sh_err"></div>
+<div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
+<div class="ph"><iframe id="sh_frame" sandbox="allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
+<div class="pane" id="pane_log"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>游记的事实骨架</b>
+<select id="lg_style"><option>通用</option><option>小红书</option><option>朋友圈</option></select>
+<label><input type="checkbox" id="lg_l"> 可写酒店</label><label><input type="checkbox" id="lg_c"> 可写花费</label>
+<button id="lg_go">生成骨架</button><button id="lg_ask" class="pri">让助手按这个写</button></div>
+<div class="tlnote" style="margin-top:4px">只含行程和你亲口记录的回顾；没记录的会标出来，写之前先补上。</div><div id="lg_out"></div>
+<div style="margin-top:12px"><b>草稿自查</b><span class="tlnote">　粘贴写好的游记，检查提到没去的景点、对不上记录的金额和时间。感受和形容无法核实，请自己读。</span>
+<textarea id="lg_text" maxlength="20000" placeholder="把游记草稿粘贴到这里"></textarea><button id="lg_chk">检查</button><div id="lg_res"></div></div></div>
+<div class="pane" id="pane_tools"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 7px;border:1px solid #bbb;border-radius:6px"><div id="tl_out">加载中…</div></div>
+</div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
 <div class="q"><input id="ap_q" maxlength="60" placeholder="景点名称，例如：大雁塔"><button id="ap_go" class="pri">查找</button></div>
 <div id="ap_list"></div><div class="w" id="ap_warn"></div>
@@ -223,7 +263,7 @@ $('trip').onchange = async () => {
   catch (e) { say(e.message, true); await loadTrips(); }
 };
 function renderAll() { renderDates(); renderTabs(); renderList(); }
-$('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (S) renderAll(); };
+$('edit').onclick = () => { edit = !edit; $('app').classList.toggle('edit', edit); $('edit').textContent = edit ? '完成编辑' : '编辑'; $('edit').className = edit ? 'pri' : ''; closePrev(); if (edit) loadPhotos().then(() => { if (S) renderAll(); }); else if (S) renderAll(); };
 // ---- 日期 ----
 const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
@@ -339,7 +379,7 @@ function rowEl(d, e, idx, di, ctx, stopIdx, nStops) {
     row.querySelector('.sub').insertAdjacentHTML('beforeend', '<div>' + linkHtml(e.name, 'guide', '看攻略：') + '</div>');
     row.querySelector('.sub').insertAdjacentHTML('beforeend', introHtml(e.pid));
     if (edit) {
-      wireDur(row, e.pid, e.stay);
+      wireDur(row, e.pid, e.stay); photoRow(row, e.pid);
       row.dataset.pid = e.pid; row.draggable = true;
       row.querySelector('[data-a=up]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.max(stopIdx - 1, 0)); };
       row.querySelector('[data-a=dn]').onclick = ev => { ev.stopPropagation(); move(e.pid, d.index, Math.min(stopIdx + 1, nStops - 1)); };
@@ -490,6 +530,97 @@ for (const k of ['sw', 'cw']) { const v = wget(k); if (v) applyW(k, v); }
 window.addEventListener('resize', () => { for (const k of ['sw', 'cw']) { const v = wget(k); if (v) applyW(k, v); } });
 function syncSp2() { $('sp2').style.display = $('chat').classList.contains('hide') ? 'none' : ''; }
 syncSp2();
+// ---- 更多：分享 / 游记 / 能力 ----
+let moTab = 'share', shareHtml = '', toolsData = null, PH = {};
+function openChatWith(t) { $('chat').classList.remove('hide'); syncSp2(); fit(); $('ctext').value = t; $('ctext').focus(); }
+function moOpen(tab) { $('mo').classList.add('on'); moShow(tab || moTab); }
+function moClose() { $('mo').classList.remove('on'); }
+function moShow(tab) {
+  moTab = tab;
+  document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+  document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
+  if (tab === 'share') shareRefresh(); else if (tab === 'log') logGen(); else toolsLoad();
+}
+const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked});
+async function shareRefresh() {
+  $('sh_err').textContent = '';
+  try {
+    const r = await api('share_preview', shareOpts()); shareHtml = r.html; $('sh_frame').srcdoc = r.html;
+    $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
+    $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
+    $('sh_pn').textContent = r.photo_count ? '已有 ' + r.photo_count + ' 张，放在对应景点下面' : '还没有照片：在“编辑”模式下给景点添加';
+  } catch (e) { shareHtml = ''; $('sh_frame').srcdoc = ''; $('sh_err').textContent = e.message; }
+}
+function dl(href, name) { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+async function logGen() {
+  $('lg_out').textContent = '加载中…';
+  try { renderLog(await api('travelogue', {style: $('lg_style').value, lodging: $('lg_l').checked, costs: $('lg_c').checked})); } catch (e) { $('lg_out').textContent = e.message; }
+}
+const STC = {'去了': 'ok', '没去': 'skip', '临时改了': 'chg', '未记录': 'no'};
+function renderLog(f) {
+  let h = '';
+  if (f.unrecorded.length) h += '<div class="warn">还有 ' + f.unrecorded.length + ' 个景点没记录去没去：' + f.unrecorded.map(esc).join('、') + '。先在聊天里告诉助手（例如“故宫去了，5 分，人很多”），再写游记。</div>';
+  f.days.forEach(d => {
+    h += '<div class="lgday"><b>第 ' + d.day + ' 天' + (d.date ? ' ' + esc(d.date) : '') + '</b>';
+    d.stops.forEach(s => { h += '<div class="lgstop"><span class="st ' + (STC[s.status] || 'no') + '">' + esc(s.status) + '</span> <b>' + esc(s.name) + '</b>' + (s.rating ? ' ' + '★'.repeat(s.rating) : '') + (s.note ? ' · ' + esc(s.note) : '') + (s.photos ? ' · 📷 ' + s.photos.length : '') + '</div>'; });
+    if (d.photos) h += '<div class="lgstop">📷 当天照片 ' + d.photos.length + ' 张</div>';
+    h += '</div>';
+  });
+  if (f.suggested_tags) h += '<div class="lgday">话题标签：' + f.suggested_tags.map(esc).join(' ') + '</div>';
+  if (f.actual_costs) h += '<div class="lgday">已记录的实际花费：' + Object.entries(f.actual_costs).map(([k, v]) => esc(k) + ' ' + esc(v) + ' 元').join('，') + '</div>';
+  $('lg_out').innerHTML = h;
+}
+async function toolsLoad() {
+  if (!toolsData) { try { toolsData = await api('tools'); } catch (e) { $('tl_out').textContent = e.message; return; } }
+  renderTools();
+}
+function renderTools() {
+  const q = $('tl_q').value.trim().toLowerCase();
+  let h = '<div class="tlnote">共 ' + toolsData.total + ' 个工具。点“示例话术”会放进聊天输入框，由你确认后发送。</div>';
+  toolsData.blocks.forEach(b => {
+    const ts = b.tools.filter(t => !q || (b.category + t.name + t.summary + t.example).toLowerCase().includes(q));
+    if (!ts.length) return;
+    h += '<h4>' + esc(b.category) + '（' + ts.length + '）</h4>';
+    ts.forEach(t => { h += '<div class="tool"><code>' + esc(t.name) + '</code> <span class="kd ' + esc(t.kind) + '">' + esc(t.kind_text) + '</span><div>' + esc(t.summary) + '</div><a href="#" data-ex="' + esc(t.example) + '">“' + esc(t.example) + '”</a></div>'; });
+  });
+  h += '<h4>承诺</h4><ul>' + toolsData.promises.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>';
+  $('tl_out').innerHTML = h;
+  $('tl_out').querySelectorAll('a[data-ex]').forEach(a => a.onclick = ev => { ev.preventDefault(); moClose(); openChatWith(a.dataset.ex); });
+}
+async function loadPhotos() {
+  try { const r = await api('photos'); PH = {}; r.photos.forEach(p => { if (p.place_id) (PH[p.place_id] = PH[p.place_id] || []).push(p); }); } catch (e) { PH = {}; }
+}
+function photoRow(row, pid) {
+  const wrap = document.createElement('div'); wrap.className = 'phr';
+  (PH[pid] || []).forEach(p => {
+    const i = document.createElement('span'); i.className = 'pht'; i.title = p.caption || '';
+    i.innerHTML = (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="">' : '📷') + '<button title="删除这张照片">×</button>';
+    i.querySelector('button').onclick = async ev => { ev.stopPropagation(); try { await api('photo_remove', {id: p.id}); await loadPhotos(); renderAll(); } catch (e) { say(e.message, true); } };
+    wrap.appendChild(i);
+  });
+  const lab = document.createElement('label'); lab.className = 'addph'; lab.textContent = '＋照片'; lab.title = '添加你自己拍的照片（保存时会去掉定位信息）';
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp'; inp.hidden = true; lab.appendChild(inp); lab.onclick = ev => ev.stopPropagation();
+  inp.onchange = () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 20 * 1024 * 1024) { say('照片太大（最多 20MB）', true); return; }
+    const rd = new FileReader();
+    rd.onload = async () => { say('正在保存照片…'); try { await api('photo_add', {place_id: pid, caption: '', name: f.name, data: String(rd.result).split(',')[1] || ''}); say('已保存，并去掉了定位信息。'); await loadPhotos(); renderAll(); } catch (e) { say(e.message, true); } };
+    rd.readAsDataURL(f);
+  };
+  wrap.appendChild(lab); row.querySelector('.sub').appendChild(wrap);
+}
+$('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
+document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
+['sh_l', 'sh_c', 'sh_p'].forEach(id => $(id).onchange = shareRefresh);
+$('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };
+$('sh_png').onclick = async () => { $('sh_err').textContent = '正在生成长图…'; $('sh_png').disabled = true; try { const r = await api('share_image', shareOpts()); dl(r.png, '行程分享.png'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_png').disabled = false; };
+$('lg_go').onclick = logGen; $('lg_style').onchange = logGen; $('lg_l').onchange = logGen; $('lg_c').onchange = logGen;
+$('lg_ask').onclick = () => { moClose(); openChatWith('请按「' + $('lg_style').value + '」模板帮我写游记：先用 draft_travelogue 拿事实骨架' + ($('lg_l').checked ? '（酒店可以写）' : '，不写酒店') + ($('lg_c').checked ? '（花费可以写）' : '，不写花费') + '；没记录的景点先问我；写完用 check_travelogue 自查。'); };
+$('lg_chk').onclick = async () => {
+  $('lg_res').textContent = '检查中…';
+  try { const r = await api('travelogue_check', {text: $('lg_text').value, costs: $('lg_c').checked}); $('lg_res').innerHTML = r.problems.length ? '<ul>' + r.problems.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '<div class="tlnote">没发现能确定的问题。' + esc(r.note) + '</div>'; } catch (e) { $('lg_res').textContent = e.message; }
+};
+$('tl_q').oninput = () => { if (toolsData) renderTools(); };
 load();
 </script></body></html>
 """

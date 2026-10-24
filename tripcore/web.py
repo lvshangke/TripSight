@@ -31,6 +31,9 @@ from pydantic import TypeAdapter, ValidationError
 from . import links as _links
 from .mealgaps import meal_gaps
 from . import daycard as _daycard
+from . import photos as _ph
+from . import share as _share
+from . import tools_catalog as _tc
 from . import mcp_server as ms
 from . import workspace as ws
 from .dates import apply_dates
@@ -45,6 +48,7 @@ from .webpage import page_html
 
 _OPS = TypeAdapter(list[Op])
 MAX_BODY = 100_000
+MAX_BODY_BY_ROUTE = {"photo_add": 30_000_000}        # 照片上传（base64）
 IDLE_SECONDS = 2 * 3600
 _lock = threading.Lock()
 
@@ -441,7 +445,7 @@ def chat_status() -> dict[str, Any]:
     return {"connected": True, "message": ""}
 
 
-_VERSION_FILES = ("web.py", "webpage.py", "mapview.py", "dates.py", "proposals.py", "state.py", "mcp_server.py", "mealgaps.py", "daycard.py", "timeline.py", "hours.py", "scheduler.py", "lodging.py", "validator.py")
+_VERSION_FILES = ("web.py", "share.py", "photos.py", "tools_catalog.py", "travelogue.py", "webpage.py", "mapview.py", "dates.py", "proposals.py", "state.py", "mcp_server.py", "mealgaps.py", "daycard.py", "timeline.py", "hours.py", "scheduler.py", "lodging.py", "validator.py")
 
 
 def code_version() -> str:
@@ -458,8 +462,102 @@ def code_version() -> str:
 CODE_VERSION = code_version()
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}}
-ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine}
+def tools() -> dict[str, Any]:
+    """“能力”页：全部工具的目录（类别、性质、一句话说明、示例话术）和承诺。"""
+    return {"total": len(_tc.CATALOG), "blocks": _tc.catalog_rows(), "promises": _tc.PROMISES}
+
+
+def _share_html(body: dict) -> str:
+    trip = ms._load()
+    if trip.plan is None:
+        raise HttpError(400, "还没有分天，先排好行程再分享。")
+    photos = _ph.for_share(ms._photo_dir(), _ph.load(ms._photo_index())) if body.get("photos") else None
+    try:
+        html = _share.build_share_html(trip, show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")), photos=photos)
+    except ValueError as e:
+        raise HttpError(400, str(e))
+    bad = _share.guard_html(html)
+    if bad:
+        raise HttpError(400, "外发检查没通过：" + "；".join(bad) + "。请检查景点名称/备注里是否混入了不该外发的内容。")
+    return html
+
+
+def share_preview(body: dict) -> dict[str, Any]:
+    import importlib.util
+    return {"html": _share_html(body), "png_ok": importlib.util.find_spec("playwright") is not None,
+            "photo_count": len(_ph.load(ms._photo_index()))}
+
+
+def share_image(body: dict) -> dict[str, Any]:
+    import base64
+    html = _share_html(body)
+    folder = ms._photo_dir().with_name("share")
+    folder.mkdir(parents=True, exist_ok=True)
+    h, p = folder / "workbench-share.html", folder / "workbench-share.png"
+    h.write_text(html, encoding="utf-8")
+    why = _share.render_png(h, p)
+    if why:
+        raise HttpError(400, "没有生成长图：" + why)
+    return {"png": "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode("ascii")}
+
+
+def photos_list() -> dict[str, Any]:
+    folder = ms._photo_dir()
+    return {"photos": [{"id": x["id"], "place_id": x.get("place_id"), "day": x.get("day"), "caption": x.get("caption", ""),
+                        "thumb": _ph.thumb_uri(folder, x["file"])} for x in _ph.load(ms._photo_index())]}
+
+
+def photo_add(body: dict) -> dict[str, Any]:
+    import base64
+    import binascii
+    trip = ms._load()
+    pid = body.get("place_id")
+    if not isinstance(pid, str) or not any(p.id == pid for p in trip.places):
+        raise HttpError(400, "找不到这个景点。")
+    try:
+        raw = base64.b64decode(body.get("data") or "", validate=True)
+    except (binascii.Error, ValueError):
+        raise HttpError(400, "图片数据不对。")
+    cap = str(body.get("caption") or "")
+    bad = ms._guard_text(cap)
+    if bad:
+        raise HttpError(400, "说明里" + "；".join(bad))
+    items = _ph.load(ms._photo_index())
+    try:
+        rec = _ph.add_bytes(ms._photo_dir(), items, raw, pid, None, cap)
+    except _ph.PhotoError as e:
+        raise HttpError(400, f"没有保存：{e}")
+    _ph.save(ms._photo_index(), items)
+    return {"id": rec["id"]}
+
+
+def photo_remove(body: dict) -> dict[str, Any]:
+    items = _ph.load(ms._photo_index())
+    try:
+        _ph.remove(ms._photo_dir(), items, str(body.get("id") or ""))
+    except _ph.PhotoError as e:
+        raise HttpError(404, str(e))
+    _ph.save(ms._photo_index(), items)
+    return {"ok": True}
+
+
+def travelogue(body: dict) -> dict[str, Any]:
+    return ms.draft_travelogue(style=str(body.get("style") or "通用"), show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")))
+
+
+def travelogue_check(body: dict) -> dict[str, Any]:
+    text = body.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HttpError(400, "先把草稿粘贴进来。")
+    if len(text) > 20_000:
+        raise HttpError(400, "草稿太长（最多 2 万字）。")
+    return ms.check_travelogue(text, show_costs=bool(body.get("costs")))
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list}
+ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
+               "share_preview": share_preview, "share_image": share_image, "photo_add": photo_add, "photo_remove": photo_remove,
+               "travelogue": travelogue, "travelogue_check": travelogue_check}
 
 
 def make_handler(token: str, state: dict):
@@ -524,7 +622,7 @@ def make_handler(token: str, state: dict):
                 n = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 n = -1
-            if not 0 <= n <= MAX_BODY:
+            if not 0 <= n <= MAX_BODY_BY_ROUTE.get(rest[4:], MAX_BODY):
                 self._json(413, {"error": "请求太大"})
                 return
             try:
@@ -537,7 +635,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] != "lookup")
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "travelogue", "travelogue_check"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

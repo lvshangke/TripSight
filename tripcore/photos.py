@@ -52,10 +52,7 @@ def _encode(img, side: int, quality: int) -> bytes:
 
 
 def add(folder: Path, items: list[dict[str, Any]], src: str, place_id: Optional[str], day: Optional[int], caption: str) -> dict[str, Any]:
-    try:
-        from PIL import Image, ImageOps
-    except ImportError:
-        raise PhotoError("没有安装 Pillow，无法安全地去掉照片里的定位信息，所以没有保存（pip install pillow）")
+    """从本机路径添加一张照片。"""
     p = Path(src).expanduser()
     if p.suffix.lower() not in EXTS:
         raise PhotoError("只支持 jpg / png / webp 图片")
@@ -67,6 +64,21 @@ def add(folder: Path, items: list[dict[str, Any]], src: str, place_id: Optional[
         raise PhotoError("这不是一个文件")
     if p.stat().st_size > MAX_BYTES:
         raise PhotoError("文件太大（最多 20MB）")
+    try:
+        raw = p.read_bytes()
+    except OSError:
+        raise PhotoError("读不了这个文件")
+    return add_bytes(folder, items, raw, place_id, day, caption)
+
+
+def add_bytes(folder: Path, items: list[dict[str, Any]], raw: bytes, place_id: Optional[str], day: Optional[int], caption: str) -> dict[str, Any]:
+    """从内存里的图片数据添加（网页上传用）。同样会重新编码、去掉 EXIF；没有 Pillow 就拒绝。"""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        raise PhotoError("没有安装 Pillow，无法安全地去掉照片里的定位信息，所以没有保存（pip install pillow）")
+    if len(raw) > MAX_BYTES:
+        raise PhotoError("文件太大（最多 20MB）")
     if (place_id is None) == (day is None):
         raise PhotoError("要么挂在某个景点，要么挂在某一天，二选一")
     if len(items) >= MAX_TOTAL:
@@ -74,9 +86,13 @@ def add(folder: Path, items: list[dict[str, Any]], src: str, place_id: Optional[
     if len(caption or "") > MAX_CAPTION:
         raise PhotoError(f"说明太长（最多 {MAX_CAPTION} 字）")
     try:
-        with Image.open(p) as im:
+        with Image.open(io.BytesIO(raw)) as im:
+            if (im.format or "").upper() not in ("JPEG", "PNG", "WEBP"):
+                raise PhotoError("只支持 jpg / png / webp 图片")
             im = ImageOps.exif_transpose(im).convert("RGB")
             data = _encode(im, MAX_SIDE, 85)
+    except PhotoError:
+        raise
     except Exception:
         raise PhotoError("打不开这张图片")
     pid = hashlib.sha1(data).hexdigest()[:10]
@@ -88,6 +104,16 @@ def add(folder: Path, items: list[dict[str, Any]], src: str, place_id: Optional[
     rec = {"id": pid, "file": fname, "place_id": place_id, "day": day, "caption": (caption or "").strip()}
     items.append(rec)
     return rec
+
+
+def thumb_uri(folder: Path, fname: str, side: int = 120) -> str:
+    """工作台小缩略图（data URI）；读不出来返回空串。"""
+    try:
+        from PIL import Image
+        with Image.open(folder / fname) as im:
+            return "data:image/jpeg;base64," + base64.b64encode(_encode(im.convert("RGB"), side, 60)).decode("ascii")
+    except Exception:
+        return ""
 
 
 def remove(folder: Path, items: list[dict[str, Any]], pid: str) -> int:

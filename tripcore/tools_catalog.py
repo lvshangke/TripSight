@@ -1,0 +1,121 @@
+"""给人看的工具目录：每个 MCP 工具一行（类别、读写性质、一句话说明、示例话术）。
+
+工作台的“能力”页和 docs/TOOLS.md 都由它生成。tests/test_tools_catalog.py 要求：每个 MCP 工具都必须在这里登记，
+目录里不能有不存在的工具；docs/TOOLS.md 必须和这里一致（scripts/gen_tools_doc.py 重新生成）。
+kind：read 只读；export 生成文件，不改行程；change 会改行程或本机数据（助手只在你确认后才做）。
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+CATEGORIES = ["行程基础", "景点与住宿", "排程与检查", "路线与交通", "餐食", "攻略与导入", "分享与导出", "复盘与游记", "偏好"]
+KINDS = {"read": "只读", "export": "生成文件", "change": "会改行程/数据"}
+
+_C = "行程基础", "景点与住宿", "排程与检查", "路线与交通", "餐食", "攻略与导入", "分享与导出", "复盘与游记", "偏好"
+
+# name: (类别, kind, 一句话说明, 示例话术)
+CATALOG: dict[str, tuple[str, str, str, str]] = {
+    # 行程基础
+    "new_trip": (_C[0], "change", "新建一个行程并切换过去，旧行程保留。", "帮我新建一个东京5日游"),
+    "set_dates": (_C[0], "change", "设置或清除出行日期，营业时间和天气检查依赖它。", "日期定在 10 月 12 日到 16 日"),
+    "set_travelers": (_C[0], "change", "设置出行人数，门票和餐饮按人数估算。", "一共 3 个人去"),
+    "list_trips": (_C[0], "read", "列出所有行程。", "我有哪些行程"),
+    "switch_trip": (_C[0], "change", "切换到另一个行程。", "切换到杭州那个行程"),
+    "archive_trip": (_C[0], "change", "把行程归档（不删除文件，可手动移回）。", "把去年的行程归档"),
+    "open_workbench": (_C[0], "read", "打开本机网页工作台。", "打开工作台"),
+    "show_trip": (_C[0], "read", "查看当前行程：每天的景点、交通、未安排项、粗略费用。", "看看现在的行程"),
+    "undo": (_C[0], "change", "撤销最近一次修改，可连续撤销。", "撤销刚才的修改"),
+    # 景点与住宿
+    "add_place": (_C[1], "change", "加入一个景点，坐标来自地图查询或你，不会编。", "把西湖加进行程"),
+    "update_place": (_C[1], "change", "修改景点的资料，如停留时长、优先级、是否必去。", "雷峰塔停留改成 90 分钟"),
+    "remove_place": (_C[1], "change", "彻底删除一个景点。", "把宋城删掉"),
+    "lookup_coords": (_C[1], "read", "查询地点坐标，返回候选并提示离城市太远的结果。", "查一下灵隐寺的位置"),
+    "add_lodging": (_C[1], "change", "添加候选住宿，可同时设为选定的酒店。", "加一家西湖边的酒店，每晚 500 左右"),
+    "suggest_lodging": (_C[1], "read", "推荐住在哪一带，并把候选住宿按通勤排序。", "住哪一带比较方便"),
+    "set_stays": (_C[1], "change", "长途旅行分段住不同酒店。", "前三晚住 A，后两晚住 B"),
+    "clear_stays": (_C[1], "change", "清除分段住宿，恢复成全程住同一家。", "不换酒店了"),
+    # 排程与检查
+    "schedule_days": (_C[2], "change", "把景点分到各天并排好顺序，已锁定的不动；relaxed 可排轻松版。", "帮我重新规划"),
+    "relaxed_alternative": (_C[2], "read", "试算一份更轻松的分天并和当前版对比，不改任何数据。", "给我一个轻松一点的备选方案"),
+    "check_plan": (_C[2], "read", "检查闭馆、来不及、太赶、没预约、路上太久等问题。", "检查一下行程有没有问题"),
+    "final_check": (_C[2], "read", "定稿前清单：还有什么没弄清楚、没处理。", "出发前还有什么没确认的"),
+    "propose_change": (_C[2], "change", "生成修改提案（移动、移出、锁定、改时长），不会直接生效。", "把天坛挪到第二天"),
+    "apply_proposal": (_C[2], "change", "你回复确认码后才套用提案，确认过的安排自动锁定。", "（回复助手给你的 4 位确认码）"),
+    # 路线与交通
+    "refine_routes": (_C[3], "change", "把估算的通勤换成高德真实路线时间和形状。", "更新一下真实路线"),
+    "set_transport_prefs": (_C[3], "change", "设置步行上限、偏好地铁、最多换乘、是否接受打车。", "我单段步行不想超过 15 分钟"),
+    "set_leg_mode": (_C[3], "change", "指定某一段用步行、公交还是驾车。", "酒店到西湖这段打车"),
+    "compare_transport": (_C[3], "read", "并排比较两点之间的步行、公交、驾车。", "比较一下从酒店到灵隐寺怎么走"),
+    "set_connection": (_C[3], "change", "记录到达和离开的航班或火车，参与首末日可玩时间的计算。", "我周一 14:30 到杭州东站"),
+    "clear_connection": (_C[3], "change", "删除已记录的大交通。", "取消到达的火车信息"),
+    "get_weather": (_C[3], "change", "查有日期的那几天的天气预报，户外景点遇雨会提示。", "查一下这几天的天气"),
+    "set_provider": (_C[3], "change", "选地图后端：高德、Google 或自动。", "这次去日本，用 Google 地图"),
+    # 餐食
+    "suggest_food": (_C[4], "read", "在某天景点附近搜候选餐厅，给评分、人均、营业时间。", "第二天中午附近有什么吃的"),
+    "find_food": (_C[4], "read", "按店名搜你想吃的店，并算出离哪天哪个景点最近。", "我想吃一家叫楼外楼的店"),
+    "choose_food": (_C[4], "change", "把选定的餐厅记为用餐点。", "就选第二家"),
+    "remove_food": (_C[4], "change", "取消一个已选的用餐点。", "把第二天午饭那家去掉"),
+    # 攻略与导入
+    "search_links": (_C[5], "read", "生成小红书、大众点评、马蜂窝等的搜索链接，在你自己的浏览器里看。", "给我杭州攻略的小红书链接"),
+    "submit_candidates": (_C[5], "change", "把你粘贴的游记或攻略里的地点整理成候选，逐条核对原文出处。", "（粘贴一篇游记）帮我提取景点"),
+    "list_candidates": (_C[5], "read", "查看候选清单和它们的核对状态。", "候选里还剩哪些"),
+    "drop_candidates": (_C[5], "change", "放弃你不要的候选。", "这几个不要了"),
+    "adopt_candidates": (_C[5], "change", "把你选中的候选加入行程，用地图核实后才加。", "把 1、3、5 加进去"),
+    "add_route_place": (_C[5], "change", "把一条顺路路线（如 citywalk）当作一个景点来安排。", "把这条老街路线当一个景点"),
+    "compare_with_source": (_C[5], "read", "对照游记的分天和我们的行程，说明哪里被拆开、为什么。", "和那篇游记对比一下"),
+    "follow_source_days": (_C[5], "change", "照搬式：把游记第 N 天放到我们的第 N 天并锁定。", "照这篇游记原样排"),
+    "fill_hours": (_C[5], "change", "给没有营业时间的景点从高德补上，并报告与现有安排的冲突。", "帮我补营业时间"),
+    # 分享与导出
+    "export_text": (_C[6], "export", "生成适合发微信的纯文字行程，每站可带地图链接。", "把今天的行程发我手机"),
+    "export_map": (_C[6], "export", "生成地图页，手机版可作为文件发给你。", "生成手机能看的地图"),
+    "export_gpx": (_C[6], "export", "导出每天的路线轨迹文件。", "导出轨迹文件"),
+    "export_share": (_C[6], "export", "生成可分享的单文件网页和长图，酒店、花费、照片默认不带。", "生成一张能分享的行程图"),
+    "personal_map_payload": (_C[6], "read", "生成高德专属地图所需的参数。", "准备高德专属地图的参数"),
+    "create_amap_map": (_C[6], "export", "在高德 App 里生成每天串联好的专属地图并返回链接。", "在高德里生成专属地图"),
+    # 复盘与游记
+    "record_review": (_C[7], "change", "旅行后记录某个景点去了没有、评分和一句备注。", "故宫去了，5 分，人很多"),
+    "record_actual_cost": (_C[7], "change", "记录一笔实际花费。", "门票一共花了 94 元"),
+    "show_review": (_C[7], "read", "回顾报告：计划对比实际，并给出可写入偏好的建议。", "回顾一下这次旅行"),
+    "draft_travelogue": (_C[7], "read", "整理写游记的事实骨架和小红书/朋友圈/通用模板。", "帮我写一篇小红书游记"),
+    "check_travelogue": (_C[7], "read", "检查游记草稿里提到没去的景点、对不上的金额和时间。", "检查一下这篇游记"),
+    "add_photo": (_C[7], "change", "把你自己的照片挂到某个景点或某天，存入时去掉定位信息。", "这张照片放到故宫下面"),
+    "remove_photo": (_C[7], "change", "删除一张照片的本机副本。", "删掉那张照片"),
+    # 偏好
+    "remember_preference": (_C[8], "change", "记下你明确说的长期偏好，之后每次规划自动套用。", "我以后都不想爬太多楼梯"),
+    "list_preferences": (_C[8], "read", "列出已记下的偏好。", "你都记了我哪些偏好"),
+    "forget_preference": (_C[8], "change", "删除一条偏好。", "忘掉不爬楼梯那条"),
+}
+
+PROMISES = [
+    "不会替你订票、订酒店或付款。",
+    "所有改动先成为提案，你确认后才生效，随时可以撤销。",
+    "坐标、营业时间、路线、天气只来自地图服务和你；查不到就写“待核实”。",
+    "你的 key 只放在你自己的配置里，不会出现在页面或分享文件里。",
+    "分享时酒店、花费、照片默认不公开，由你决定。",
+]
+
+
+def catalog_rows() -> list[dict[str, Any]]:
+    """按类别顺序整理成列表，工作台和文档共用。"""
+    out = []
+    for cat in CATEGORIES:
+        items = [{"name": n, "kind": k, "kind_text": KINDS[k], "summary": s, "example": e}
+                 for n, (c, k, s, e) in CATALOG.items() if c == cat]
+        out.append({"category": cat, "tools": items})
+    return out
+
+
+def render_markdown() -> str:
+    total = len(CATALOG)
+    lines = ["# 能力地图", "",
+             f"TripSight 通过 MCP 提供 **{total}** 个工具。大模型只理解你的话并调用它们；排程、检查、路线、版本和撤销都由这些确定性的工具完成。",
+             "本页由 `scripts/gen_tools_doc.py` 从 `tripcore/tools_catalog.py` 生成，请不要手改。", "",
+             "**标记**：只读 = 不改任何数据；生成文件 = 不改行程；会改行程/数据 = 助手只在你确认后才做，多数可 `undo`。", ""]
+    for block in catalog_rows():
+        lines += [f"## {block['category']}（{len(block['tools'])}）", "", "| 工具 | 性质 | 做什么 | 可以这样说 |", "|---|---|---|---|"]
+        for t in block["tools"]:
+            lines.append(f"| `{t['name']}` | {t['kind_text']} | {t['summary']} | “{t['example']}” |")
+        lines.append("")
+    lines += ["## 承诺", ""] + [f"- {p}" for p in PROMISES] + [""]
+    return "\n".join(lines)
