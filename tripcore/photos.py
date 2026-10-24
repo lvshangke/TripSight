@@ -106,12 +106,12 @@ def add_bytes(folder: Path, items: list[dict[str, Any]], raw: bytes, place_id: O
     return rec
 
 
-def thumb_uri(folder: Path, fname: str, side: int = 120) -> str:
+def thumb_uri(folder: Path, fname: str, side: int = 120, quality: int = 60) -> str:
     """工作台小缩略图（data URI）；读不出来返回空串。"""
     try:
         from PIL import Image
         with Image.open(folder / fname) as im:
-            return "data:image/jpeg;base64," + base64.b64encode(_encode(im.convert("RGB"), side, 60)).decode("ascii")
+            return "data:image/jpeg;base64," + base64.b64encode(_encode(im.convert("RGB"), side, quality)).decode("ascii")
     except Exception:
         return ""
 

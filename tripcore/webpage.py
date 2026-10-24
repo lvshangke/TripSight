@@ -137,6 +137,11 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #pane_tools h4{margin:14px 0 4px;font-size:14px}.tool{padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
 .tool code{font-weight:700}.tool a{color:#1a6fe8;text-decoration:none;font-size:12.5px}.tlnote{color:#777;font-size:12.5px}
 .kd{font-size:11px;padding:0 6px;border-radius:10px;border:1px solid}.kd.read{color:#2e7d32;border-color:#2e7d32}.kd.export{color:#1565c0;border-color:#1565c0}.kd.change{color:#b45309;border-color:#b45309}
+#lb{position:fixed;inset:0;background:#000d;z-index:4000;display:none;align-items:center;justify-content:center;flex-direction:column}#lb.on{display:flex}
+#lb img{max-width:92vw;max-height:80vh;border-radius:6px;background:#222}#lb_cap{color:#eee;font-size:13px;margin-top:10px;max-width:90vw;text-align:center}
+#lb button{position:absolute;background:#fff2;color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer}#lb button:hover{background:#fff4}
+#lb_x{top:16px;right:16px}#lb_prev{left:16px;top:50%}#lb_next{right:16px;top:50%}.pht img,.lgph img{cursor:zoom-in}
+.lgph{display:flex;gap:4px;margin:3px 0 0 4px;flex-wrap:wrap}.lgph img{width:56px;height:56px;object-fit:cover;border-radius:4px}
 .phr{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center}.pht{position:relative;display:inline-block}
 .pht img{width:44px;height:44px;object-fit:cover;border-radius:4px;display:block}.pht button{position:absolute;top:-5px;right:-5px;width:16px;height:16px;line-height:12px;padding:0;border-radius:50%;font-size:11px}
 .addph{font-size:12px;border:1px dashed #999;border-radius:4px;padding:2px 8px;cursor:pointer;color:#1a6fe8}
@@ -163,7 +168,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
 <button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><div id="sh_err"></div>
 <div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
-<div class="ph"><iframe id="sh_frame" sandbox="allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
+<div class="ph"><iframe id="sh_frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
 <div class="pane" id="pane_log"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>游记的事实骨架</b>
 <select id="lg_style"><option>通用</option><option>小红书</option><option>朋友圈</option></select>
 <label><input type="checkbox" id="lg_l"> 可写酒店</label><label><input type="checkbox" id="lg_c"> 可写花费</label>
@@ -187,7 +192,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="err" id="nt_err"></div>
 <div class="btns"><button type="button" id="nt_cancel">取消</button><button type="submit" class="pri" id="nt_ok">创建</button></div></form></div>
 <script>__JS__</script>
-<script>
+<div id="lb"><img id="lb_img" alt=""><div id="lb_cap"></div><button id="lb_prev" title="上一张">‹</button><button id="lb_next" title="下一张">›</button><button id="lb_x" title="关闭">×</button></div><script>
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
 let S = null, selDay = 0, edit = false, pending = null, drag = null, picks = [], calMonth = null;
@@ -554,7 +559,27 @@ async function shareRefresh() {
 function dl(href, name) { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 async function logGen() {
   $('lg_out').textContent = '加载中…';
-  try { renderLog(await api('travelogue', {style: $('lg_style').value, lodging: $('lg_l').checked, costs: $('lg_c').checked})); } catch (e) { $('lg_out').textContent = e.message; }
+  try { await loadPhotos(); renderLog(await api('travelogue', {style: $('lg_style').value, lodging: $('lg_l').checked, costs: $('lg_c').checked})); } catch (e) { $('lg_out').textContent = e.message; }
+}
+let LB = {list: [], i: 0}, PHID = {};
+async function lbShow() {
+  const p = LB.list[LB.i]; if (!p) return; $('lb').classList.add('on'); $('lb_img').src = p.thumb || '';
+  $('lb_cap').textContent = (LB.list.length > 1 ? (LB.i + 1) + '/' + LB.list.length + ' ' : '') + (p.caption || '');
+  $('lb_prev').style.display = $('lb_next').style.display = LB.list.length > 1 ? '' : 'none';
+  try { const r = await api('photo_full', {id: p.id}); if (LB.list[LB.i] === p && r.uri) $('lb_img').src = r.uri; } catch (e) {}
+}
+function lbOpen(list, i) { LB = {list: list, i: i}; lbShow(); }
+function lbClose() { $('lb').classList.remove('on'); $('lb_img').src = ''; }
+$('lb_x').onclick = lbClose; $('lb_prev').onclick = () => { LB.i = (LB.i + LB.list.length - 1) % LB.list.length; lbShow(); }; $('lb_next').onclick = () => { LB.i = (LB.i + 1) % LB.list.length; lbShow(); };
+$('lb').onclick = e => { if (e.target === $('lb')) lbClose(); };
+document.addEventListener('keydown', e => { if (!$('lb').classList.contains('on')) return; if (e.key === 'Escape') { e.stopPropagation(); lbClose(); } else if (e.key === 'ArrowLeft') $('lb_prev').click(); else if (e.key === 'ArrowRight') $('lb_next').click(); }, true);
+function lgPhotos(list) {
+  const rows = (list || []).map(x => PHID[x.id] ? Object.assign({}, PHID[x.id], {caption: x.caption || PHID[x.id].caption}) : null).filter(Boolean);
+  if (!rows.length) return '';
+  return '<span class="lgph">' + rows.map((r, i) => '<img data-pid="' + esc(r.id) + '" src="' + esc(r.thumb) + '" alt="" title="' + esc(r.caption || '点击放大') + '">').join('') + '</span>';
+}
+function lgWire(box) {
+  box.querySelectorAll('.lgph').forEach(g => { const imgs = [...g.querySelectorAll('img')]; const list = imgs.map(im => PHID[im.dataset.pid]); imgs.forEach((im, i) => im.onclick = () => lbOpen(list, i)); });
 }
 const STC = {'去了': 'ok', '没去': 'skip', '临时改了': 'chg', '未记录': 'no'};
 function renderLog(f) {
@@ -562,13 +587,13 @@ function renderLog(f) {
   if (f.unrecorded.length) h += '<div class="warn">还有 ' + f.unrecorded.length + ' 个景点没记录去没去：' + f.unrecorded.map(esc).join('、') + '。先在聊天里告诉助手（例如“故宫去了，5 分，人很多”），再写游记。</div>';
   f.days.forEach(d => {
     h += '<div class="lgday"><b>第 ' + d.day + ' 天' + (d.date ? ' ' + esc(d.date) : '') + '</b>';
-    d.stops.forEach(s => { h += '<div class="lgstop"><span class="st ' + (STC[s.status] || 'no') + '">' + esc(s.status) + '</span> <b>' + esc(s.name) + '</b>' + (s.rating ? ' ' + '★'.repeat(s.rating) : '') + (s.note ? ' · ' + esc(s.note) : '') + (s.photos ? ' · 📷 ' + s.photos.length : '') + '</div>'; });
-    if (d.photos) h += '<div class="lgstop">📷 当天照片 ' + d.photos.length + ' 张</div>';
+    d.stops.forEach(s => { h += '<div class="lgstop"><span class="st ' + (STC[s.status] || 'no') + '">' + esc(s.status) + '</span> <b>' + esc(s.name) + '</b>' + (s.rating ? ' ' + '★'.repeat(s.rating) : '') + (s.note ? ' · ' + esc(s.note) : '') + (s.photos ? ' · 📷 ' + s.photos.length : '') + lgPhotos(s.photos) + '</div>'; });
+    if (d.photos) h += '<div class="lgstop">📷 当天照片 ' + d.photos.length + ' 张' + lgPhotos(d.photos) + '</div>';
     h += '</div>';
   });
   if (f.suggested_tags) h += '<div class="lgday">话题标签：' + f.suggested_tags.map(esc).join(' ') + '</div>';
   if (f.actual_costs) h += '<div class="lgday">已记录的实际花费：' + Object.entries(f.actual_costs).map(([k, v]) => esc(k) + ' ' + esc(v) + ' 元').join('，') + '</div>';
-  $('lg_out').innerHTML = h;
+  $('lg_out').innerHTML = h; lgWire($('lg_out'));
 }
 async function toolsLoad() {
   if (!toolsData) { try { toolsData = await api('tools'); } catch (e) { $('tl_out').textContent = e.message; return; } }
@@ -588,7 +613,7 @@ function renderTools() {
   $('tl_out').querySelectorAll('a[data-ex]').forEach(a => a.onclick = ev => { ev.preventDefault(); moClose(); openChatWith(a.dataset.ex); });
 }
 async function loadPhotos() {
-  try { const r = await api('photos'); PH = {}; r.photos.forEach(p => { if (p.place_id) (PH[p.place_id] = PH[p.place_id] || []).push(p); }); } catch (e) { PH = {}; }
+  try { const r = await api('photos'); PH = {}; PHID = {}; r.photos.forEach(p => { PHID[p.id] = p; if (p.place_id) (PH[p.place_id] = PH[p.place_id] || []).push(p); }); } catch (e) { PH = {}; }
 }
 function photoRow(row, pid) {
   const wrap = document.createElement('div'); wrap.className = 'phr';
@@ -596,6 +621,7 @@ function photoRow(row, pid) {
     const i = document.createElement('span'); i.className = 'pht'; i.title = p.caption || '';
     i.innerHTML = (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="">' : '📷') + '<button title="删除这张照片">×</button>';
     i.querySelector('button').onclick = async ev => { ev.stopPropagation(); try { await api('photo_remove', {id: p.id}); await loadPhotos(); renderAll(); } catch (e) { say(e.message, true); } };
+    i.querySelector('img') && (i.querySelector('img').onclick = ev => { ev.stopPropagation(); lbOpen(PH[pid], PH[pid].indexOf(p)); });
     wrap.appendChild(i);
   });
   const lab = document.createElement('label'); lab.className = 'addph'; lab.textContent = '＋照片'; lab.title = '添加你自己拍的照片（保存时会去掉定位信息）';

@@ -57,8 +57,13 @@ def test_photo_upload_strips_exif_lists_and_removes(server, tmp_path):
     assert len(stored) == 1 and b"SecretCameraMaker" not in stored[0].read_bytes()
     code, lst = call(server, "/tok/api/photos")
     assert lst["photos"][0]["place_id"] == pid and lst["photos"][0]["thumb"].startswith("data:image/jpeg")
+    code, full = call(server, "/tok/api/photo_full", {"id": lst["photos"][0]["id"]})
+    assert code == 200 and full["uri"].startswith("data:image/jpeg;base64,")
+    assert call(server, "/tok/api/photo_full", {"id": "missing"})[0] == 404
     code, r = call(server, "/tok/api/share_preview", {"photos": True})
     assert r["html"].count("data:image/jpeg;base64,") == 1 and r["photo_count"] == 1
+    assert 'id="lb"' in r["html"]                                    # 带照片时才内联放大查看器
+    assert 'id="lb"' not in call(server, "/tok/api/share_preview", {})[1]["html"]
     assert call(server, "/tok/api/photo_remove", {"id": lst["photos"][0]["id"]})[0] == 200
     assert call(server, "/tok/api/photos")[1]["photos"] == [] and not list((tmp_path / "photos").glob("*.jpg"))
 

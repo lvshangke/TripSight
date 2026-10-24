@@ -42,8 +42,17 @@ h1{font-size:22px;margin:4px 0 2px}.sub{color:var(--mute);font-size:13px;margin-
 .leg{margin:0 14px 0 48px;padding:2px 0 2px 10px;border-left:2px dashed var(--line);color:var(--mute);font-size:12.5px}
 .meal,.hot,.term{padding:6px 14px 6px 48px;color:var(--mute);font-size:13px}
 .ph{display:block;width:100%;border-radius:10px;margin:6px 0 2px}.cap{color:var(--mute);font-size:12px;margin-bottom:4px}
+.ph{cursor:zoom-in}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:9}#lb.on{display:flex}
+#lb img{max-width:96vw;max-height:84vh;border-radius:6px}#lb div{color:#eee;font-size:13px;margin-top:10px;padding:0 16px;text-align:center}
+#lb button{position:absolute;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:22px}
+#lb .x{top:14px;right:14px}#lb .p{left:10px;top:50%}#lb .n{right:10px;top:50%}
 .foot{color:var(--mute);font-size:12px;margin-top:22px;text-align:center}.foot a{color:inherit}
 """
+
+
+_LIGHTBOX = (
+    '<div id="lb"><img alt=""><div></div><button class="p">‹</button><button class="n">›</button><button class="x">×</button></div><script>(function(){var b=document.getElementById(\'lb\'),im=b.querySelector(\'img\'),cp=b.querySelector(\'div\'),L=[],i=0;function show(){var e=L[i];im.src=e.src;cp.textContent=(L.length>1?(i+1)+\'/\'+L.length+\' \':\'\')+(e.alt||\'\');b.querySelector(\'.p\').style.display=b.querySelector(\'.n\').style.display=L.length>1?\'\':\'none\';b.className=\'on\'}document.addEventListener(\'click\',function(ev){var t=ev.target;if(t.classList&&t.classList.contains(\'ph\')){L=Array.prototype.slice.call((t.closest(\'.sb\')||t.parentNode).querySelectorAll(\'img.ph\'));i=L.indexOf(t);show()}else if(t===b||t.classList.contains(\'x\')){b.className=\'\'}else if(t.classList.contains(\'p\')){i=(i+L.length-1)%L.length;show()}else if(t.classList.contains(\'n\')){i=(i+1)%L.length;show()}});document.addEventListener(\'keydown\',function(e){if(b.className!==\'on\')return;if(e.key===\'Escape\')b.className=\'\';else if(e.key===\'ArrowLeft\')b.querySelector(\'.p\').click();else if(e.key===\'ArrowRight\')b.querySelector(\'.n\').click()})})();</script>'
+)
 
 
 def _e(x: Any) -> str:
@@ -154,7 +163,8 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
             f"<title>{_e(trip.meta.name)}</title><style>{_CSS}</style></head><body><div class=\"wrap\">"
             f"<h1>{_e(trip.meta.name)}</h1><div class=\"sub\">{_e(span)}</div>{_chips(summary)}{body}"
             f"<div class=\"foot\">营业时间等信息来自高德，标“待核实”的出行前请再确认；路程标“估算”的是直线估算，不是实时路线。<br>"
-            f"由 <a href=\"{_REPO}\">TripSight</a> 生成</div></div></body></html>")
+            f"由 <a href=\"{_REPO}\">TripSight</a> 生成</div></div>"
+            + (_LIGHTBOX if photos else "") + "</body></html>")
 
 
 def guard_html(html: str) -> list[str]:

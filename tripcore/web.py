@@ -531,6 +531,18 @@ def photo_add(body: dict) -> dict[str, Any]:
     return {"id": rec["id"]}
 
 
+def photo_full(body: dict) -> dict[str, Any]:
+    """放大查看用：1400 边的大图（data URI），只读。"""
+    pid = str(body.get("id") or "")
+    row = next((x for x in _ph.load(ms._photo_index()) if x["id"] == pid), None)
+    if row is None:
+        raise HttpError(404, "找不到这张照片")
+    uri = _ph.thumb_uri(ms._photo_dir(), row["file"], 1400, 80)
+    if not uri:
+        raise HttpError(404, "照片读不出来")
+    return {"uri": uri}
+
+
 def photo_remove(body: dict) -> dict[str, Any]:
     items = _ph.load(ms._photo_index())
     try:
@@ -556,7 +568,7 @@ def travelogue_check(body: dict) -> dict[str, Any]:
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
-               "share_preview": share_preview, "share_image": share_image, "photo_add": photo_add, "photo_remove": photo_remove,
+               "share_preview": share_preview, "share_image": share_image, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check}
 
 
@@ -635,7 +647,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "travelogue", "travelogue_check"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "travelogue", "travelogue_check", "photo_full"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""
