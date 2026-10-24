@@ -30,9 +30,9 @@
 </p>
 
 <p>
-<!-- <a href="docs/images/poster.png">
+<a href="docs/images/poster.png">
 <img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成" width="760">
-</a> -->
+</a>
 </p>
 
 </div>
@@ -140,13 +140,35 @@ TripSight 把这些问题拆开来解决：
 
 <sub>以上对话和行程是真实运行的记录（助手的回复没有改写，模型使用Qwen3.7-Max,Harness使用nanobot），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
 
-**8 种分享风格，一键切换。** 同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。
+<!-- **8 种分享风格，一键切换。** 同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。 -->
 
-<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格：西安、京都、杭州、哈尔滨的不同天"></a>
+<!-- <a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格：西安、京都、杭州、哈尔滨的不同天"></a> -->
 
-**路线图叠在高德底图上。** 分享页自带内联 SVG 路线图，可导出路线动画 GIF；可选联网叠加高德底图（用你自己的 `AMAP_KEY`，页面仍是单文件）。
+<!-- **路线图叠在高德底图上。** 分享页自带内联 SVG 路线图，可导出路线动画 GIF；可选联网叠加高德底图（用你自己的 `AMAP_KEY`，页面仍是单文件）。 -->
 
-<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="路线图叠在高德底图上：总览和每天的小图"></a>
+<!-- <a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="路线图叠在高德底图上：总览和每天的小图"></a> -->
+
+
+<div align="center">
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<sub><b>8 种分享风格，一键切换。</b><br>
+同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。</sub><br><br>
+<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" width="100%" alt="8 种分享风格：西安、京都、杭州、哈尔滨的不同天"></a>
+</td>
+<td width="50%" valign="top">
+<sub><b>路线图叠在高德底图上。</b><br>
+分享页自带内联 SVG 路线图，可导出路线动画 GIF；可选联网叠加高德底图（用你自己的 <code>AMAP_KEY</code>，页面仍是单文件）。</sub><br><br>
+<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" width="100%" alt="路线图叠在高德底图上：总览和每天的小图"></a>
+</td>
+</tr>
+</table>
+
+<p><sub>图中行程是作者自己的测试行程（西安、京都、杭州、哈尔滨），营业时间来自高德；底图 © 高德地图。</sub></p>
+
+</div>
 
 <sub>图中行程是作者自己的测试行程（西安、京都、杭州、哈尔滨），营业时间来自高德；底图 © 高德地图。</sub>
 
