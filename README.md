@@ -169,20 +169,32 @@ TripSight 把它们拆开解决：
 
 ## 🚀 快速开始
 
-需要 Python 3.10 或更新版本。
+TripSight 是一个标准的 MCP 服务：**模型负责听懂你，TripSight 负责排准、查实、留好退路**。所以先装好它，再接到你用的聊天 Agent 里。
+
+**1. 安装**（需要 Python 3.10 或更新版本）
 
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-./setup.sh      # 一键：虚拟环境 + 安装 + 检查 nanobot + 登记 + 安装技能 + 自检（改 nanobot 配置前会先让你确认）
-tripcore doctor # 自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）
-tripcore demo   # 不用任何 key，用示例数据完整演示一遍
+pip install -e .   # 装好后有 tripcore、tripcore-mcp 两个命令
+tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演示一遍
 ```
 
-**在聊天里使用**：按 [docs/SETUP.md](docs/SETUP.md) 接入 nanobot（安装、登记 tripcore、安装技能、可选微信渠道），然后运行 `nanobot`，直接说想去哪、想怎么玩。想拖动调整、看地图或导出时，对助手说 **“打开工作台”**，它会返回一个带一次性令牌的网址，在这台电脑的浏览器里打开即可。
+**2. 接到你的聊天 Agent**
 
-**只用网页工作台**：不接聊天也可以，`tripcore web --open` 直接打开本机工作台。
+| Agent | 做法 | 状态 |
+|---|---|---|
+| [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
+| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再让它读 `skills/trip-planner/SKILL.md`，助手才知道该按什么流程使用这 60 个工具 | 按 MCP 标准接入，**未逐个测试** |
 
-手动安装、Docker、命令行和代码结构见 [docs/reference.md](docs/reference.md)。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
+`tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
+
+**3. 开始用**
+
+运行你的 Agent，直接说想去哪、想怎么玩。想拖动调整、看地图或导出时，对助手说 **“打开工作台”**，它会返回一个带一次性令牌的网址，在这台电脑的浏览器里打开即可。
+
+> 暂时不想接模型？`tripcore web --open` 可以单独打开网页工作台，用于拖动调整、检查和导出；一句话加景点、粘贴攻略这类功能需要接入聊天 Agent。
+
+手动安装、Docker、命令行和代码结构见 [docs/reference.md](docs/reference.md)。
 
 ## 📚 更多文档
 

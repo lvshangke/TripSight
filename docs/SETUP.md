@@ -87,6 +87,17 @@ nanobot 自带 `weixin` 渠道（二维码登录的个人微信，长轮询，�
 注意：接口单次回复默认最多等 120 秒；超时或中断不会撤销 agent 已经做完的动作，聊天栏会提示“回复可能不完整”。
 聊天按行程分开：每个行程有自己的助手会话，聊天记录存在该行程目录的 `chat.json`（最近 200 条，不在 `trip.json` 里，不影响版本和撤销）；切换行程时聊天栏跟着换成那个行程的记录，助手回复中不能切换。只有从工作台聊天栏发的对话会记在这里，微信等其他渠道的对话在 nanobot 自己的会话里。
 
+## 10. 接入其他支持 MCP 的 Agent（未逐个测试）
+
+tripcore 是标准 MCP 服务（stdio），不依赖 nanobot。其他 Agent（Claude Code、Claude Desktop、Cursor 等）理论上按各自的 MCP 配置方式添加即可，作者目前只在 nanobot 上测试过：
+
+1. 先按第 1 节安装，装好后有 `tripcore-mcp` 命令（等价于 `python -m tripcore.mcp_server`）。
+2. 在该 Agent 的 MCP 配置里添加一个 stdio 服务，命令填 `tripcore-mcp`（或虚拟环境里 python 的绝对路径加 `-m tripcore.mcp_server`），`env` 里放你自己的 `AMAP_KEY`（可选 `GOOGLE_MAPS_KEY`）。各 Agent 的配置文件位置和字段名不同，请看它自己的文档；可参考 `nanobot/config.example.json` 里 `tripcore` 那一项。
+3. 让助手读 `skills/trip-planner/SKILL.md`（用法、流程和铁律）：复制到该 Agent 的指令/技能位置，或在对话开头让它先读。没有这份说明，助手知道有 60 个工具，但不知道该按什么顺序用、什么时候必须先请你确认。
+4. 重启 Agent，应能看到 tripcore 的工具；对它说“打开工作台”测试。
+
+如果你在别的 Agent 上接通了，欢迎告诉我们具体步骤。
+
 ## 改 skill 时
 
 以仓库里的 `skills/` 为准，改完用 `scripts/install_skills.py` 同步到 nanobot（或用 `--link` 一次链好）。
