@@ -30,9 +30,9 @@
 </p>
 
 <p>
-<a href="docs/images/poster.png">
+<!-- <a href="docs/images/poster.png">
 <img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成" width="760">
-</a>
+</a> -->
 </p>
 
 </div>
