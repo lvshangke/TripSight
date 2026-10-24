@@ -12,7 +12,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-449%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-451%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成"></a>
@@ -68,6 +68,16 @@ TripSight 把这些问题拆开来解决：
 - **数据留在你自己电脑上**：行程是本机的 JSON 文件；网页工作台只监听 `127.0.0.1`；API key 只放在你自己的配置里，`tripcore doctor` 只显示“已配置/未配置”。
 
 ## 🖼️ 效果一览
+
+**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。（[1920 宽 MP4](docs/videos/chat-plan.mp4)）
+
+<a href="docs/images/chat-plan.gif"><img src="docs/images/chat-plan.gif" alt="聊天排行程：加景点、排程、提案确认、选餐厅和住宿、真实路线"></a>
+
+**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。（[1920 宽 MP4](docs/videos/chat-paste.mp4)）
+
+<a href="docs/images/chat-paste.gif"><img src="docs/images/chat-paste.gif" alt="粘贴攻略：逐条核对、列成候选、挑选加入"></a>
+
+<sub>以上对话和行程是真实运行的记录（助手的回复没有改写），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
 
 **8 种分享风格，一键切换。** 同一份行程换个样子发给朋友；都是浅色底，酒店和花费默认不公开，勾选才带。
 

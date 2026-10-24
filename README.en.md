@@ -11,7 +11,7 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-449%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-451%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight: the LLM only proposes; code schedules and checks"></a>
@@ -67,6 +67,16 @@ It is not another "one-click guide generator" but a workbench where the plan can
 - **Your data stays on your machine.** Trips are local JSON files, the workbench listens on `127.0.0.1` only, keys live in your own config, and `tripcore doctor` only prints "configured / not configured".
 
 ## 🖼️ At a glance
+
+**Plan by chatting.** Ask the assistant to add stops and schedule 3 days; changes are proposed first and applied only after you confirm; hotels are recorded, never booked; one sentence turns every leg into a real Amap route. The itinerary panel, map and chat update together. ([1920-wide MP4](docs/videos/chat-plan.mp4))
+
+<a href="docs/images/chat-plan.gif"><img src="docs/images/chat-plan.gif" alt="Plan by chatting: add stops, schedule, confirm a proposal, pick food and lodging, real routes"></a>
+
+**Paste someone else's guide.** Paste a Xiaohongshu guide: places already in the trip are skipped, new ones are checked one by one and listed as candidates (nothing is added yet); after you pick, the assistant verifies real names and opening hours on Amap, and adds them only after you confirm, saying plainly what does not fit. ([1920-wide MP4](docs/videos/chat-paste.mp4))
+
+<a href="docs/images/chat-paste.gif"><img src="docs/images/chat-paste.gif" alt="Paste a guide: check each item, list candidates, pick and add"></a>
+
+<sub>The conversations and itineraries are real recordings (the assistant's replies are not edited); basemap © Amap; the guide text was pasted by the author from a Xiaohongshu post.</sub>
 
 **8 share themes, one click.** The same itinerary in a different look to send to friends; all light backgrounds, hotels and costs are hidden by default.
 
