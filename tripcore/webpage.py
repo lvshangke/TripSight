@@ -553,10 +553,12 @@ function moShow(tab) {
   if (tab === 'share') shareRefresh(); else if (tab === 'log') logGen(); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
+let shareSeq = 0;
 async function shareRefresh() {
+  const my = ++shareSeq;
   $('sh_err').textContent = '';
   try {
-    const r = await api('share_preview', shareOpts()); shareHtml = r.html; $('sh_frame').srcdoc = r.html;
+    const r = await api('share_preview', shareOpts()); if (my !== shareSeq) return; shareHtml = r.html; $('sh_frame').srcdoc = r.html;
     if (r.themes && !$('sh_t').options.length) r.themes.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('sh_t').appendChild(o); });
     $('sh_b').disabled = !r.key_ok; if (!r.key_ok) $('sh_b').checked = false;
     $('sh_bn').textContent = !r.key_ok ? '没有检测到 AMAP_KEY：在你自己的终端里设置后重启工作台，这个选项才能用。' : (r.bm_note ? '部分底图没取到：' + r.bm_note + '（对应的图已退回无底图）' : '默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。');
@@ -564,7 +566,7 @@ async function shareRefresh() {
     $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
     $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
     $('sh_pn').textContent = r.photo_count ? '已有 ' + r.photo_count + ' 张，放在对应景点下面' : '还没有照片：在“编辑”模式下给景点添加';
-  } catch (e) { shareHtml = ''; $('sh_frame').srcdoc = ''; $('sh_err').textContent = e.message; }
+  } catch (e) { if (my !== shareSeq) return; shareHtml = ''; $('sh_frame').srcdoc = ''; $('sh_err').textContent = e.message; }
 }
 function dl(href, name) { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 async function logGen() {

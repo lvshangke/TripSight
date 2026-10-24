@@ -17,6 +17,7 @@ from .coords import wgs84_to_gcj02
 from .region import trip_region
 from .connections import day_window, leave_by, terminal_leg, terminal_point, transfer_target, arrival_day, departure_day
 from .metrics import day_stats
+from .hours import hours_window
 from .models import Trip
 from .routeplace import entry, exit_
 
@@ -122,6 +123,28 @@ def _route_data(p) -> dict[str, Any]:
     return {"points": pts, "paths": paths, "walk_minutes": mins}
 
 
+def _hm_min(m: int) -> str:
+    m %= 24 * 60
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+def hours_line(oh: str, src: str, d) -> str:
+    """展示用的营业时间一行：知道旅行日期且能解析时，只写当天适用的那一条；否则不猜，写原文前 40 字。"""
+    if not oh:
+        return "营业时间：待核实"
+    tail = f"（来源：{src or '未注明'}）"
+    w = hours_window(oh, d) if d is not None else None
+    if w is not None:
+        if w.closed:
+            return "营业时间：当天不开放" + tail
+        span = "全天开放" if w.all_day else "、".join(f"{_hm_min(a)}–{_hm_min(b)}" for a, b in w.ranges)
+        if w.last_entry is not None:
+            span += f"，最晚进入 {_hm_min(w.last_entry)}"
+        return f"营业时间：{span}" + tail
+    short = oh if len(oh) <= 40 else oh[:40] + "…"
+    return f"营业时间：{short}" + tail
+
+
 def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
     icon = {"flight": "✈", "train": "🚄"}.get(c.kind, "🚌")
     return {"type": "term", "icon": icon, "role": role, "time": when.strftime("%H:%M"), "name": tp.name,
@@ -161,7 +184,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     t += st.lodging_out.minutes
             for i, p in enumerate(st.places):
                 lines = []
-                lines.append(f"营业时间：{p.opening_hours}（来源：{p.hours_source or '未注明'}）" if p.opening_hours else "营业时间：待核实")
+                lines.append(hours_line(p.opening_hours, p.hours_source, d))
                 if p.reservation_required:
                     bk = [x.name for x in trip.places if x.id in p.backups]
                     lines.append("需预约；备选：" + ("、".join(bk) if bk else "未设置"))
@@ -181,7 +204,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     if m.rating is not None:
                         ml.append(f"评分 {m.rating:g}（高德）")
                     ml.append(f"人均约 {m.cost_per_person:.0f} 元（参考）" if m.cost_per_person is not None else "人均待核实")
-                    ml.append(f"营业时间：{m.opening_hours}（来源：{m.hours_source}）" if m.opening_hours else "营业时间待核实")
+                    ml.append(hours_line(m.opening_hours, m.hours_source, d) if m.opening_hours else "营业时间待核实")
                     timeline.append({"type": "meal", "mid": m.id, "name": m.name, "pos": _gcj(m.lat, m.lon), "lines": ml,
                                      "web": marker_link(m.name, m.lat, m.lon, region)})
                 if i < len(st.legs):

@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import re as _re
+
 from html import escape
 from pathlib import Path
 from typing import Any, Optional
@@ -200,7 +202,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
                        f'{_photos((by_place or {}).get(e["pid"], []))}</div></div>')
         elif t == "meal":
             lines = [x for x in e["lines"] if show_costs or not x.startswith("人均")]
-            out.append(f'<div class="meal">🍜 用餐：{_e(e["name"])}' + (f'（{_e("；".join(lines))}）' if lines else "") + "</div>")
+            mtxt = _re.sub(r"（来源：([^）]*)）", r" 来源：\1", "；".join(lines))
+            out.append(f'<div class="meal">🍜 用餐：{_e(e["name"])}' + (f'（{_e(mtxt)}）' if lines else "") + "</div>")
     if by_day and by_day.get(idx + 1):
         out.append(f'<div class="meal">{_photos(by_day[idx + 1])}</div>')
     out.append("</section>")
