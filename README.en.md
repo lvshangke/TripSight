@@ -18,39 +18,77 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 > **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
-<p><sub>Core: click a cover to watch the full animation (1600 px wide, with the map)</sub></p>
-<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-plan.gif"><img src="docs/images/chat-plan-cover.jpg" alt="Plan by chatting: add stops, schedule, confirm proposals, pick food and lodging, real routes" width="760"></a><br><sub>Plan by chatting: add stops, schedule, confirm proposals, pick food and lodging, real routes</sub>
+<p><b>Core</b>　<sub>Click a cover to watch the full animation (1600 px wide, with the map)</sub></p>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-plan.gif"><img src="docs/images/chat-plan-cover.jpg" alt="Plan by chatting" width="760"></a><br><sub><b>Plan by chatting</b>: add stops, schedule, confirm proposals, pick food and lodging, real routes</sub>
 <br><br>
-<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-paste.gif"><img src="docs/images/chat-paste-cover.jpg" alt="Paste a guide: check each item, list candidates, pick and add" width="760"></a><br><sub>Paste a guide: check each item, list candidates, pick and add</sub>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-paste.gif"><img src="docs/images/chat-paste-cover.jpg" alt="Paste a guide" width="760"></a><br><sub><b>Paste a guide</b>: check each item, list candidates, pick and add</sub>
 <br><br>
+<!-- 视频：把 MP4 上传到 GitHub 后，把得到的 user-attachments 链接单独一行写在这里，即可替换上面的封面。 -->
 <p><b>Plan and check</b></p>
 <table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="Drag & check" width="190"><br><sub>Drag a stop, code checks instantly</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="Closed-day check" width="190"><br><sub>Hours, last entry, closed-day preview</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="Real routes" width="190"><br><sub>Estimated dashes → real Amap routes</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="Weather" width="190"><br><sub>Real forecast; no forecast, no invention</sub></td>
+<td width="33%" valign="top">
+<strong>Drag and check</strong><br>
+<sub>Drag the Palace Museum to a Monday: code flags the closure and overload at once; nothing applies until you confirm.</sub><br><br>
+<img src="docs/images/demo.gif" width="100%" alt="Drag and check">
+</td>
+<td width="33%" valign="top">
+<strong>Closed days and hours</strong><br>
+<sub>Opening hours and last entry; changes show a preview first and can be cancelled.</sub><br><br>
+<img src="docs/images/feat-closed.gif" width="100%" alt="Closed-day check">
+</td>
+<td width="33%" valign="top">
+<strong>Real routes</strong><br>
+<sub>Estimated dashes become real Amap routes in one click, with transfers and navigation.</sub><br><br>
+<img src="docs/images/feat-route.gif" width="100%" alt="Real routes">
+</td>
 </tr>
 </table>
-<p><b>Share before you go</b></p>
+<p><b>Handy before and during the trip</b></p>
 <table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="Share themes" width="190"><br><sub>One itinerary, one-click restyle</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="One-click export" width="190"><br><sub>Web page opens maps; long image for chat</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="Click-through" width="190"><br><sub>Guides, Amap navigation, reviews</sub></td>
+<td width="33%" valign="top">
+<strong>Weather</strong><br>
+<sub>Real forecast for dated days, rain warnings for outdoor stops; no forecast, no invention.</sub><br><br>
+<img src="docs/images/feat-weather.gif" width="100%" alt="Weather">
+</td>
+<td width="33%" valign="top">
+<strong>Click-through</strong><br>
+<sub>Guide searches per stop, Amap navigation per leg, reviews for meals and hotels.</sub><br><br>
+<img src="docs/images/feat-links.gif" width="100%" alt="Click-through">
+</td>
+<td width="33%" valign="top">
+<strong>60 tools</strong><br>
+<sub>Browse and search; each tool comes with a sample phrase.</sub><br><br>
+<img src="docs/images/feat-tools.gif" width="100%" alt="60 tools">
+</td>
 </tr>
 </table>
 <p><b>After the trip: share and publish in one click</b></p>
 <table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="Travelogue" width="190"><br><sub>Only facts you recorded; draft check</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-photos.gif" alt="Photos" width="190"><br><sub>Xi’an Muslim Quarter: upload, open, ship with the share page</sub></td>
+<td width="50%" valign="top">
+<strong>8 share themes</strong><br>
+<sub>One itinerary, many looks; hotel and costs hidden by default.</sub><br><br>
+<img src="docs/images/feat-themes.gif" width="100%" alt="Share themes">
+</td>
+<td width="50%" valign="top">
+<strong>One-click export</strong><br>
+<sub>Web page opens each stop in Amap; long image is ready for chat.</sub><br><br>
+<img src="docs/images/feat-export.gif" width="100%" alt="Export">
+</td>
 </tr>
-</table>
-<p><b>Everything it can do</b></p>
-<table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-tools.gif" alt="60 tools" width="190"><br><sub>Browse and search, each with a sample phrase</sub></td>
+<td width="50%" valign="top">
+<strong>Travelogue</strong><br>
+<sub>Skeleton from facts you recorded; the draft check flags places you skipped, unrecorded ones and wrong amounts.</sub><br><br>
+<img src="docs/images/feat-travelogue.gif" width="100%" alt="Travelogue">
+</td>
+<td width="50%" valign="top">
+<strong>Photos</strong><br>
+<sub>Upload photos per stop (location data stripped), open them large, ship them with the share page.</sub><br><br>
+<img src="docs/images/feat-photos.gif" width="100%" alt="Photos">
+</td>
 </tr>
 </table>
 <sub>Demos use the bundled Beijing sample, a Suzhou sample trip and Xi’an Muslim Quarter (photo taken by the author); weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
