@@ -83,8 +83,8 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .chip{font-size:11px;font-weight:400;background:#f1f3f8;color:#456;border-radius:10px;padding:1px 8px;white-space:nowrap}
 .chip.warn{background:#fff1dc;color:#a05a00}.chip.err{background:#fde8e8;color:#b02020}.chip.mute{color:#999}
 .tags{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 4px -2px}
-.st,.cat{font-size:11px;border-radius:10px;padding:0 8px;line-height:17px}
-.st.ok{background:#e6f5e9;color:#256b36}.st.warn{background:#fff1dc;color:#a05a00}.st.bad{background:#fde8e8;color:#b02020}.st.unknown{background:#eee;color:#777}
+.hrs,.cat{font-size:11px;border-radius:10px;padding:0 8px;line-height:17px}
+.hrs.ok{background:#e6f5e9;color:#256b36}.hrs.warn{background:#fff1dc;color:#a05a00}.hrs.bad{background:#fde8e8;color:#b02020}.hrs.unknown{background:#eee;color:#777}
 .cat{background:#eef1fb;color:#3a4a8a}
 .it.stop{border-left:3px solid #4363d8}.it.stop .tm{font-weight:700;color:#222;font-size:14px}
 .dh.cur{background:#eef3ff}
@@ -350,7 +350,7 @@ function dayHead(d) {
 function tagsHtml(pid) {
   const x = (S.stop_info || {})[pid]; if (!x) return '';
   const txt = {ok: '营业 ' + x.hours, warn: '注意营业时间 ' + x.hours, bad: '营业时间对不上 ' + x.hours, unknown: '营业时间待核实'}[x.state];
-  return '<div class="tags"><span class="st ' + x.state + '" title="营业时间来自地图服务，请以现场为准">' + esc(txt) + '</span>' + (x.cat ? '<span class="cat">' + esc(x.cat) + '</span>' : '') + '</div>';
+  return '<div class="tags"><span class="hrs ' + x.state + '" title="营业时间来自地图服务，请以现场为准">' + esc(txt) + '</span>' + (x.cat ? '<span class="cat">' + esc(x.cat) + '</span>' : '') + '</div>';
 }
 function introHtml(pid) {
   const x = (S.intros || {})[pid]; if (!x) return '';
