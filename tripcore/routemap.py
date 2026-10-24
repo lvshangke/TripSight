@@ -40,12 +40,52 @@ class _Proj:
         dx, dy = max(dx, 1e-4), max(dy, 1e-4)
         scale = min((W - 2 * PAD) / dx, (max_h - 2 * PAD) / dy)
         self.scale = scale
+        self.mpu = 111320.0 / scale                      # 每个视图单位约多少米
         self.h = max(MIN_H, dy * scale + 2 * PAD)
         self.ox = (W - dx * scale) / 2
         self.oy = (self.h - dy * scale) / 2
 
     def xy(self, lat: float, lon: float) -> tuple[float, float]:
         return (self.ox + (lon - self.lon0) * self.k * self.scale, self.oy + (self.lat1 - lat) * self.scale)
+
+
+_NICE_M = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000]
+
+
+def _fmt_len(m: float) -> str:
+    return f"{m / 1000:g} km" if m >= 1000 else f"{m:g} m"
+
+
+def _fmt_ext(wm: float, hm: float) -> str:
+    if max(wm, hm) >= 1000:
+        return f"约 {wm / 1000:.1f} × {hm / 1000:.1f} km"
+    return f"约 {round(wm, -1):g} × {round(hm, -1):g} m"
+
+
+def _scalebar(pr) -> str:
+    """左下角比例尺：选一个好读的长度，画成 30~110 个视图单位长。"""
+    mpu = getattr(pr, "mpu", 0) or 0
+    if mpu <= 0:
+        return ""
+    best = None
+    for m in _NICE_M:
+        u = m / mpu
+        if 30 <= u <= 110:
+            best = (m, u)
+    if best is None:
+        return ""
+    m, u = best
+    x0, y = 12.0, pr.h - 12.0
+    return (f'<g class="sc"><rect x="{x0 - 6:.1f}" y="{y - 14:.1f}" width="{u + 12:.1f}" height="22" rx="3" fill="#fff" opacity=".72"/>'
+            f'<path d="M{x0:.1f} {y - 4:.1f} V{y:.1f} H{x0 + u:.1f} V{y - 4:.1f}" fill="none" stroke="#333" stroke-width="1.4"/>'
+            f'<text x="{x0:.1f}" y="{y - 6:.1f}" class="st">{_fmt_len(m)}</text></g>')
+
+
+def _extent(pts) -> tuple[float, float]:
+    lats = [p[0] for p in pts]
+    lons = [p[1] for p in pts]
+    k = math.cos(math.radians((min(lats) + max(lats)) / 2))
+    return ((max(lons) - min(lons)) * 111320.0 * k, (max(lats) - min(lats)) * 111320.0)
 
 
 def _thin(pts: list[tuple[float, float]], tol: float = 0.6) -> list[tuple[float, float]]:
@@ -68,7 +108,7 @@ def _d(pts: list[tuple[float, float]]) -> str:
 
 
 _JS = """(function(){var svg=document.getElementById('rmap');if(!svg)return;
-var VB=JSON.parse(svg.getAttribute('data-vb')),FULL=svg.getAttribute('viewBox'),FW=+FULL.split(' ')[2];
+var VB=JSON.parse(svg.getAttribute('data-vb')),EXT=JSON.parse(svg.getAttribute('data-ext')||'{}'),sc=svg.querySelector('.sc'),FULL=svg.getAttribute('viewBox'),FW=+FULL.split(' ')[2];
 var legs=[].slice.call(svg.querySelectorAll('.rl path')),stops=[].slice.call(svg.querySelectorAll('.rs g'));
 var steps=legs.concat(stops).sort(function(a,b){return a.getAttribute('data-s')-b.getAttribute('data-s')});
 var lab=document.getElementById('rm_d'),badge=document.getElementById('rm_n'),total=lab.textContent,T=0,starts=[];
@@ -77,9 +117,9 @@ function seek(p){var t=p*T,day=-1;steps.forEach(function(el,i){if(t>starts[i]||(
 var live=p>0&&p<1,vb=VB[day],z=1;if(live&&vb){svg.setAttribute('viewBox',vb.join(' '));z=FW/vb[2]}else{svg.setAttribute('viewBox',FULL)}
 steps.forEach(function(el,i){var w=+el.getAttribute('data-w'),q=Math.max(0,Math.min(1,(t-starts[i])/w));
 if(el.tagName==='path'){var L=+el.getAttribute('data-len');el.style.strokeDasharray=L+' '+L;el.style.strokeDashoffset=L*(1-q);el.style.strokeWidth=((el.getAttribute('class')==='r'?3.4:1.8)/z)+'px'}else{el.style.opacity=q;el.style.transform='scale('+((.6+.4*q)/z)+')'}});
-lab.style.display=live?'none':'';badge.textContent=live&&day>=0?'第 '+(day+1)+' 天':''}
+lab.style.display=live?'none':'';badge.textContent=live&&day>=0?'第 '+(day+1)+' 天'+(EXT[day]?' · 范围'+EXT[day]:''):'';if(sc)sc.style.display=live?'none':''}
 window.__seek=seek;var raf=0,btn=document.getElementById('rm_b');
-function clear(){svg.setAttribute('viewBox',FULL);badge.textContent='';lab.style.display='';steps.forEach(function(el){el.style.strokeDasharray='';el.style.strokeDashoffset='';el.style.strokeWidth='';el.style.opacity='';el.style.transform=''})}
+function clear(){svg.setAttribute('viewBox',FULL);badge.textContent='';if(sc)sc.style.display='';lab.style.display='';steps.forEach(function(el){el.style.strokeDasharray='';el.style.strokeDashoffset='';el.style.strokeWidth='';el.style.opacity='';el.style.transform=''})}
 function play(){cancelAnimationFrame(raf);var D=Math.max(5000,Math.min(16000,T*1100)),t0=null;btn.disabled=true;
 function f(ts){if(t0===null)t0=ts;var p=Math.min(1,(ts-t0)/D);seek(p);if(p<1)raf=requestAnimationFrame(f);else{clear();btn.disabled=false;btn.textContent='▶ 再播一次'}}
 seek(0.0001);raf=requestAnimationFrame(f)}
@@ -142,6 +182,7 @@ def _draw(legs_raw, marks_raw, order, colors, max_h: float = MAX_H, base: Option
             else:
                 marks_svg.append(f'<g data-s="{step}" data-d="{di}" style="{tr};--c:{col}"><circle cx="{x:.1f}" cy="{y:.1f}" r="7.5"/>'
                                  f'<text x="{x:.1f}" y="{y + 3.3:.1f}">{n}</text></g>')
+    pr.ext = _extent(pts_all)
     return legs_svg, marks_svg, pr, img
 
 
@@ -160,7 +201,8 @@ def build_day(day: dict[str, Any], color: str, keep: Callable[[list[dict], int],
         return ""
     legs_svg, marks_svg, pr, img = drawn
     return (f'<div class="dmap"><svg class="rsvg{" bm" if img else ""}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="当天路线图">{_image(img, pr)}'
-            f'<g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g></svg>{"<div class=bmc>底图 © 高德地图</div>" if img else ""}</div>')
+            f'<g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g>{_scalebar(pr)}</svg>'
+            f'<div class="bmc"><span>当天范围{_fmt_ext(*pr.ext)}</span>{"<span>底图 © 高德地图</span>" if img else ""}</div></div>')
 
 
 def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[dict], int], bool], show_lodging: bool = False,
@@ -173,7 +215,11 @@ def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[di
     legs_svg, marks_svg, pr, img = drawn
     used = sorted({o[0] for o in order})
     vbs: dict[int, list[float]] = {}
+    exts: dict[int, str] = {}
     ratio = W / pr.h
+    for di in used:
+        dpts = [p_ for dd, pts, _ in legs_raw if dd == di for p_ in pts] + [(m[2], m[3]) for m in marks_raw if m[0] == di]
+        exts[di] = _fmt_ext(*_extent(dpts))
     for di in ([] if img else used):
         xy = [pr.xy(la, lo) for dd, pts, _ in legs_raw if dd == di for la, lo in pts] + [pr.xy(m[2], m[3]) for m in marks_raw if m[0] == di]
         x0, x1, y0, y1 = min(x for x, _ in xy), max(x for x, _ in xy), min(y for _, y in xy), max(y for _, y in xy)
@@ -192,9 +238,9 @@ def build(days: list[dict[str, Any]], colors: list[str], keep: Callable[[list[di
            ".rsvg{width:100%;height:auto;display:block}.rsvg .rl path{fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 .8px rgba(0,0,0,.4))}"
            ".rsvg .rl path.r{stroke-width:3.4}.rsvg .rl path.g{stroke-width:1.8;opacity:.75}.rsvg .rs circle{fill:var(--c);stroke:#fff;stroke-width:1.5}"
            ".rsvg .rs text{font:700 9px sans-serif;text-anchor:middle;fill:var(--on)}.rsvg .rs text.hm{fill:#fff;font-size:8px}#rm_d{font:700 13px sans-serif;fill:var(--mute)}"
-           ".rsvg.bm .rl path{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff)}.bmc{font-size:11px;color:var(--mute);text-align:right;margin-top:2px}.rmw{position:relative}#rm_n{position:absolute;left:8px;top:6px;font:700 15px sans-serif;color:var(--ink);background:var(--chip);border-radius:999px;padding:0 10px}#rm_n:empty{display:none}.rmn{font-size:11.5px;color:var(--mute);margin-top:4px}.dmap{padding:6px 14px 0}.dmap .rsvg{max-height:340px}</style>")
-    svg = (f'<svg class="rsvg{" bm" if img else ""}" id="rmap" data-vb="{_e(json.dumps(vbs))}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="路线图">{_image(img, pr)}'
-           f'<text id="rm_d" x="10" y="18">共 {len(used)} 天</text><g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g></svg>')
+           ".rsvg.bm .rl path{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff)}.bmc{font-size:11px;color:var(--mute);margin-top:2px;display:flex;justify-content:space-between;gap:8px}.rsvg .sc text{font:600 9px sans-serif;fill:#333}.rmw{position:relative}#rm_n{position:absolute;left:8px;top:6px;font:700 15px sans-serif;color:var(--ink);background:var(--chip);border-radius:999px;padding:0 10px}#rm_n:empty{display:none}.rmn{font-size:11.5px;color:var(--mute);margin-top:4px}.dmap{padding:6px 14px 0}.dmap .rsvg{max-height:340px}</style>")
+    svg = (f'<svg class="rsvg{" bm" if img else ""}" id="rmap" data-vb="{_e(json.dumps(vbs))}" data-ext="{_e(json.dumps(exts, ensure_ascii=False))}" viewBox="0 0 {W:.0f} {pr.h:.0f}" role="img" aria-label="路线图">{_image(img, pr)}'
+           f'<text id="rm_d" x="10" y="18">共 {len(used)} 天</text><g class="rl">{"".join(legs_svg)}</g><g class="rs">{"".join(marks_svg)}</g>{_scalebar(pr)}</svg>')
     return (css + '<section class="rmap"><div class="rmh"><b>路线图</b><button id="rm_b" type="button">▶ 播放路线</button></div>'
             f'<div class="rmh" style="margin:0 0 4px">{legend}</div><div class="rmw">{svg}<div id="rm_n"></div></div><div class="rmn">{_e(note)}；{"底图 © 高德地图，已内嵌在页面里。" if img else "只画路线和景点，不含街道底图。"}</div></section>'
             f"<script>{_JS}</script>")

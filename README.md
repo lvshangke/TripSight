@@ -12,7 +12,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-443%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
@@ -120,7 +120,7 @@ TripSight 把这些问题拆开来解决：
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、443 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、444 个自动化测试 |
 
 ---
 

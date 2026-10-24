@@ -117,3 +117,11 @@ def test_gif_option_reports_reason_instead_of_failing(monkeypatch):
     monkeypatch.setattr(share, "render_gif", lambda *a, **k: "测试里不录制")
     out = s.export_share(gif=True)
     assert "没有生成路线动画：测试里不录制" in out and "已生成" in out
+
+
+def test_day_maps_show_scale_bar_and_extent():
+    _trip()
+    h = share.build_share_html(s._load())
+    assert 'class="sc"' in h and "当天范围约" in h and 'data-ext="' in h
+    bar_label = h.split('class="st">', 1)[1].split("<", 1)[0]
+    assert bar_label.endswith(" m") or bar_label.endswith(" km")

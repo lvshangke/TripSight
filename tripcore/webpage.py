@@ -134,9 +134,15 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .lgday{margin:8px 0;padding:6px 8px;border:1px solid #eee;border-radius:8px}.lgstop{margin:3px 0 0 6px;font-size:13px}
 .st{display:inline-block;font-size:11px;padding:0 6px;border-radius:10px;color:#fff}.st.ok{background:#3a9d5d}.st.skip{background:#888}.st.chg{background:#d98e04}.st.no{background:#c2410c}
 #pane_log textarea{width:100%;height:110px;font:inherit;font-size:13px;box-sizing:border-box;margin-top:6px}
-#pane_tools h4{margin:14px 0 4px;font-size:14px}.tool{padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
-.tool code{font-weight:700}.tool a{color:#1a6fe8;text-decoration:none;font-size:12.5px}.tlnote{color:#777;font-size:12.5px}
-.kd{font-size:11px;padding:0 6px;border-radius:10px;border:1px solid}.kd.read{color:#2e7d32;border-color:#2e7d32}.kd.export{color:#1565c0;border-color:#1565c0}.kd.change{color:#b45309;border-color:#b45309}
+#pane_tools .tbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}#pane_tools .tbar input{flex:1;min-width:200px;font:inherit;padding:6px 9px;border:1px solid #bbb;border-radius:8px}
+#pane_tools .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}.tchip{font:inherit;font-size:12.5px;padding:2px 10px;border:1px solid #d5d5d5;border-radius:999px;background:#fff;color:#444;cursor:pointer}.tchip.on{background:#2563eb;border-color:#2563eb;color:#fff}.tchip i{font-style:normal;opacity:.65;margin-left:3px}
+.tlg{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-top:10px}
+.tcard{border:1px solid #e3e3e3;border-radius:10px;padding:10px 12px;background:#fafafa;display:flex;flex-direction:column;gap:5px;font-size:13px}.tcard:hover{border-color:#b9c6e8;background:#fff}
+.tcard .hd{display:flex;align-items:center;gap:6px;justify-content:space-between}.tcard code{font-weight:700;font-size:13px;word-break:break-all}.tcard .sm2{color:#555;line-height:1.45;flex:1}
+.tcard a{color:#1a6fe8;text-decoration:none;font-size:12.5px;background:#eef3ff;border-radius:6px;padding:3px 8px;display:block}
+.tlpro{margin-top:14px;border-top:1px solid #eee;padding-top:8px;font-size:13px;color:#555}.tlpro summary{cursor:pointer;font-weight:700;color:#333}
+.tlnote{color:#777;font-size:12.5px}
+.kd{font-size:11px;padding:0 6px;border-radius:10px;border:1px solid;white-space:nowrap}.kd.read{color:#2e7d32;border-color:#2e7d32}.kd.export{color:#1565c0;border-color:#1565c0}.kd.change{color:#b45309;border-color:#b45309}
 #lb{position:fixed;inset:0;background:#000d;z-index:4000;display:none;align-items:center;justify-content:center;flex-direction:column}#lb.on{display:flex}
 #lb img{max-width:92vw;max-height:80vh;border-radius:6px;background:#222}#lb_cap{color:#eee;font-size:13px;margin-top:10px;max-width:90vw;text-align:center}
 #lb button{position:absolute;background:#fff2;color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer}#lb button:hover{background:#fff4}
@@ -176,7 +182,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="tlnote" style="margin-top:4px">只含行程和你亲口记录的回顾；没记录的会标出来，写之前先补上。</div><div id="lg_out"></div>
 <div style="margin-top:12px"><b>草稿自查</b><span class="tlnote">　粘贴写好的游记，检查提到没去的景点、对不上记录的金额和时间。感受和形容无法核实，请自己读。</span>
 <textarea id="lg_text" maxlength="20000" placeholder="把游记草稿粘贴到这里"></textarea><button id="lg_chk">检查</button><div id="lg_res"></div></div></div>
-<div class="pane" id="pane_tools"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 7px;border:1px solid #bbb;border-radius:6px"><div id="tl_out">加载中…</div></div>
+<div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
 <div class="q"><input id="ap_q" maxlength="60" placeholder="景点名称，例如：大雁塔"><button id="ap_go" class="pri">查找</button></div>
@@ -603,18 +609,25 @@ async function toolsLoad() {
   if (!toolsData) { try { toolsData = await api('tools'); } catch (e) { $('tl_out').textContent = e.message; return; } }
   renderTools();
 }
+let tlCat = '', tlKind = '';
 function renderTools() {
   const q = $('tl_q').value.trim().toLowerCase();
-  let h = '<div class="tlnote">共 ' + toolsData.total + ' 个工具。点“示例话术”会放进聊天输入框，由你确认后发送。</div>';
-  toolsData.blocks.forEach(b => {
-    const ts = b.tools.filter(t => !q || (b.category + t.name + t.summary + t.example).toLowerCase().includes(q));
-    if (!ts.length) return;
-    h += '<h4>' + esc(b.category) + '（' + ts.length + '）</h4>';
-    ts.forEach(t => { h += '<div class="tool"><code>' + esc(t.name) + '</code> <span class="kd ' + esc(t.kind) + '">' + esc(t.kind_text) + '</span><div>' + esc(t.summary) + '</div><a href="#" data-ex="' + esc(t.example) + '">“' + esc(t.example) + '”</a></div>'; });
-  });
-  h += '<h4>承诺</h4><ul>' + toolsData.promises.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>';
+  const match = t => !q || (t.name + t.summary + t.example).toLowerCase().includes(q);
+  const kinds = [['', '全部'], ['read', '只读'], ['export', '导出'], ['change', '会改行程/数据']];
+  const pool = toolsData.blocks.map(b => ({category: b.category, tools: b.tools.filter(t => match(t) && (!tlKind || t.kind === tlKind))}));
+  const all = pool.reduce((n, b) => n + b.tools.length, 0);
+  $('tl_n').textContent = '共 ' + toolsData.total + ' 个工具' + (all !== toolsData.total ? '，当前显示 ' + all : '');
+  $('tl_kind').innerHTML = kinds.map(k => '<button class="tchip' + (tlKind === k[0] ? ' on' : '') + '" data-k="' + k[0] + '">' + k[1] + '</button>').join('');
+  $('tl_cat').innerHTML = '<button class="tchip' + (tlCat === '' ? ' on' : '') + '" data-c="">全部类别<i>' + all + '</i></button>' + pool.filter(b => b.tools.length).map(b => '<button class="tchip' + (tlCat === b.category ? ' on' : '') + '" data-c="' + esc(b.category) + '">' + esc(b.category) + '<i>' + b.tools.length + '</i></button>').join('');
+  let h = '<div class="tlg">';
+  pool.forEach(b => { if (tlCat && b.category !== tlCat) return; b.tools.forEach(t => { h += '<div class="tcard"><div class="hd"><code>' + esc(t.name) + '</code><span class="kd ' + esc(t.kind) + '">' + esc(t.kind_text) + '</span></div><div class="sm2">' + esc(t.summary) + '</div><a href="#" data-ex="' + esc(t.example) + '" title="放进聊天输入框，由你确认后发送">“' + esc(t.example) + '”</a></div>'; }); });
+  h += '</div>';
+  if (all === 0) h = '<div class="tlnote" style="margin-top:14px">没有匹配的能力，换个词试试。</div>';
+  h += '<details class="tlpro"><summary>承诺（' + toolsData.promises.length + ' 条）</summary><ul>' + toolsData.promises.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul></details>';
   $('tl_out').innerHTML = h;
   $('tl_out').querySelectorAll('a[data-ex]').forEach(a => a.onclick = ev => { ev.preventDefault(); moClose(); openChatWith(a.dataset.ex); });
+  $('tl_kind').querySelectorAll('button').forEach(bt => bt.onclick = () => { tlKind = bt.dataset.k; renderTools(); });
+  $('tl_cat').querySelectorAll('button').forEach(bt => bt.onclick = () => { tlCat = bt.dataset.c; renderTools(); });
 }
 async function loadPhotos() {
   try { const r = await api('photos'); PH = {}; PHID = {}; r.photos.forEach(p => { PHID[p.id] = p; if (p.place_id) (PH[p.place_id] = PH[p.place_id] || []).push(p); }); } catch (e) { PH = {}; }

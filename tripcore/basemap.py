@@ -63,6 +63,7 @@ class Projection:
         self.view = view
         self.h = view.h
         self._cx, self._cy = _world(view.lat, view.lon, view.req_zoom)
+        self.mpu = 156543.03392 * math.cos(math.radians(view.lat)) / (2 ** view.req_zoom) * view.ratio     # 每个视图单位约多少米
 
     def xy(self, lat: float, lon: float) -> tuple[float, float]:
         x, y = _world(lat, lon, self.view.req_zoom)
