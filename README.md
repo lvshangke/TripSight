@@ -21,13 +21,13 @@
 
 <p><b>核心功能</b>　<sub>点击视频观看完整演示（1600 宽，含地图）</sub></p>
 
-<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="760" controls></video>
+https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b
 
 <sub><b>聊天排行程</b>：加景点、排程、提案确认、选餐厅和住宿、真实路线</sub>
 
 <br><br>
 
-<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="760" controls></video>
+https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a
 
 <sub><b>粘贴攻略</b>：逐条核对、列成候选、挑选后加入</sub>
 
