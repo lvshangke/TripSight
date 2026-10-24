@@ -40,9 +40,9 @@
 
 
 
+## 核心功能
 
-
-<!-- <p><b>核心功能</b></p>
+<!-- <p><b>核心功能</b></p> -->
 
 
 <p><b>规划与检查</b></p>
@@ -52,10 +52,10 @@
 <p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="60 个工具"></p>
 
 <p><b>回程之后：一键分享发布</b></p>
-<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p> -->
+<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p>
 
 
-<div align="center">
+<!-- <div align="center">
 
 <p><b>核心功能</b></p>
 
@@ -81,7 +81,7 @@
 <img src="docs/images/feat-photos.gif" width="23%" alt="上传照片">
 </p>
 
-</div>
+</div> -->
 
 > 演示用北京、苏州示例行程和西安回民街；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。
 ---
