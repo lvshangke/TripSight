@@ -20,12 +20,14 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 <table>
 <tr>
-<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="360"></td>
-<td align="center" valign="top"><img src="docs/images/share-demo.png" alt="Shareable itinerary image (hotel and costs hidden by default)" width="300"></td>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="200"></td>
+<td align="center" valign="top"><a href="docs/videos/chat-plan.mp4"><img src="docs/images/chat-plan-cover.jpg" alt="Plan by chatting" width="300"></a></td>
+<td align="center" valign="top"><a href="docs/videos/chat-paste.mp4"><img src="docs/images/chat-paste-cover.jpg" alt="Paste a guide" width="300"></a></td>
 </tr>
 <tr>
-<td align="center"><sub>Web workbench: per-day stats and opening-hours state; drag to edit with instant checks</sub></td>
-<td align="center"><sub>One-click shareable long image (hotel and costs hidden by default)</sub></td>
+<td align="center"><sub>Web workbench: drag to edit, instant checks</sub></td>
+<td align="center"><sub>Plan by chatting (click for HD video)</sub></td>
+<td align="center"><sub>Paste a guide (click for HD video)</sub></td>
 </tr>
 </table>
 
@@ -68,15 +70,15 @@ It is not another "one-click guide generator" but a workbench where the plan can
 
 ## 🖼️ At a glance
 
-**Plan by chatting.** Ask the assistant to add stops and schedule 3 days; changes are proposed first and applied only after you confirm; hotels are recorded, never booked; one sentence turns every leg into a real Amap route. The itinerary panel, map and chat update together. ([1920-wide MP4](docs/videos/chat-plan.mp4))
+**Plan by chatting.** Ask the assistant to add stops and schedule 3 days; changes are proposed first and applied only after you confirm; hotels are recorded, never booked; one sentence turns every leg into a real Amap route. The itinerary panel, map and chat update together. ([HD video](docs/videos/chat-plan.mp4), 2560 wide)
 
-<a href="docs/images/chat-plan.gif"><img src="docs/images/chat-plan.gif" alt="Plan by chatting: add stops, schedule, confirm a proposal, pick food and lodging, real routes"></a>
-
-**Paste someone else's guide.** Paste a Xiaohongshu guide: places already in the trip are skipped, new ones are checked one by one and listed as candidates (nothing is added yet); after you pick, the assistant verifies real names and opening hours on Amap, and adds them only after you confirm, saying plainly what does not fit. ([1920-wide MP4](docs/videos/chat-paste.mp4))
-
-<a href="docs/images/chat-paste.gif"><img src="docs/images/chat-paste.gif" alt="Paste a guide: check each item, list candidates, pick and add"></a>
+**Paste someone else's guide.** Paste a Xiaohongshu guide: places already in the trip are skipped, new ones are checked one by one and listed as candidates (nothing is added yet); after you pick, the assistant verifies real names and opening hours on Amap, and adds them only after you confirm, saying plainly what does not fit. ([HD video](docs/videos/chat-paste.mp4), 2560 wide)
 
 <sub>The conversations and itineraries are real recordings (the assistant's replies are not edited); basemap © Amap; the guide text was pasted by the author from a Xiaohongshu post.</sub>
+
+**One-click long image.** Ready to send in a chat; hotel and costs hidden by default.
+
+<img src="docs/images/share-demo.png" alt="Shareable itinerary image (hotel and costs hidden by default)" width="300">
 
 **8 share themes, one click.** The same itinerary in a different look to send to friends; all light backgrounds, hotels and costs are hidden by default.
 

@@ -21,12 +21,14 @@
 
 <table>
 <tr>
-<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="360"></td>
-<td align="center" valign="top"><img src="docs/images/share-demo.png" alt="可分享的行程长图（默认不含酒店和花费）" width="300"></td>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="200"></td>
+<td align="center" valign="top"><a href="docs/videos/chat-plan.mp4"><img src="docs/images/chat-plan-cover.jpg" alt="聊天排行程" width="300"></a></td>
+<td align="center" valign="top"><a href="docs/videos/chat-paste.mp4"><img src="docs/images/chat-paste-cover.jpg" alt="粘贴攻略" width="300"></a></td>
 </tr>
 <tr>
-<td align="center"><sub>网页工作台：每天的统计、营业状态，拖动调整并即时检查</sub></td>
-<td align="center"><sub>一键导出可发微信的长图（酒店和花费默认不公开）</sub></td>
+<td align="center"><sub>网页工作台：拖动调整，即时检查</sub></td>
+<td align="center"><sub>聊天排行程（点击看高清视频）</sub></td>
+<td align="center"><sub>粘贴游记交给助手（点击看高清视频）</sub></td>
 </tr>
 </table>
 
@@ -69,15 +71,15 @@ TripSight 把这些问题拆开来解决：
 
 ## 🖼️ 效果一览
 
-**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。（[1920 宽 MP4](docs/videos/chat-plan.mp4)）
+**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。（[高清视频](docs/videos/chat-plan.mp4)，2560 宽）
 
-<a href="docs/images/chat-plan.gif"><img src="docs/images/chat-plan.gif" alt="聊天排行程：加景点、排程、提案确认、选餐厅和住宿、真实路线"></a>
-
-**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。（[1920 宽 MP4](docs/videos/chat-paste.mp4)）
-
-<a href="docs/images/chat-paste.gif"><img src="docs/images/chat-paste.gif" alt="粘贴攻略：逐条核对、列成候选、挑选加入"></a>
+**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。（[高清视频](docs/videos/chat-paste.mp4)，2560 宽）
 
 <sub>以上对话和行程是真实运行的记录（助手的回复没有改写），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
+
+**一键导出长图。** 发微信的长图，酒店和花费默认不公开。
+
+<img src="docs/images/share-demo.png" alt="可分享的行程长图（默认不含酒店和花费）" width="300">
 
 **8 种分享风格，一键切换。** 同一份行程换个样子发给朋友；都是浅色底，酒店和花费默认不公开，勾选才带。
 
