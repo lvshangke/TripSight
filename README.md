@@ -1,30 +1,50 @@
 <div align="center">
 
-# 🧭 TripSight
+<h1>🧭 TripSight</h1>
 
-**不是一键生成攻略，而是一个记得你、陪你一步步把行程排准的旅行助手。**
+<p><b>不是一键生成攻略，而是一个记得你、陪你一步步把行程排准的旅行助手。</b></p>
 
+<p>
 你说想去哪、想怎么玩；它记住你的节奏和偏好，<br>
 把景点分到每天、把每一段路查成真实路线、把闭馆和来不及提前标出来。<br>
-你随时可以改，它随时重算——**每一步都看得见、改得动、退得回。**
+你随时可以改，它随时重算——<b>每一步都看得见、改得动、退得回。</b>
+</p>
+
+<p>
+接上高德真实路线，随时去小红书 / 大众点评 / 知乎 / 携程查资料，粘贴任何人的攻略都能逐条核对、定点修改；<br>
+把全程所有路线一键串起来，旅途中不用再一遍遍地查路。<br>
+<b>大模型负责听懂你，确定性代码负责把每一步算准、查实、留好退路。</b>
+</p>
+
+<p>
+<a href="README.en.md">English</a> ·
+<a href="docs/SETUP.md">安装与接入</a> ·
+<a href="DESIGN.md">设计说明</a>
+</p>
+
+<p>
+<img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
+<img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
+<img src="https://img.shields.io/badge/tests-452%20passing-brightgreen" alt="Tests">
+<img src="https://img.shields.io/badge/MCP%20tools-60-8A2BE2" alt="MCP tools">
+</p>
+
+<p>
+<a href="docs/images/poster.png">
+<img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成" width="760">
+</a>
+</p>
 
 </div>
-
-接上高德真实路线，随时去小红书 / 大众点评 / 知乎 / 携程查资料，粘贴任何人的攻略都能逐条核对、定点修改；把全程所有路线一键串起来，旅途中不用再一遍遍地查路。
-
-**大模型负责听懂你，确定性代码负责把每一步算准、查实、留好退路。**
-
-[English](README.en.md) · [安装与接入](docs/SETUP.md) · [设计说明](DESIGN.md)
-
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-452%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight：让 AI 只提议，排程和检查由代码完成"></a>
 
 
-> **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
+
+
+
+
+
 
 <p><b>核心功能</b></p>
 <table>
