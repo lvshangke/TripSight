@@ -97,3 +97,23 @@ def test_unknown_theme_is_refused_with_choices():
     with pytest.raises(Exception) as e:
         s.export_share(theme="neon")
     assert "magazine" in str(e.value) and "没有这个风格" in str(e.value)
+
+
+def test_route_map_is_offline_hides_hotel_by_default_and_has_hooks():
+    _trip()
+    path = s.export_share().split("：", 1)[1].split("\n")[0]
+    h = open(path, encoding="utf-8").read()
+    assert 'id="rmap"' in h and "window.__seek" in h and "播放路线" in h and "http" not in h.split('id="rmap"', 1)[1].split("</svg>")[0]
+    assert ">H</text>" not in h and HOTEL not in h                          # 默认不画酒店
+    h2 = open(s.export_share(show_lodging=True).split("：", 1)[1].split("\n")[0], encoding="utf-8").read()
+    assert ">H</text>" in h2 and "rm_d" in h2
+    off = share.build_share_html(s._load(), route_map=False)
+    assert 'id="rmap"' not in off and 'class="dmap"' not in off
+    assert 'class="dmap"' in h                                              # 每天一张放大的小图
+
+
+def test_gif_option_reports_reason_instead_of_failing(monkeypatch):
+    _trip()
+    monkeypatch.setattr(share, "render_gif", lambda *a, **k: "测试里不录制")
+    out = s.export_share(gif=True)
+    assert "没有生成路线动画：测试里不录制" in out and "已生成" in out

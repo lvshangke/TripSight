@@ -12,7 +12,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-434%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-437%20passing-brightgreen)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-60-8A2BE2)
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
@@ -120,7 +120,7 @@ TripSight 把这些问题拆开来解决：
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、434 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、437 个自动化测试 |
 
 ---
 
@@ -412,7 +412,7 @@ DESIGN.md           设计原则、算法说明
 
 ## MCP 服务
 
-分享页有 8 种浅色风格可选（默认、杂志编辑、奶油温柔、手账贴纸、植物清新、新中式墨韵、多巴胺、瑞士极简），风格思路参考了 [Easel](https://github.com/ZJU-REAL/Easel) 的风格库，配色与样式为本项目自写。
+分享页顶部有路线图（SVG，每天一种颜色，不带街道底图、不联网），每天卡片里有当天放大的小图，网页里点「播放路线」会按天画出来，也可以录成 GIF（需 `pip install playwright pillow`；没有 Chromium 会自动试本机 Chrome）。分享页有 8 种浅色风格可选（默认、杂志编辑、奶油温柔、手账贴纸、植物清新、新中式墨韵、多巴胺、瑞士极简），风格思路参考了 [Easel](https://github.com/ZJU-REAL/Easel) 的风格库，配色与样式为本项目自写。
 
 全部 60 个工具按类别、读/导出/改动分类的清单见 [docs/TOOLS.md](docs/TOOLS.md)；工作台右上角「更多 → 能力」也能搜索查看，「分享/游记」面板可直接预览分享页、生成游记骨架，景点卡片可「＋照片」。
 

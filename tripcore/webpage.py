@@ -166,7 +166,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
-<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><div id="sh_err"></div>
+<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><div id="sh_err"></div>
 <div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
 <div class="ph"><iframe id="sh_frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
 <div class="pane" id="pane_log"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>游记的事实骨架</b>
@@ -552,6 +552,7 @@ async function shareRefresh() {
   try {
     const r = await api('share_preview', shareOpts()); shareHtml = r.html; $('sh_frame').srcdoc = r.html;
     if (r.themes && !$('sh_t').options.length) r.themes.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('sh_t').appendChild(o); });
+    $('sh_gif').disabled = !r.gif_ok; $('sh_gif').title = r.gif_ok ? '把路线图按天画出来的过程录成 GIF' : '需要先安装 Playwright 和 Pillow';
     $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
     $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
     $('sh_pn').textContent = r.photo_count ? '已有 ' + r.photo_count + ' 张，放在对应景点下面' : '还没有照片：在“编辑”模式下给景点添加';
@@ -640,6 +641,7 @@ $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onc
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
 ['sh_l', 'sh_c', 'sh_p', 'sh_t'].forEach(id => $(id).onchange = shareRefresh);
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };
+$('sh_gif').onclick = async () => { $('sh_err').textContent = '正在录制路线动画（几秒钟）…'; $('sh_gif').disabled = true; try { const r = await api('share_gif', shareOpts()); dl(r.gif, '路线动画.gif'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_gif').disabled = false; };
 $('sh_png').onclick = async () => { $('sh_err').textContent = '正在生成长图…'; $('sh_png').disabled = true; try { const r = await api('share_image', shareOpts()); dl(r.png, '行程分享.png'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_png').disabled = false; };
 $('lg_go').onclick = logGen; $('lg_style').onchange = logGen; $('lg_l').onchange = logGen; $('lg_c').onchange = logGen;
 $('lg_ask').onclick = () => { moClose(); openChatWith('请按「' + $('lg_style').value + '」模板帮我写游记：先用 draft_travelogue 拿事实骨架' + ($('lg_l').checked ? '（酒店可以写）' : '，不写酒店') + ($('lg_c').checked ? '（花费可以写）' : '，不写花费') + '；没记录的景点先问我；写完用 check_travelogue 自查。'); };

@@ -474,7 +474,7 @@ def _share_html(body: dict) -> str:
     photos = _ph.for_share(ms._photo_dir(), _ph.load(ms._photo_index())) if body.get("photos") else None
     try:
         html = _share.build_share_html(trip, show_lodging=bool(body.get("lodging")), show_costs=bool(body.get("costs")), photos=photos,
-                                       theme=str(body.get("theme") or "default"))
+                                       theme=str(body.get("theme") or "default"), route_map=body.get("route_map", True) is not False)
     except ValueError as e:
         raise HttpError(400, str(e))
     bad = _share.guard_html(html)
@@ -487,6 +487,7 @@ def share_preview(body: dict) -> dict[str, Any]:
     import importlib.util
     return {"html": _share_html(body), "png_ok": importlib.util.find_spec("playwright") is not None,
             "photo_count": len(_ph.load(ms._photo_index())),
+            "gif_ok": importlib.util.find_spec("playwright") is not None and importlib.util.find_spec("PIL") is not None,
             "themes": [{"id": k, "label": v["label"]} for k, v in _share.THEMES.items()]}
 
 
@@ -501,6 +502,19 @@ def share_image(body: dict) -> dict[str, Any]:
     if why:
         raise HttpError(400, "没有生成长图：" + why)
     return {"png": "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode("ascii")}
+
+
+def share_gif(body: dict) -> dict[str, Any]:
+    import base64
+    html = _share_html(body)
+    folder = ms._photo_dir().with_name("share")
+    folder.mkdir(parents=True, exist_ok=True)
+    h, g = folder / "workbench-share.html", folder / "workbench-route.gif"
+    h.write_text(html, encoding="utf-8")
+    why = _share.render_gif(h, g)
+    if why:
+        raise HttpError(400, "没有生成动画：" + why)
+    return {"gif": "data:image/gif;base64," + base64.b64encode(g.read_bytes()).decode("ascii")}
 
 
 def photos_list() -> dict[str, Any]:
@@ -570,7 +584,7 @@ def travelogue_check(body: dict) -> dict[str, Any]:
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
-               "share_preview": share_preview, "share_image": share_image, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
+               "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check}
 
 
@@ -649,7 +663,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "travelogue", "travelogue_check", "photo_full"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

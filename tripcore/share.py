@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from . import daycard as _daycard
+from . import routemap as _routemap
 from .mapview import build_map_data
 from .metrics import estimate_cost
 from .models import Trip
@@ -153,7 +154,7 @@ def _photos(items: list[dict]) -> str:
 
 
 def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, show_costs: bool,
-              by_place: dict | None = None, by_day: dict | None = None) -> str:
+              by_place: dict | None = None, by_day: dict | None = None, route_map: bool = True) -> str:
     idx = d["index"]
     date_ = trip.day_date(idx)
     if date_:
@@ -173,6 +174,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
     if w:
         out.append(f'<div class="wx">🌤 {_e(fmt_snap(w))}</div>')
     tl = d["timeline"]
+    if route_map:
+        out.append(_routemap.build_day(d, color, lambda t_, i_: _keep_leg(t_, i_, show_lodging), show_lodging))
     for i, e in enumerate(tl):
         t = e["type"]
         if t == "conn":
@@ -205,7 +208,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
 
 
 def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = False,
-                     photos: Optional[tuple[dict, dict]] = None, theme: str = "default") -> str:
+                     photos: Optional[tuple[dict, dict]] = None, theme: str = "default",
+                     route_map: bool = True) -> str:
     """theme：见 THEMES。photos：(按景点, 按天) 的照片，来自 photos.for_share；None 表示不带照片（默认）。"""
     if trip.plan is None:
         raise ValueError("还没有分天")
@@ -225,13 +229,14 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
         if show_lodging and ce.nights and ce.lodging:
             summary.append(f"住宿约 ¥{ce.lodging:.0f}（{ce.nights} 晚）")
     colors = _theme(theme)["colors"]
+    rmap = _routemap.build(days, colors, lambda tl, i: _keep_leg(tl, i, show_lodging), show_lodging) if route_map else ""
     body = "".join(_day_html(trip, d, colors[d["index"] % len(colors)], stats.get(str(d["index"]), {}), show_lodging, show_costs,
-                                 photos[0] if photos else None, photos[1] if photos else None)
+                                 photos[0] if photos else None, photos[1] if photos else None, route_map)
                    for d in days)
     return ("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             f"<title>{_e(trip.meta.name)}</title><style>{_css(theme)}</style></head><body><div class=\"wrap\">"
-            f"<h1>{_e(trip.meta.name)}</h1><div class=\"sub\">{_e(span)}</div>{_chips(summary)}{body}"
+            f"<h1>{_e(trip.meta.name)}</h1><div class=\"sub\">{_e(span)}</div>{_chips(summary)}{rmap}{body}"
             f"<div class=\"foot\">营业时间等信息来自高德，标“待核实”的出行前请再确认；路程标“估算”的是直线估算，不是实时路线。<br>"
             f"由 <a href=\"{_REPO}\">TripSight</a> 生成</div></div>"
             + (_LIGHTBOX if photos else "") + "</body></html>")
@@ -239,6 +244,17 @@ def build_share_html(trip: Trip, show_lodging: bool = False, show_costs: bool = 
 
 def guard_html(html: str) -> list[str]:
     return guard_text(html)
+
+
+def _launch(p):
+    """优先用 Playwright 自带的 Chromium；没装（或下载不了）就退回本机已装的 Chrome。"""
+    try:
+        return p.chromium.launch()
+    except Exception as first:
+        try:
+            return p.chromium.launch(channel="chrome")
+        except Exception:
+            raise first
 
 
 def render_png(html_path: Path, png_path: Path, width: int = 430) -> Optional[str]:
@@ -249,11 +265,44 @@ def render_png(html_path: Path, png_path: Path, width: int = 430) -> Optional[st
         return "没有安装 playwright（pip install playwright && python -m playwright install chromium）"
     try:
         with sync_playwright() as p:
-            b = p.chromium.launch()
+            b = _launch(p)
             pg = b.new_page(viewport={"width": width, "height": 900}, device_scale_factor=2)
             pg.goto(html_path.resolve().as_uri())
             pg.screenshot(path=str(png_path), full_page=True)
             b.close()
     except Exception as e:                                  # 浏览器没装好等：不影响 HTML
         return f"截图失败：{type(e).__name__}"
+    return None
+
+
+def render_gif(html_path: Path, gif_path: Path, width: int = 430, frames: int = 36) -> Optional[str]:
+    """把路线图的“按天画出来”动画录成 GIF（逐帧调用页面里的 __seek 截图，所以每次结果一样）。成功返回 None，失败返回原因。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return "没有安装 playwright（pip install playwright && python -m playwright install chromium）"
+    try:
+        from PIL import Image
+    except ImportError:
+        return "没有安装 Pillow（pip install pillow）"
+    import io
+    try:
+        with sync_playwright() as p:
+            b = _launch(p)
+            pg = b.new_page(viewport={"width": width, "height": 900}, device_scale_factor=1.5)
+            pg.goto(html_path.resolve().as_uri())
+            if not pg.evaluate("!!window.__rm_ready"):
+                b.close()
+                return "这个分享页里没有路线图，没法录动画"
+            pg.evaluate("document.querySelector('#rm_b').style.visibility='hidden'")
+            box = pg.locator("section.rmap")
+            ims = []
+            for i in range(frames + 1):
+                pg.evaluate(f"window.__seek({i / frames})")
+                ims.append(Image.open(io.BytesIO(box.screenshot())).convert("RGB").quantize(128, method=Image.Quantize.MEDIANCUT))
+            b.close()
+    except Exception as e:
+        return f"录制失败：{type(e).__name__}"
+    dur = [350] + [70] * (len(ims) - 2) + [1800]
+    ims[0].save(str(gif_path), save_all=True, append_images=ims[1:], duration=dur, loop=0, optimize=True, disposal=2)
     return None

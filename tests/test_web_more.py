@@ -84,6 +84,14 @@ def test_big_body_allowed_only_for_photo_upload(server):
     assert call(server, "/tok/api/photo_add", {"place_id": "nope", "data": big})[0] == 400      # 没被 413 拦下，进入了业务校验
 
 
+def test_share_gif_route_reports_missing_dependency(server, monkeypatch):
+    from tripcore import share
+    monkeypatch.setattr(share, "render_gif", lambda *a, **k: "测试里不录制")
+    code, r = call(server, "/tok/api/share_gif", {})
+    assert code == 400 and "测试里不录制" in r["error"]
+    assert "gif_ok" in call(server, "/tok/api/share_preview", {})[1]
+
+
 def test_travelogue_routes(server):
     s.record_review("甲", "去了", 4, "很好")
     code, f = call(server, "/tok/api/travelogue", {"style": "小红书"})
