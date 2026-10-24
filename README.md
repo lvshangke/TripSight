@@ -28,79 +28,13 @@
 </table>
 
 <p><b>规划与检查</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>拖动检查</strong><br>
-<sub>把故宫拖到周一，代码立刻指出闭馆和超出节奏；你确认前不生效。</sub><br><br>
-<img src="docs/images/demo.gif" width="100%" alt="拖动检查">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>闭馆与营业时间</strong><br>
-<sub>营业时间和最晚进入；改动先出预览，可以取消。</sub><br><br>
-<img src="docs/images/feat-closed.gif" width="100%" alt="闭馆提示">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>真实路线</strong><br>
-<sub>估算虚线一键换成高德真实路线，带换乘和导航。</sub><br><br>
-<img src="docs/images/feat-route.gif" width="100%" alt="真实路线">
-</td>
-<td width="4%"></td>
-<td width="22%"></td>
-</tr>
-</table>
+<p><img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="真实路线"></p>
 
 <p><b>出行前后随时可用</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>天气提示</strong><br>
-<sub>对已定日期查真实预报，户外景点遇雨提醒；没有预报的天不编造。</sub><br><br>
-<img src="docs/images/feat-weather.gif" width="100%" alt="天气提示">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>点击跳转</strong><br>
-<sub>景点的攻略搜索、路段的高德导航、午餐和酒店的点评，一点就跳。</sub><br><br>
-<img src="docs/images/feat-links.gif" width="100%" alt="点击跳转">
-</td>
-<td width="4%"></td>
-<td width="22%"></td>
-<td width="4%"></td>
-<td width="22%"></td>
-</tr>
-</table>
+<p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="60 个工具"></p>
 
 <p><b>回程之后：一键分享发布</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>8 种分享风格</strong><br>
-<sub>同一份行程换风格；酒店和花费默认不公开。</sub><br><br>
-<img src="docs/images/feat-themes.gif" width="100%" alt="分享风格">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>一键导出</strong><br>
-<sub>网页版每个景点可点开高德地图；长图适合直接发微信。</sub><br><br>
-<img src="docs/images/feat-export.gif" width="100%" alt="一键导出">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>游记生成</strong><br>
-<sub>只用你记录过的事实写骨架，写完自查没去、没记录、金额对不上的地方。</sub><br><br>
-<img src="docs/images/feat-travelogue.gif" width="100%" alt="游记生成">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>上传照片</strong><br>
-<sub>景点上传照片（保存时去掉定位信息），点开大图，分享页带上照片。</sub><br><br>
-<img src="docs/images/feat-photos.gif" width="100%" alt="上传照片">
-</td>
-</tr>
-</table>
+<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p>
 
 <sub>演示用北京、苏州示例行程和西安回民街（照片为作者自己拍摄）；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
 ---

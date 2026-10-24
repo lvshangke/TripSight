@@ -27,79 +27,13 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 </table>
 
 <p><b>Plan and check</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>Drag and check</strong><br>
-<sub>Drag the Palace Museum to a Monday: code flags the closure and overload at once; nothing applies until you confirm.</sub><br><br>
-<img src="docs/images/demo.gif" width="100%" alt="Drag and check">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>Closed days and hours</strong><br>
-<sub>Opening hours and last entry; changes show a preview first and can be cancelled.</sub><br><br>
-<img src="docs/images/feat-closed.gif" width="100%" alt="Closed-day check">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>Real routes</strong><br>
-<sub>Estimated dashes become real Amap routes in one click, with transfers and navigation.</sub><br><br>
-<img src="docs/images/feat-route.gif" width="100%" alt="Real routes">
-</td>
-<td width="4%"></td>
-<td width="22%"></td>
-</tr>
-</table>
+<p><img src="docs/images/demo.gif" width="23%" alt="Drag and check">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="Closed-day check">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="Real routes"></p>
 
 <p><b>Handy before and during the trip</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>Weather</strong><br>
-<sub>Real forecast for dated days, rain warnings for outdoor stops; no forecast, no invention.</sub><br><br>
-<img src="docs/images/feat-weather.gif" width="100%" alt="Weather">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>Click-through</strong><br>
-<sub>Guide searches per stop, Amap navigation per leg, reviews for meals and hotels.</sub><br><br>
-<img src="docs/images/feat-links.gif" width="100%" alt="Click-through">
-</td>
-<td width="4%"></td>
-<td width="22%"></td>
-<td width="4%"></td>
-<td width="22%"></td>
-</tr>
-</table>
+<p><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="60 tools"></p>
 
 <p><b>After the trip: share and publish in one click</b></p>
-<table>
-<tr>
-<td width="22%" valign="top">
-<strong>8 share themes</strong><br>
-<sub>One itinerary, many looks; hotel and costs hidden by default.</sub><br><br>
-<img src="docs/images/feat-themes.gif" width="100%" alt="Share themes">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>One-click export</strong><br>
-<sub>Web page opens each stop in Amap; long image is ready for chat.</sub><br><br>
-<img src="docs/images/feat-export.gif" width="100%" alt="Export">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>Travelogue</strong><br>
-<sub>Skeleton from facts you recorded; the draft check flags places you skipped, unrecorded ones and wrong amounts.</sub><br><br>
-<img src="docs/images/feat-travelogue.gif" width="100%" alt="Travelogue">
-</td>
-<td width="4%"></td>
-<td width="22%" valign="top">
-<strong>Photos</strong><br>
-<sub>Upload photos per stop (location data stripped), open them large, ship them with the share page.</sub><br><br>
-<img src="docs/images/feat-photos.gif" width="100%" alt="Photos">
-</td>
-</tr>
-</table>
+<p><img src="docs/images/feat-themes.gif" width="23%" alt="Share themes">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="Export">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="Travelogue">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="Photos"></p>
 
 <sub>Demos use the bundled Beijing sample, a Suzhou sample trip and Xi’an Muslim Quarter (photo taken by the author); weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
 ---
