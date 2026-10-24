@@ -42,7 +42,7 @@
 
 
 
-<p><b>核心功能</b></p>
+<!-- <p><b>核心功能</b></p>
 
 
 <p><b>规划与检查</b></p>
@@ -52,7 +52,36 @@
 <p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="60 个工具"></p>
 
 <p><b>回程之后：一键分享发布</b></p>
-<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p>
+<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p> -->
+
+
+<div align="center">
+
+<p><b>核心功能</b></p>
+
+<p><b>规划与检查</b></p>
+<p>
+<img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;
+<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;
+<img src="docs/images/feat-route.gif" width="23%" alt="真实路线">
+</p>
+
+<p><b>出行前后随时可用</b></p>
+<p>
+<img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;
+<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;
+<img src="docs/images/feat-tools.gif" width="23%" alt="60 个工具">
+</p>
+
+<p><b>回程之后：一键分享发布</b></p>
+<p>
+<img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;
+<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;
+<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;
+<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片">
+</p>
+
+</div>
 
 > 演示用北京、苏州示例行程和西安回民街；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。
 ---
@@ -109,7 +138,7 @@ TripSight 把这些问题拆开来解决：
 </tr>
 </table>
 
-<sub>以上对话和行程是真实运行的记录（助手的回复没有改写），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
+<sub>以上对话和行程是真实运行的记录（助手的回复没有改写，模型使用Qwen3.7-Max,Harness使用nanobot），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
 
 **8 种分享风格，一键切换。** 同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。
 
