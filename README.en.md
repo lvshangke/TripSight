@@ -18,22 +18,36 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 > **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
+<p><sub>Core: click a cover to watch the full animation (1600 px wide, with the map)</sub></p>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-plan.gif"><img src="docs/images/chat-plan-cover.jpg" alt="Plan by chatting: add stops, schedule, confirm proposals, pick food and lodging, real routes" width="760"></a><br><sub>Plan by chatting: add stops, schedule, confirm proposals, pick food and lodging, real routes</sub>
+<br><br>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-paste.gif"><img src="docs/images/chat-paste-cover.jpg" alt="Paste a guide: check each item, list candidates, pick and add" width="760"></a><br><sub>Paste a guide: check each item, list candidates, pick and add</sub>
+<br><br>
+<p><b>Plan and check</b></p>
 <table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="Drag & check" width="200"><br><sub>Drag a stop, code checks instantly</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="Real routes" width="200"><br><sub>Estimated dashes → real Amap routes</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="Closed-day check" width="200"><br><sub>Hours, last entry, closed-day preview</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="Share themes" width="200"><br><sub>One itinerary, one-click restyle</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="Weather" width="200"><br><sub>Real forecast; no forecast, no invention</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="Travelogue" width="200"><br><sub>Only facts you recorded; draft check</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="Click-through" width="200"><br><sub>Guides, Amap navigation, reviews</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="One-click export" width="200"><br><sub>Web page opens maps; long image for chat</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="Drag & check" width="190"><br><sub>Drag a stop, code checks instantly</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="Closed-day check" width="190"><br><sub>Hours, last entry, closed-day preview</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="Real routes" width="190"><br><sub>Estimated dashes → real Amap routes</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="Weather" width="190"><br><sub>Real forecast; no forecast, no invention</sub></td>
 </tr>
 </table>
-
-<sub>Demos use the bundled Beijing and a Suzhou sample trip; weather is a real forecast, travelogue records are sample data. Two full chat recordings are under “At a glance” below (<a href="docs/videos/chat-plan.mp4">plan by chatting</a>, <a href="docs/videos/chat-paste.mp4">paste a guide</a>). The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
+<p><b>Share before you go</b></p>
+<table>
+<tr>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="Share themes" width="190"><br><sub>One itinerary, one-click restyle</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="One-click export" width="190"><br><sub>Web page opens maps; long image for chat</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="Click-through" width="190"><br><sub>Guides, Amap navigation, reviews</sub></td>
+</tr>
+</table>
+<p><b>After the trip, and beyond</b></p>
+<table>
+<tr>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="Travelogue" width="190"><br><sub>Only facts you recorded; draft check</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-tools.gif" alt="60 tools" width="190"><br><sub>Browse and search, each with a sample phrase</sub></td>
+</tr>
+</table>
+<sub>Demos use the bundled Beijing and a Suzhou sample trip; weather is a real forecast, travelogue records are sample data. The real workbench has three panes: itinerary, Amap map, chat assistant.</sub>
 
 </div>
 
@@ -72,9 +86,9 @@ It is not another "one-click guide generator" but a workbench where the plan can
 
 ## 🖼️ At a glance
 
-**Plan by chatting.** Ask the assistant to add stops and schedule 3 days; changes are proposed first and applied only after you confirm; hotels are recorded, never booked; one sentence turns every leg into a real Amap route. The itinerary panel, map and chat update together. ([HD video](docs/videos/chat-plan.mp4), 2560 wide)
+**Plan by chatting.** Ask the assistant to add stops and schedule 3 days; changes are proposed first and applied only after you confirm; hotels are recorded, never booked; one sentence turns every leg into a real Amap route. The itinerary panel, map and chat update together.
 
-**Paste someone else's guide.** Paste a Xiaohongshu guide: places already in the trip are skipped, new ones are checked one by one and listed as candidates (nothing is added yet); after you pick, the assistant verifies real names and opening hours on Amap, and adds them only after you confirm, saying plainly what does not fit. ([HD video](docs/videos/chat-paste.mp4), 2560 wide)
+**Paste someone else's guide.** Paste a Xiaohongshu guide: places already in the trip are skipped, new ones are checked one by one and listed as candidates (nothing is added yet); after you pick, the assistant verifies real names and opening hours on Amap, and adds them only after you confirm, saying plainly what does not fit.
 
 <sub>The conversations and itineraries are real recordings (the assistant's replies are not edited); basemap © Amap; the guide text was pasted by the author from a Xiaohongshu post.</sub>
 

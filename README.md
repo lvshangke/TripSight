@@ -19,22 +19,36 @@
 
 > **大模型只提建议，排程、检查、撤销全由代码完成。** 下面的演示里，把故宫拖到周一，系统立刻指出“闭馆、超出节奏上限”，改动在你确认前不会生效。
 
+<p><sub>核心功能：点击封面观看完整动图（1600 宽，含地图）</sub></p>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-plan.gif"><img src="docs/images/chat-plan-cover.jpg" alt="聊天排行程：加景点、排程、提案确认、选餐厅和住宿、真实路线" width="760"></a><br><sub>聊天排行程：加景点、排程、提案确认、选餐厅和住宿、真实路线</sub>
+<br><br>
+<a href="https://raw.githubusercontent.com/lvshangke/TripSight/main/docs/images/chat-paste.gif"><img src="docs/images/chat-paste-cover.jpg" alt="粘贴攻略：逐条核对、列成候选、挑选后加入" width="760"></a><br><sub>粘贴攻略：逐条核对、列成候选、挑选后加入</sub>
+<br><br>
+<p><b>规划与检查</b></p>
 <table>
 <tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="拖动检查" width="200"><br><sub>拖动景点，代码立刻检查</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="真实路线" width="200"><br><sub>估算虚线 → 高德真实路线</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="闭馆提示" width="200"><br><sub>营业时间、最晚进入、闭馆预览</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="分享风格" width="200"><br><sub>同一份行程，一键换风格</sub></td>
-</tr>
-<tr>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="天气提示" width="200"><br><sub>真实预报；没有预报的天不编造</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="游记生成" width="200"><br><sub>只写你记录过的事实，草稿自查</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="点击跳转" width="200"><br><sub>攻略搜索、高德导航、点评</sub></td>
-<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="一键导出" width="200"><br><sub>网页可点地图，长图发微信</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/demo.gif" alt="拖动检查" width="190"><br><sub>拖动景点，代码立刻检查</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-closed.gif" alt="闭馆提示" width="190"><br><sub>营业时间、最晚进入、闭馆预览</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-route.gif" alt="真实路线" width="190"><br><sub>估算虚线 → 高德真实路线</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-weather.gif" alt="天气提示" width="190"><br><sub>真实预报；没有预报的天不编造</sub></td>
 </tr>
 </table>
-
-<sub>演示用北京、苏州示例行程；天气是真实预报，游记里的记录是演示用示例数据。两段完整的聊天录屏见下面的「效果一览」（<a href="docs/videos/chat-plan.mp4">聊天排行程</a>、<a href="docs/videos/chat-paste.mp4">粘贴攻略</a>）。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
+<p><b>出发前分享</b></p>
+<table>
+<tr>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-themes.gif" alt="分享风格" width="190"><br><sub>同一份行程，一键换风格</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-export.gif" alt="一键导出" width="190"><br><sub>网页可点地图，长图发微信</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-links.gif" alt="点击跳转" width="190"><br><sub>攻略搜索、高德导航、点评</sub></td>
+</tr>
+</table>
+<p><b>回来之后与扩展</b></p>
+<table>
+<tr>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-travelogue.gif" alt="游记生成" width="190"><br><sub>只写你记录过的事实，草稿自查</sub></td>
+<td align="center" valign="top" width="25%"><img src="docs/images/feat-tools.gif" alt="60 个工具" width="190"><br><sub>一览并可搜索，每个都有示例说法</sub></td>
+</tr>
+</table>
+<sub>演示用北京、苏州示例行程；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。</sub>
 
 </div>
 
@@ -73,9 +87,9 @@ TripSight 把这些问题拆开来解决：
 
 ## 🖼️ 效果一览
 
-**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。（[高清视频](docs/videos/chat-plan.mp4)，2560 宽）
+**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。
 
-**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。（[高清视频](docs/videos/chat-paste.mp4)，2560 宽）
+**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。
 
 <sub>以上对话和行程是真实运行的记录（助手的回复没有改写），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
 
