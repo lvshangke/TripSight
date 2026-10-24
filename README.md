@@ -21,7 +21,7 @@
 
 <table>
 <tr>
-<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="420"></td>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight 演示：拖动景点，代码立刻检查" width="360"></td>
 <td align="center" valign="top"><img src="docs/images/share-demo.png" alt="可分享的行程长图（默认不含酒店和花费）" width="300"></td>
 </tr>
 <tr>

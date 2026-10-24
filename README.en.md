@@ -20,7 +20,7 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 <table>
 <tr>
-<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="420"></td>
+<td align="center" valign="top"><img src="docs/images/demo.gif" alt="TripSight demo: drag a stop, code checks instantly" width="360"></td>
 <td align="center" valign="top"><img src="docs/images/share-demo.png" alt="Shareable itinerary image (hotel and costs hidden by default)" width="300"></td>
 </tr>
 <tr>
