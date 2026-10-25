@@ -1,6 +1,6 @@
 """行程手册：一个可直接打开的网页文件夹（index.html + photos/ + media/），外加每天一张 3:4 卡片和一份发布文案。
 
-只写本地文件，不联网、不连账号；小红书只生成"发布包"，由用户自己上传。内容全部来自行程本身（景点、预计时间、营业时间、路线）；
+只写本地文件，不联网、不连账号；小红书只生成"发布包"，由用户自己上传。内容全部来自行程本身（景点、、营业时间、路线）；
 照片只用用户用 add_photo 挂过的原图（已去掉定位等元数据），默认不带；视频只用用户明确给出的文件，原样复制不转码。
 酒店、花费默认不出现。导出目录已存在时不覆盖，新建 "-2"、"-3"…。
 """
@@ -123,7 +123,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .pic{{position:absolute;right:70px;bottom:120px;width:300px;background:#fff;padding:14px 14px 44px;box-shadow:0 10px 26px rgba(0,0,0,.2);transform:rotate(3deg)}}.pic img{{width:100%;display:block}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
-{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm)}{items}</div>{pic_html}<div class="f">时间为预计 · 营业时间以现场为准</div>"""
+{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm)}{items}</div>{pic_html}<div class="f">营业时间以现场为准</div>"""
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
@@ -212,7 +212,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     title = e(trip.meta.name)
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
             f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div></div>'
-            f'{"".join(days_html)}<div class="foot">时间为预计时间，营业时间来自地图服务，出发前请再核实。</div></div>{JS}</html>')
+            f'{"".join(days_html)}<div class="foot">营业时间来自地图服务，出发前请再核实。</div></div>{JS}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 
     if cards:
@@ -253,6 +253,6 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     cap = [f"{trip.meta.name}｜{len(trip.plan.days)} 天行程手册"]
     for idx, d, vs, km, legs, pic in card_jobs:
         cap.append(f"第{idx + 1}天：" + "→".join(v.place.name for v in vs))
-    cap += ["", "时间为预计时间，营业时间以现场为准。"]
+    cap += ["", "营业时间以现场为准。"]
     (root / "caption.txt").write_text("\n".join(cap) + "\n", encoding="utf-8"); files.append("caption.txt")
     return {"folder": str(root), "files": files, "skipped": skipped}

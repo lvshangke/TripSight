@@ -75,7 +75,7 @@ class Place(BaseModel):
     lat: float = Field(ge=-90, le=90, description="纬度")
     lon: float = Field(ge=-180, le=180, description="经度")
     status: PlaceStatus = PlaceStatus.SHORTLIST
-    duration_min: int = Field(default=90, ge=10, le=720, description="预计游览时长（分钟）")
+    duration_min: int = Field(default=90, ge=10, le=720, description="建议游览时长（分钟）")
     waypoints: list[Waypoint] = Field(default_factory=list, description="路线型景点的有序途经点；为空表示普通景点")
     priority: int = Field(default=3, ge=1, le=5, description="重要程度 1~5，5 最重要")
     must_go: bool = Field(default=False, description="是否必去")

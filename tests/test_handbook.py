@@ -26,7 +26,7 @@ def test_handbook_writes_page_and_caption_without_photos():
     out = s.export_handbook(cards=False)
     root = _root()
     page = (root / "index.html").read_text(encoding="utf-8")
-    assert "故宫" in page and "天坛" in page and "预计时间" in page and "<img" not in page
+    assert "故宫" in page and "天坛" in page and "营业时间" in page and "<img" not in page
     assert (root / "caption.txt").exists() and str(root) in out
     assert not (root / "photos").exists()
 

@@ -134,6 +134,15 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #sh_frame{width:min(430px,100%);height:100%;border:1px solid #ccc;border-radius:12px;background:#f6f4ef}
 #sh_err{color:#b91c1c;font-size:13px;min-height:18px;margin-top:6px}
 .warn{background:#fff8ed;border:1px solid #f1e3cd;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:13px;color:#8a4b00}
+.hbtop{display:flex;align-items:center;gap:12px;margin-bottom:8px}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}.seg button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+.hbimp{border:1px solid #e3e3e3;background:#fafafa;border-radius:8px;padding:8px 10px;margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}#hb_folder{flex:1;min-width:260px}
+.hbs{border:1px solid #e3e3e3;border-radius:8px;padding:8px 10px;margin:8px 0;background:#fff}.hbs .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hbs .h input.nm{flex:1;min-width:140px;font:inherit;font-weight:700;padding:3px 6px;border:1px solid #ccc;border-radius:6px}
+.hbs .dy{font-size:12px;background:#eef2ff;color:#2347a5;border-radius:99px;padding:1px 8px}.hbs .tm{font-size:12px;color:#777}
+.hbp{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hbp .c{width:96px}.hbp img{width:96px;height:72px;object-fit:cover;border-radius:6px;display:block;cursor:zoom-in}.hbp .c.cover img{outline:2px solid #c4553a}
+.hbp .bt{display:flex;justify-content:space-between;margin-top:2px}.hbp .bt{align-items:center}.hbp .bt button,.hbp .bt span{padding:0 5px;font-size:12px;white-space:nowrap;line-height:20px}.hbp .add{width:96px;height:72px;border:1px dashed #999;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#1a6fe8;cursor:pointer;font-size:12px}
+.hbs textarea{width:100%;box-sizing:border-box;font:inherit;min-height:48px;border:1px solid #ccc;border-radius:6px;padding:4px 6px}.hbs .fr{display:flex;gap:6px;margin:3px 0}.hbs .fr input{font:inherit;padding:2px 6px;border:1px solid #ccc;border-radius:6px}.hbs .fr input:first-child{flex:2}.hbs .fr input:nth-child(2){flex:1}
+.hbs .lb2{font-size:12px;color:#777;margin:6px 0 2px;display:flex;gap:8px;align-items:center}.hbexp{border-top:2px solid #ddd;margin-top:14px;padding-top:8px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.hbexp b{width:100%}
+#hb_out{width:100%;white-space:pre-wrap;font-size:12px;color:#444;margin:4px 0 0}
 .lgday{margin:8px 0;padding:6px 8px;border:1px solid #eee;border-radius:8px}.lgstop{margin:3px 0 0 6px;font-size:13px}
 .st{display:inline-block;font-size:11px;padding:0 6px;border-radius:10px;color:#fff}.st.ok{background:#3a9d5d}.st.skip{background:#888}.st.chg{background:#d98e04}.st.no{background:#c2410c}
 #pane_log textarea{width:100%;height:110px;font:inherit;font-size:13px;box-sizing:border-box;margin-top:6px}
@@ -170,7 +179,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="帮我在第【几】天的景点附近找午餐，给我几家对比；我选定后请直接加进行程。">找午餐</button><button data-t="帮我在第【几】天的景点附近找晚餐，给我几家对比；我选定后请直接加进行程。">找晚餐</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
-<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="log">游记</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
+<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
@@ -178,13 +187,21 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><div id="sh_err"></div>
 <div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
 <div class="ph"><iframe id="sh_frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
-<div class="pane" id="pane_log"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>游记的事实骨架</b>
-<select id="lg_style"><option>通用</option><option>小红书</option><option>朋友圈</option></select>
-<label><input type="checkbox" id="lg_l"> 可写酒店</label><label><input type="checkbox" id="lg_c"> 可写花费</label>
-<button id="lg_go">生成骨架</button><button id="lg_ask" class="pri">让助手按这个写</button></div>
-<div class="tlnote" style="margin-top:4px">只含行程和你亲口记录的回顾；没记录的会标出来，写之前先补上。</div><div id="lg_out"></div>
-<div style="margin-top:12px"><b>草稿自查</b><span class="tlnote">　粘贴写好的游记，检查提到没去的景点、对不上记录的金额和时间。感受和形容无法核实，请自己读。</span>
-<textarea id="lg_text" maxlength="20000" placeholder="把游记草稿粘贴到这里"></textarea><button id="lg_chk">检查</button><div id="lg_res"></div></div></div>
+<div class="pane" id="pane_hb">
+<div class="hbtop"><div class="seg"><button data-m="restore" class="on">恢复行程</button><button data-m="plan">计划行程</button></div>
+<span class="tlnote" id="hb_hint"></span></div>
+<div id="hb_import" class="hbimp"><b>从相册文件夹恢复</b>
+<input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
+<label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
+<button id="hb_go" class="pri">读取照片</button><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
+<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span></div>
+<div id="hb_list"></div>
+<div class="hbexp"><b>确定最终版并导出</b>
+<label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
+<label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
+<label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label>
+<button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
@@ -579,7 +596,7 @@ function moShow(tab) {
   moTab = tab;
   document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
-  if (tab === 'share') shareRefresh(); else if (tab === 'log') logGen(); else toolsLoad();
+  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 let shareSeq = 0;
@@ -598,10 +615,6 @@ async function shareRefresh() {
   } catch (e) { if (my !== shareSeq) return; shareHtml = ''; $('sh_frame').srcdoc = ''; $('sh_err').textContent = e.message; }
 }
 function dl(href, name) { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
-async function logGen() {
-  $('lg_out').textContent = '加载中…';
-  try { await loadPhotos(); renderLog(await api('travelogue', {style: $('lg_style').value, lodging: $('lg_l').checked, costs: $('lg_c').checked})); } catch (e) { $('lg_out').textContent = e.message; }
-}
 let LB = {list: [], i: 0}, PHID = {};
 async function lbShow() {
   const p = LB.list[LB.i]; if (!p) return; $('lb').classList.add('on'); $('lb_img').src = p.thumb || '';
@@ -614,28 +627,6 @@ function lbClose() { $('lb').classList.remove('on'); $('lb_img').src = ''; }
 $('lb_x').onclick = lbClose; $('lb_prev').onclick = () => { LB.i = (LB.i + LB.list.length - 1) % LB.list.length; lbShow(); }; $('lb_next').onclick = () => { LB.i = (LB.i + 1) % LB.list.length; lbShow(); };
 $('lb').onclick = e => { if (e.target === $('lb')) lbClose(); };
 document.addEventListener('keydown', e => { if (!$('lb').classList.contains('on')) return; if (e.key === 'Escape') { e.stopPropagation(); lbClose(); } else if (e.key === 'ArrowLeft') $('lb_prev').click(); else if (e.key === 'ArrowRight') $('lb_next').click(); }, true);
-function lgPhotos(list) {
-  const rows = (list || []).map(x => PHID[x.id] ? Object.assign({}, PHID[x.id], {caption: x.caption || PHID[x.id].caption}) : null).filter(Boolean);
-  if (!rows.length) return '';
-  return '<span class="lgph">' + rows.map((r, i) => '<img data-pid="' + esc(r.id) + '" src="' + esc(r.thumb) + '" alt="" title="' + esc(r.caption || '点击放大') + '">').join('') + '</span>';
-}
-function lgWire(box) {
-  box.querySelectorAll('.lgph').forEach(g => { const imgs = [...g.querySelectorAll('img')]; const list = imgs.map(im => PHID[im.dataset.pid]); imgs.forEach((im, i) => im.onclick = () => lbOpen(list, i)); });
-}
-const STC = {'去了': 'ok', '没去': 'skip', '临时改了': 'chg', '未记录': 'no'};
-function renderLog(f) {
-  let h = '';
-  if (f.unrecorded.length) h += '<div class="warn">还有 ' + f.unrecorded.length + ' 个景点没记录去没去：' + f.unrecorded.map(esc).join('、') + '。先在聊天里告诉助手（例如“故宫去了，5 分，人很多”），再写游记。</div>';
-  f.days.forEach(d => {
-    h += '<div class="lgday"><b>第 ' + d.day + ' 天' + (d.date ? ' ' + esc(d.date) : '') + '</b>';
-    d.stops.forEach(s => { h += '<div class="lgstop"><span class="st ' + (STC[s.status] || 'no') + '">' + esc(s.status) + '</span> <b>' + esc(s.name) + '</b>' + (s.rating ? ' ' + '★'.repeat(s.rating) : '') + (s.note ? ' · ' + esc(s.note) : '') + (s.photos ? ' · 📷 ' + s.photos.length : '') + lgPhotos(s.photos) + '</div>'; });
-    if (d.photos) h += '<div class="lgstop">📷 当天照片 ' + d.photos.length + ' 张' + lgPhotos(d.photos) + '</div>';
-    h += '</div>';
-  });
-  if (f.suggested_tags) h += '<div class="lgday">话题标签：' + f.suggested_tags.map(esc).join(' ') + '</div>';
-  if (f.actual_costs) h += '<div class="lgday">已记录的实际花费：' + Object.entries(f.actual_costs).map(([k, v]) => esc(k) + ' ' + esc(v) + ' 元').join('，') + '</div>';
-  $('lg_out').innerHTML = h; lgWire($('lg_out'));
-}
 async function toolsLoad() {
   if (!toolsData) { try { toolsData = await api('tools'); } catch (e) { $('tl_out').textContent = e.message; return; } }
   renderTools();
@@ -689,11 +680,88 @@ document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moS
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };
 $('sh_gif').onclick = async () => { $('sh_err').textContent = '正在录制路线动画（几秒钟）…'; $('sh_gif').disabled = true; try { const r = await api('share_gif', shareOpts()); dl(r.gif, '路线动画.gif'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_gif').disabled = false; };
 $('sh_png').onclick = async () => { $('sh_err').textContent = '正在生成长图…'; $('sh_png').disabled = true; try { const r = await api('share_image', shareOpts()); dl(r.png, '行程分享.png'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } $('sh_png').disabled = false; };
-$('lg_go').onclick = logGen; $('lg_style').onchange = logGen; $('lg_l').onchange = logGen; $('lg_c').onchange = logGen;
-$('lg_ask').onclick = () => { moClose(); openChatWith('请按「' + $('lg_style').value + '」模板帮我写游记：先用 draft_travelogue 拿事实骨架' + ($('lg_l').checked ? '（酒店可以写）' : '，不写酒店') + ($('lg_c').checked ? '（花费可以写）' : '，不写花费') + '；没记录的景点先问我；写完用 check_travelogue 自查。'); };
-$('lg_chk').onclick = async () => {
-  $('lg_res').textContent = '检查中…';
-  try { const r = await api('travelogue_check', {text: $('lg_text').value, costs: $('lg_c').checked}); $('lg_res').innerHTML = r.problems.length ? '<ul>' + r.problems.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '<div class="tlnote">没发现能确定的问题。' + esc(r.note) + '</div>'; } catch (e) { $('lg_res').textContent = e.message; }
+
+let HB = {mode: 'restore', data: null, sel: new Set()};
+async function hbLoad() {
+  try { HB.data = await api('hb_state'); } catch (e) { $('hb_list').textContent = e.message; return; }
+  hbRender();
+}
+function hbRender() {
+  const d = HB.data, restore = HB.mode === 'restore';
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
+  $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
+  $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
+  const rows = d.stops.filter(s => !restore || s.restored);
+  if (!rows.length) { $('hb_list').innerHTML = '<div class="tlnote">' + (restore ? '还没有恢复过的行程：在上面填相册文件夹，点“读取照片”。' : '这个行程还没有排好的景点。') + '</div>'; return; }
+  $('hb_list').innerHTML = rows.map(s => hbCard(s, restore)).join('');
+  rows.forEach(s => hbWire(s));
+  $('hb_exp').disabled = false;
+}
+function hbCard(s, restore) {
+  const st = s.story || {}, facts = (st.facts || []).concat([{text: '', source: ''}]);
+  const ph = s.photos.map((p, i) => '<div class="c' + (i === 0 ? ' cover' : '') + '" data-p="' + esc(p.id) + '"><img src="' + esc(p.thumb) + '" alt="">' +
+    '<div class="bt"><button data-a="left" title="往前">◀</button>' + (i ? '<button data-a="front" title="设为封面">★</button>' : '<span class="tm" title="当前封面">★</span>') + '<button data-a="right" title="往后">▶</button><button data-a="del" title="删除这张">✕</button></div></div>').join('');
+  const add = s.photos.length < HB.data.max_photos ? '<label class="add" data-a="add">＋照片<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label>' : '';
+  return '<div class="hbs" id="hb_' + esc(s.id) + '"><div class="h">' + (restore ? '<input type="checkbox" class="sel" ' + (HB.sel.has(s.id) ? 'checked' : '') + ' title="选中后可合并">' : '') +
+    '<span class="dy">第 ' + s.day + ' 天</span><input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + '</div>' +
+    '<div class="hbp">' + ph + add + '</div>' +
+    '<div class="lb2">我的话 <button data-a="ai"' + (HB.data.vision ? '' : ' disabled title="还没有配置能读图的模型（DASHSCOPE_API_KEY、TRIPSIGHT_VISION_MODEL），先留空或自己写"') + '>用 AI 看图起草</button><span class="tlnote">草稿不会自动保存，改完点“保存”</span></div>' +
+    '<textarea class="imp" maxlength="300" placeholder="写几句这里的光线、天气、心情（300 字内）">' + esc(st.impression || '') + '</textarea>' +
+    '<div class="lb2">地点介绍（每条要有来源，没有来源的不要写）</div>' +
+    facts.map(f => '<div class="fr"><input class="ft" placeholder="一句话介绍" value="' + esc(f.text) + '"><input class="fs" placeholder="来源网址或“高德地图”" value="' + esc(f.source) + '"></div>').join('') +
+    '<div style="margin-top:6px"><button data-a="save" class="pri">保存</button> <span class="tlnote hbm"></span></div></div>';
+}
+function hbWire(s) {
+  const box = $('hb_' + s.id), m = box.querySelector('.hbm');
+  const note = (t, err) => { m.textContent = t; m.style.color = err ? '#b91c1c' : '#555'; };
+  const sel = box.querySelector('.sel'); if (sel) sel.onchange = () => { sel.checked ? HB.sel.add(s.id) : HB.sel.delete(s.id); };
+  const lbList = s.photos.map(p => ({id: p.id, thumb: p.thumb, caption: ''}));
+  box.querySelectorAll('.hbp .c').forEach((c, i) => {
+    c.querySelector('img').onclick = () => lbOpen(lbList, i);
+    c.querySelectorAll('button').forEach(b => b.onclick = async () => {
+      try {
+        if (b.dataset.a === 'del') { if (!confirm('删掉这张照片？（只删手册里的这一份，原图不动）')) return; await api('photo_remove', {id: c.dataset.p}); }
+        else await api('hb_photo_move', {id: c.dataset.p, to: b.dataset.a});
+        await hbLoad();
+      } catch (e) { note(e.message, true); }
+    });
+  });
+  const inp = box.querySelector('.add input');
+  if (inp) inp.onchange = () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 20 * 1024 * 1024) { note('照片太大（最多 20MB）', true); return; }
+    const rd = new FileReader();
+    rd.onload = async () => { try { note('正在保存照片…'); await api('photo_add', {place_id: s.id, caption: '', data: String(rd.result).split(',')[1] || ''}); await hbLoad(); } catch (e) { note(e.message, true); } };
+    rd.readAsDataURL(f);
+  };
+  const ai = box.querySelector('[data-a=ai]');
+  ai.onclick = async () => {
+    ai.disabled = true; note('正在请模型看图（只发一张缩小的拼图）…');
+    try { const r = await api('hb_describe', {place_id: s.id}); box.querySelector('.imp').value = r.draft; note('已放进文本框，是草稿，请自己读一遍再保存。'); } catch (e) { note(e.message, true); }
+    ai.disabled = !HB.data.vision;
+  };
+  box.querySelector('[data-a=save]').onclick = async () => {
+    const facts = [...box.querySelectorAll('.fr')].map(r => ({text: r.querySelector('.ft').value.trim(), source: r.querySelector('.fs').value.trim()})).filter(f => f.text || f.source);
+    try {
+      await api('hb_edit', {place_id: s.id, name: box.querySelector('.nm').value, impression: box.querySelector('.imp').value, facts: facts});
+      note('已保存'); try { await load(); } catch (e) {}
+    } catch (e) { note(e.message, true); }
+  };
+}
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { HB.mode = b.dataset.m; if (HB.data) hbRender(); });
+$('hb_go').onclick = async () => {
+  $('hb_go').disabled = true; $('hb_list').textContent = '正在读取照片，几十秒内…';
+  try { const r = await api('hb_import', {folder: $('hb_folder').value, radius_m: +$('hb_r').value}); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
+  $('hb_go').disabled = false;
+};
+$('hb_mgo').onclick = async () => {
+  try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
+};
+$('hb_exp').onclick = async () => {
+  const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
+  $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, basemap: $('hb_bm').checked}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
+  $('hb_exp').disabled = false;
 };
 $('tl_q').oninput = () => { if (toolsData) renderTools(); };
 load();

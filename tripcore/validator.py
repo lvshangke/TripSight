@@ -118,7 +118,7 @@ def validate(trip: Trip) -> list[Issue]:
 
         visits, end_min = day_visits(trip, day)
         if not w_why and end_min > w_end:
-            issues.append(Issue("DAY_RUNS_LATE", "warning", f"{label}预计{'次日 ' if end_min >= 24 * 60 else ' '}{_hm(end_min)} 才结束，晚于建议的 {_hm(w_end)}。", day.index))
+            issues.append(Issue("DAY_RUNS_LATE", "warning", f"{label}约{'次日 ' if end_min >= 24 * 60 else ' '}{_hm(end_min)} 才结束，晚于建议的 {_hm(w_end)}。", day.index))
         for v in visits:
             if not v.place.opening_hours:
                 continue

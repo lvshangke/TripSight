@@ -20,7 +20,7 @@ def test_export_notes_writes_obsidian_folder_and_ics():
     out = s.export_notes()
     root = next(p for p in s.trip_path().with_name("exports").iterdir() if p.is_dir())
     day = (root / "第1天.md").read_text(encoding="utf-8")
-    assert "[[故宫]]" in day and "[[天坛]]" in day and "预计时间" in day
+    assert "[[故宫]]" in day and "[[天坛]]" in day and "建议停留" in day
     assert (root / "景点" / "故宫.md").exists()
     ics = next(root.glob("*.ics")).read_bytes().decode("utf-8")
     assert ics.count("BEGIN:VEVENT") == 2 and "DTSTART:20261107T" in ics and ics.endswith("\r\n")

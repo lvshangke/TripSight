@@ -69,7 +69,7 @@ def build_ics(trip: Trip) -> str:
             p = v.place
             s = datetime(d.year, d.month, d.day) + timedelta(minutes=v.arrive)
             e = datetime(d.year, d.month, d.day) + timedelta(minutes=v.leave)
-            desc = [f"建议停留 {p.duration_min} 分钟（预计时间，非预约）"]
+            desc = [f"建议停留 {p.duration_min} 分钟（非预约）"]
             if p.opening_hours:
                 desc.append(f"营业时间：{p.opening_hours}（来源：{p.hours_source or '未标注'}，以现场为准）")
             else:
@@ -160,7 +160,7 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             p = v.place
             place_days.setdefault(p.id, []).append(day.index)
             body += [f"## {i + 1}. [[{_safe(p.name)}]]  {_hm(v.arrive)}–{_hm(v.leave)}",
-                     f"- 建议停留 {p.duration_min} 分钟（预计时间）",
+                     f"- 建议停留 {p.duration_min} 分钟",
                      f"- 营业：{p.opening_hours}（{p.hours_source or '来源未标注'}）" if p.opening_hours else "- 营业：未核实"]
             for it in by_place.get(p.id, []):
                 body.append(f"![[{it['name']}]]" + (f"\n*{it['caption']}*" if it["caption"] else ""))
@@ -203,7 +203,7 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     n_days = len(trip.plan.days)
     head = ["---", f"title: {_y(trip.meta.name)}", "type: trip", f"days: {n_days}", f"distance_km: {round(total_km, 2)}",
             "tags: [tripsight]", "---", "", f"# {trip.meta.name}", "", *day_links, "",
-            "> 由 TripSight 导出。时间为预计时间，天气为预报，营业时间来自地图服务，出发前请再核实。", ""]
+            "> 由 TripSight 导出。天气为预报，营业时间来自地图服务，出发前请再核实。", ""]
     w(root / f"{_safe(trip.meta.name)}.md", "\n".join(head))
     try:
         (root / f"{base}.ics").write_text(build_ics(trip), encoding="utf-8", newline="")

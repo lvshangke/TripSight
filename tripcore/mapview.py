@@ -226,7 +226,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                     timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp, region))
                     timeline.append(_term_entry(trip.departure, "离开", trip.departure.dep_time, tp))
             if w_why and t > w_end:
-                timeline.append({"type": "conn", "text": f"⚠ 预计 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
+                timeline.append({"type": "conn", "text": f"⚠ 约 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）
             marks = [e for e in timeline if e["type"] in ("stop", "meal")]
             hotel_pos = [_gcj(lod_m.lat, lod_m.lon)] if lod_m and st.places else []
