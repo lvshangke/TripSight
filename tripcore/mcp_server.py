@@ -1210,10 +1210,10 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
     return msg
 
 
-def export_handbook(show_photos: bool = False, video_path: str = "", video_place: str = "", cards: bool = True) -> str:
+def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
     只写本机 ~/.tripcore/exports/，不联网、不连账号，也不会替用户发布。时间是预计时间，营业时间标了来源；酒店和花费不会出现。
-    show_photos=true 才会放用户用 add_photo 挂过的原图（含人脸或路人的照片要先问用户）；视频只用用户给的原文件：video_path 是视频路径，
+    默认会放用户挂过的照片（含人像；已去掉定位）；用户说要不露脸、或要公开分享前不想带照片时传 show_photos=false；视频只用用户给的原文件：video_path 是视频路径，
     video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。已有导出不会被覆盖。"""
     trip = _load()
     if trip.plan is None or not trip.plan.days:
@@ -1230,7 +1230,7 @@ def export_handbook(show_photos: bool = False, video_path: str = "", video_place
     items = _ph.load(_photo_index()) if show_photos else []
     try:
         res = build_handbook(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards)
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()))
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     msg = f"手册已生成：{res['folder']}\n用浏览器打开其中的 index.html；cards/ 里是每天一张 3:4 图，caption.txt 是文案草稿，发布要用户自己操作。"
@@ -1285,6 +1285,167 @@ def check_trip_changes(temp_delta: float = 5.0) -> dict[str, Any]:
     return {"weather_changes": wc, "hours_changes": hc, "hours_unchecked": unchecked, "baseline_days": baseline, "notes": notes,
             "summary": ("没有需要注意的变化。" if not wc and not hc else f"天气变化 {len(wc)} 处，营业时间变化 {len(hc)} 处。") +
                        (f"（{baseline} 天是第一次记录预报，只作为之后对比的基线。）" if baseline else "")}
+
+
+def _photo_trip_path() -> Path:
+    return trip_path().with_name("photo_trip.json")
+
+
+def _stories_path() -> Path:
+    return trip_path().with_name("stories.json")
+
+
+def _load_json_file(p: Path) -> dict:
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_passing: bool = False,
+                      radius_m: int = 300, photos_per_stop: int = 3) -> str:
+    """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
+    每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
+    macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
+    景点名先是"月-日 时:分 停留点"，要靠 view_stop 看图和候选地名，再用 update_place 改成真实名字，不要猜。
+    每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
+    from . import phototrip as _pt
+    from .models import DayItem, DayPlan, Plan, PlaceStatus
+    root = Path(folder).expanduser()
+    if not root.is_dir():
+        raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+    try:
+        photos, st = _pt.read_photos(root)
+    except ValueError as e:
+        raise ToolError(str(e))
+    if not photos:
+        raise ToolError(f"没有找到带拍摄时间和位置的照片（统计：{st}）。照片要有 GPS，导出时记得勾选位置信息。")
+    stops = _pt.cluster(photos, radius_m=max(50, min(int(radius_m), 2000)))
+    keep = [s for s in stops if include_passing or s.n >= max(1, int(min_photos))]
+    if not keep:
+        raise ToolError(f"聚成了 {len(stops)} 个点，但没有一个达到 {min_photos} 张。可以降低 min_photos 或设 include_passing=true。")
+    first, last = keep[0].day, keep[-1].day
+    ndays = (last - first).days + 1
+    if ndays > 30:
+        raise ToolError(f"照片跨度 {ndays} 天，超过行程上限 30 天。请先把照片分到不同文件夹。")
+    new_trip(name=name or f"照片还原 {first:%m.%d}-{last:%m.%d}", num_days=ndays, start_date=first.isoformat(),
+             end_date=last.isoformat(), mode="drive")
+    ids: list[str] = []
+
+    def mutate(t: Trip) -> None:
+        days = [DayPlan(index=i) for i in range(ndays)]
+        for sp in keep:
+            pid = _next_id("p", [p.id for p in t.places])
+            t.places.append(Place(
+                id=pid, name=f"{sp.start:%m-%d %H:%M} 停留点", lat=sp.lat, lon=sp.lon, status=PlaceStatus.CONFIRMED,
+                duration_min=max(15, min(720, sp.minutes + 10)), source="photo", tags=["photo"],
+                notes=f"从照片还原：{sp.n} 张照片，{sp.start:%H:%M}–{sp.end:%H:%M}"))
+            days[(sp.day - first).days].items.append(DayItem(place_id=pid, locked=True))
+            ids.append(pid)
+        t.plan = Plan(days=days)
+    _save(commit(_load(), mutate))
+    items = _ph.load(_photo_index())
+    attached = failed = 0
+    for pid, sp in zip(ids, keep):
+        for f in _pt.best_files(root, sp.files, max(0, min(int(photos_per_stop), 6))):
+            if len(items) >= _ph.MAX_TOTAL:
+                break
+            try:
+                _ph.add(_photo_dir(), items, str(root / f), pid, None, "")
+                attached += 1
+            except _ph.PhotoError:
+                failed += 1
+    _ph.save(_photo_index(), items)
+    _photo_trip_path().write_text(json.dumps({"folder": str(root), "stops": [
+        {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files}
+        for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
+    lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
+             f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
+             f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if len(stops) > len(keep):
+        lines.append(f"其余 {len(stops) - len(keep)} 个是路过的零散点，没放进行程（include_passing=true 可保留）。")
+    for d in range(ndays):
+        row = [f"{pid} {sp.start:%H:%M}–{sp.end:%H:%M} {sp.n}张" for pid, sp in zip(ids, keep) if (sp.day - first).days == d]
+        lines.append(f"第{d + 1}天 {first.fromordinal(first.toordinal() + d).isoformat()}：" + ("；".join(row) if row else "（这天没有保留的停留点）"))
+    lines.append("下一步：对每个点用 view_stop 看缩略图和候选地名，向用户确认后用 update_place 改名；介绍和描写用 save_stop_story 写；最后 export_handbook。")
+    return "\n".join(lines)
+
+
+def view_stop(place_id: str) -> list[Any]:
+    """看一个从照片还原出来的停留点：返回文字（时间、张数、候选地名）和一张缩略联系图，用来认出这是哪里、写描写。
+    候选地名只有在配置了高德 key 时才有：会把这个点的坐标发给高德（用户自己的 key）查 200 米内的景点，候选只是参考，不要直接当真，
+    要和用户确认。图里的人脸、路人不要识别、不要猜是谁。照片内容会发给你背后的模型，所以每点只给一张缩小的拼图。"""
+    from . import phototrip as _pt
+    from mcp.server.fastmcp import Image
+    trip = _load()
+    try:
+        place = trip.place(place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+    side = _load_json_file(_photo_trip_path())
+    rec = next((x for x in side.get("stops", []) if x["place_id"] == place_id), None)
+    if rec is None or place.source != "photo":
+        raise ToolError("这个景点不是从照片还原出来的。")
+    root = Path(side["folder"])
+    if not root.is_dir():
+        raise ToolError(f"原照片文件夹不在了：{root}")
+    try:
+        data = _pt.contact_sheet(root, rec["files"])
+    except ValueError as e:
+        raise ToolError(str(e))
+    text = [f"{place.name}（{place_id}）：{rec['n']} 张照片，{rec['start'][11:16]}–{rec['end'][11:16]}，{rec['day']}"]
+    client = _amap()
+    if client is None or _is_google(client):
+        text.append("没有可用的高德 key，没有候选地名，请向用户询问这是哪里。")
+    else:
+        try:
+            hits = client.search_around(place.lat, place.lon, radius_m=200, types="110000", limit=5)
+            cand = [f"{h.name}（约 {round(haversine_km(place.lat, place.lon, h.lat, h.lon) * 1000)} 米）" for h in hits]
+            text.append("200 米内的景点候选（来自高德，仅供参考）：" + ("；".join(cand) if cand else "没有"))
+        except AmapError as e:
+            text.append(f"候选地名查询失败：{e}")
+    return ["\n".join(text), Image(data=data, format="jpeg")]
+
+
+def save_stop_story(place_id: str, impression: str = "", facts: Optional[list[dict[str, str]]] = None) -> str:
+    """给一个景点保存两种内容，手册里会分开显示：
+    facts = 地点介绍，每条 {"text": 一句话, "source": 网址或"高德地图"}，必须有来源，没有来源的不要写、不要凭记忆写；
+    impression = 根据照片写的一两句感受（≤300 字），只描写画面里看得到的光线、天气、色彩、气氛，不写画面外的事实和事件，
+    不推测照片里的人在想什么；手册里会标注"AI 根据照片的描写"。两者可只传一个。不会写进景点的 intro 字段（那里只放游记原文或用户自己的话）。"""
+    trip = _load()
+    try:
+        trip.place(place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+    if not impression.strip() and facts is None:
+        raise ToolError("没有要保存的内容：impression 和 facts 至少给一个。")
+    if len(impression) > 300:
+        raise ToolError("描写太长（最多 300 字）。")
+    bad = _guard_text(impression or "")
+    if bad:
+        raise ToolError("描写里" + "；".join(bad))
+    clean = []
+    for f in facts or []:
+        text, src = (f.get("text") or "").strip(), (f.get("source") or "").strip()
+        if not text or not src:
+            raise ToolError("每条介绍都要有 text 和 source（网址或地图服务名）；没有来源的不要写。")
+        if len(text) > 200:
+            raise ToolError("单条介绍太长（最多 200 字）。")
+        bad = _guard_text(text)
+        if bad:
+            raise ToolError("介绍里" + "；".join(bad))
+        clean.append({"text": text, "source": src})
+    data = _load_json_file(_stories_path())
+    ent = data.setdefault(place_id, {})
+    if impression.strip():
+        ent["impression"] = impression.strip()
+    if facts is not None:
+        ent["facts"] = clean
+    try:
+        _stories_path().write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"保存失败：{e}")
+    return f"已保存「{trip.place(place_id).name}」的" + ("描写" if impression.strip() else "") + ("、" if impression.strip() and facts is not None else "") + (f"{len(clean)} 条介绍" if facts is not None else "") + "。"
 
 
 def _parse_dt(text: str, label: str):
@@ -2544,7 +2705,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

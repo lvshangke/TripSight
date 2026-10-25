@@ -87,7 +87,7 @@ def add_bytes(folder: Path, items: list[dict[str, Any]], raw: bytes, place_id: O
         raise PhotoError(f"说明太长（最多 {MAX_CAPTION} 字）")
     try:
         with Image.open(io.BytesIO(raw)) as im:
-            if (im.format or "").upper() not in ("JPEG", "PNG", "WEBP"):
+            if (im.format or "").upper() not in ("JPEG", "MPO", "PNG", "WEBP"):
                 raise PhotoError("只支持 jpg / png / webp 图片")
             im = ImageOps.exif_transpose(im).convert("RGB")
             data = _encode(im, MAX_SIDE, 85)

@@ -69,6 +69,8 @@ CSS = """
 .polaroid img,.polaroid video{width:100%;display:block}.cap{position:absolute;left:0;right:0;bottom:9px;text-align:center;font-size:14px;color:var(--sub)}
 .tabs{display:flex;gap:8px;justify-content:center;margin:6px 0 0}.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:99px;padding:3px 12px;cursor:pointer}
 .tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.facts{margin:10px 0 0 18px;font-size:14px;color:var(--ink)}.facts small,.imp small{color:var(--sub);font-size:12px}.facts a{color:var(--sub)}
+.imp{margin-top:10px;padding:8px 12px;border-left:3px solid var(--acc);background:#fbf5ea;font-size:15px;font-style:italic}.imp small{display:block;font-style:normal;margin-top:2px}
 .foot{margin-top:40px;text-align:center;color:var(--sub);font-size:13px}
 """
 JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previousElementSibling.firstElementChild;t.querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -91,7 +93,8 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
-                   show_photos: bool = False, videos: Optional[dict[str, Path]] = None, cards: bool = True) -> dict[str, Any]:
+                   show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
+                   stories: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -153,6 +156,13 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                     body += '<div class="tabs">' + "".join(f'<button data-k="{k}" class="{"on" if j == 0 else ""}">{nm}</button>' for j, (k, nm) in enumerate(tabs)) + "</div>"
                 else:
                     body += '<div class="tabs" style="display:none"></div>'
+            sty = (stories or {}).get(p.id) or {}
+            if sty.get("facts"):
+                body += '<ul class="facts">' + "".join(
+                    f'<li>{e(f["text"])} <small>来源：' + (f'<a href="{e(f["source"])}" rel="noreferrer">{e(f["source"])}</a>' if f["source"].startswith("http") else e(f["source"])) + "</small></li>"
+                    for f in sty["facts"]) + "</ul>"
+            if sty.get("impression"):
+                body += f'<p class="imp">“{e(sty["impression"])}”<small>AI 根据照片的描写，仅供参考，可修改</small></p>'
             body += "</div>"
             parts.append(body)
             if i < len(st.legs):
