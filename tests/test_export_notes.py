@@ -48,3 +48,13 @@ def test_export_notes_requires_plan():
     s.new_trip(num_days=1, city="北京")
     with pytest.raises(s.ToolError):
         s.export_notes()
+
+
+def test_export_notes_into_given_folder_only_if_it_exists(tmp_path):
+    _trip()
+    with pytest.raises(s.ToolError):
+        s.export_notes(folder=str(tmp_path / "不存在"))
+    assert not (tmp_path / "不存在").exists()
+    out = s.export_notes(folder=str(tmp_path))
+    sub = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert len(sub) == 1 and (sub[0] / "第1天.md").exists() and str(sub[0]) in out

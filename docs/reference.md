@@ -224,7 +224,7 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 
 ## Obsidian 笔记与日历（`export_notes`）
 
-写到 `~/.tripcore/exports/<行程名>/`（重名时加 `-2`、`-3`，不覆盖）：总览、`第N天.md`、`景点/<名>.md`、`附件/`（照片、每天 GPX、可选视频）和 `<行程名>.ics`。笔记里的景点互相用 `[[双链]]`，Obsidian 关系图谱可直接看。营业时间标了来源，时间和天气都是预计/预报；别人游记里的景点介绍不导出。照片来自 `add_photo`（已去掉定位等元数据）；视频要给 `video_path` 和 `video_day`。行程没设日期时只导出笔记，不导出日历。
+默认写到 `~/.tripcore/exports/<行程名>/`；给 `folder`（已存在的文件夹，比如 Obsidian 库里的某个目录）就写到那里面（重名时加 `-2`、`-3`，不覆盖）：总览、`第N天.md`、`景点/<名>.md`、`附件/`（照片、每天 GPX、可选视频）和 `<行程名>.ics`。笔记里的景点互相用 `[[双链]]`，Obsidian 关系图谱可直接看。营业时间标了来源，时间和天气都是预计/预报；别人游记里的景点介绍不导出。照片来自 `add_photo`（已去掉定位等元数据）；视频要给 `video_path` 和 `video_day`。行程没设日期时只导出笔记，不导出日历。
 
 ## 地图页（`export_map`）与 GPX（`export_gpx`）
 

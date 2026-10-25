@@ -1173,9 +1173,10 @@ def export_gpx(day: Optional[int] = None) -> str:
     return "已导出 GPX（坐标为标准 WGS84）：\n" + "\n".join(written)
 
 
-def export_notes(include_photos: bool = True, video_path: str = "", video_day: Optional[int] = None) -> str:
+def export_notes(include_photos: bool = True, video_path: str = "", video_day: Optional[int] = None, folder: str = "") -> str:
     """把行程导出成本地文件：一个 Obsidian 笔记文件夹（每天一篇、每个景点一篇、[[双链]]、路线轨迹、你挂过的照片）和一个日历 .ics 文件。
-    只写到本机 ~/.tripcore/exports/，不联网、不连任何账号；日历要用户自己双击导入。时间是预计时间，营业时间标了来源。
+    默认写到本机 ~/.tripcore/exports/；用户想直接放进自己的 Obsidian 库时，让他给出库里的文件夹路径填到 folder（必须是已存在的文件夹，
+    不要自己去找用户的库），会在里面新建一个行程文件夹。不联网、不连任何账号；日历要用户自己双击导入。时间是预计时间，营业时间标了来源。
     video_path 是用户电脑上某天的 vlog 视频路径，video_day 是它属于第几天（从 1 起），两个都给才会放进笔记；不给就不带视频。
     已有同名导出文件夹时不会覆盖，会新建 -2、-3。行程没设日期时只导出笔记，不导出日历。"""
     trip = _load()
@@ -1191,9 +1192,14 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
             raise ToolError(f"找不到视频文件：{video_path}")
         videos = {video_day - 1: vp}
     from .export_notes import build_obsidian
+    target = trip_path().with_name("exports")
+    if folder:
+        target = Path(folder).expanduser()
+        if not target.is_dir():
+            raise ToolError(f"文件夹不存在：{folder}（不会自动创建，请确认路径）。")
     items = _ph.load(_photo_index()) if include_photos else []
     try:
-        res = build_obsidian(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
+        res = build_obsidian(trip, target, photos=items, photo_dir=_photo_dir(),
                              videos=videos, include_photos=include_photos, include_videos=videos is not None,
                              city="")
     except (OSError, ValueError) as e:
