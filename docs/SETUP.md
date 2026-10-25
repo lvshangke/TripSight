@@ -1,6 +1,6 @@
 # 安装与接入 nanobot
 
-tripcore 本身是一个 MCP 服务（60 个工具）。要在聊天里使用它，需要一个能连 MCP 的 Agent；本项目用 [nanobot](https://github.com/HKUDS/nanobot)（MIT 协议）。**nanobot 不在本仓库里**，请自己安装；本仓库只提供接入需要的 skill、配置样例和脚本。
+tripcore 本身是一个 MCP 服务（61 个工具）。要在聊天里使用它，需要一个能连 MCP 的 Agent；本项目用 [nanobot](https://github.com/HKUDS/nanobot)（MIT 协议）。**nanobot 不在本仓库里**，请自己安装；本仓库只提供接入需要的 skill、配置样例和脚本。
 
 测试过的版本：nanobot 0.3.5，Python 3.10–3.12，mcp 1.x。
 
@@ -93,7 +93,7 @@ tripcore 是标准 MCP 服务（stdio），不依赖 nanobot。其他 Agent（Cl
 
 1. 先按第 1 节安装，装好后有 `tripcore-mcp` 命令（等价于 `python -m tripcore.mcp_server`）。
 2. 在该 Agent 的 MCP 配置里添加一个 stdio 服务，命令填 `tripcore-mcp`（或虚拟环境里 python 的绝对路径加 `-m tripcore.mcp_server`），`env` 里放你自己的 `AMAP_KEY`（可选 `GOOGLE_MAPS_KEY`）。各 Agent 的配置文件位置和字段名不同，请看它自己的文档；可参考 `nanobot/config.example.json` 里 `tripcore` 那一项。
-3. 让助手读 `skills/trip-planner/SKILL.md`（用法、流程和铁律）：复制到该 Agent 的指令/技能位置，或在对话开头让它先读。没有这份说明，助手知道有 60 个工具，但不知道该按什么顺序用、什么时候必须先请你确认。
+3. 让助手读 `skills/trip-planner/SKILL.md`（用法、流程和铁律）：复制到该 Agent 的指令/技能位置，或在对话开头让它先读。没有这份说明，助手知道有 61 个工具，但不知道该按什么顺序用、什么时候必须先请你确认。
 4. 重启 Agent，应能看到 tripcore 的工具；对它说“打开工作台”测试。
 
 如果你在别的 Agent 上接通了，欢迎告诉我们具体步骤。

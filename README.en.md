@@ -33,7 +33,7 @@ Plug it into your own chat assistant and plan a trip step by step.
 <p><img src="docs/images/demo.gif" width="23%" alt="Drag and check">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="Closed-day check">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="Real routes"></p>
 
 <p><b>Handy before and during the trip</b></p>
-<p><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="60 tools"></p>
+<p><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="61 tools"></p>
 
 <p><b>After the trip: share and publish in one click</b></p>
 <p><img src="docs/images/feat-themes.gif" width="23%" alt="Share themes">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="Export">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="Travelogue">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="Photos"></p>
@@ -51,7 +51,7 @@ TripSight attacks these one by one:
 - **It fills in what guides leave out:** hotel, arrival/departure transport, dates and season are part of the trip and feed into day assignment, opening-hours checks and first/last-day playable time.
 - **Personal touches merge in place:** your preferences are remembered, and any single stop can be moved to another day, removed, locked or re-timed, with automatic re-checking — no starting over.
 - **No more repeated route look-ups:** with Amap configured, real routes for every leg are filled in at once, and one click generates a chained personal map for each day.
-- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 60 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
+- **Facts come from code and tools, never from the model's imagination:** the **LLM** (via chat) only understands intent and proposes changes; **tripcore** (deterministic code, 61 MCP tools) schedules, checks, fetches routes, versions and undoes; **you** confirm every change.
 - **Opening hours take part in scheduling**, not just in after-the-fact warnings: closed days and impossible time slots are avoided, and places that cannot fit are listed with the reason.
 - **Every step is confirmable and undoable:** changes are proposals applied only after you confirm; `undo` works repeatedly.
 - **Not tied to one model, and your data stays on your machine:** it is an MCP server, so any MCP-capable chat agent can use it (the repo ships setup for [nanobot](https://github.com/HKUDS/nanobot)); trips are local JSON files, the workbench listens on `127.0.0.1` only, and keys live in your own config.

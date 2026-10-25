@@ -1173,6 +1173,37 @@ def export_gpx(day: Optional[int] = None) -> str:
     return "已导出 GPX（坐标为标准 WGS84）：\n" + "\n".join(written)
 
 
+def export_notes(include_photos: bool = True, video_path: str = "", video_day: Optional[int] = None) -> str:
+    """把行程导出成本地文件：一个 Obsidian 笔记文件夹（每天一篇、每个景点一篇、[[双链]]、路线轨迹、你挂过的照片）和一个日历 .ics 文件。
+    只写到本机 ~/.tripcore/exports/，不联网、不连任何账号；日历要用户自己双击导入。时间是预计时间，营业时间标了来源。
+    video_path 是用户电脑上某天的 vlog 视频路径，video_day 是它属于第几天（从 1 起），两个都给才会放进笔记；不给就不带视频。
+    已有同名导出文件夹时不会覆盖，会新建 -2、-3。行程没设日期时只导出笔记，不导出日历。"""
+    trip = _load()
+    if trip.plan is None or not trip.plan.days:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    videos = None
+    if video_path or video_day is not None:
+        n = len(trip.plan.days)
+        if not video_path or video_day is None or not (1 <= video_day <= n):
+            raise ToolError(f"video_path 和 video_day（1~{n}）要一起给。")
+        vp = Path(video_path).expanduser()
+        if not vp.is_file():
+            raise ToolError(f"找不到视频文件：{video_path}")
+        videos = {video_day - 1: vp}
+    from .export_notes import build_obsidian
+    items = _ph.load(_photo_index()) if include_photos else []
+    try:
+        res = build_obsidian(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
+                             videos=videos, include_photos=include_photos, include_videos=videos is not None,
+                             city="")
+    except (OSError, ValueError) as e:
+        raise ToolError(f"导出失败：{e}")
+    msg = f"已导出到：{res['folder']}\n共 {len(res['files'])} 个文件；用 Obsidian 的“打开文件夹作为库”即可查看，日历文件双击导入。"
+    if res["skipped"]:
+        msg += "\n没有导出的部分：" + "；".join(res["skipped"])
+    return msg
+
+
 def _parse_dt(text: str, label: str):
     from datetime import datetime
     try:
@@ -2430,7 +2461,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
