@@ -1303,7 +1303,7 @@ def _load_json_file(p: Path) -> dict:
 
 
 def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_passing: bool = False,
-                      radius_m: int = 300, photos_per_stop: int = 3) -> str:
+                      radius_m: int = 300, photos_per_stop: int = 6) -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
@@ -1369,6 +1369,71 @@ def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_
         lines.append(f"第{d + 1}天 {first.fromordinal(first.toordinal() + d).isoformat()}：" + ("；".join(row) if row else "（这天没有保留的停留点）"))
     lines.append("下一步：对每个点用 view_stop 看缩略图和候选地名，向用户确认后用 update_place 改名；介绍和描写用 save_stop_story 写；最后 export_handbook。")
     return "\n".join(lines)
+
+
+def merge_stops(place_ids: list[str], name: str = "") -> str:
+    """把同一天里几个从照片还原的停留点合并成一个（比如神仙居景区里的七仙女、神女峰、如意桥其实都在一个景区）。
+    保留第一个，其余的照片、拍摄时段并进来，景点位置取各点的加权中心，其余景点从行程里移除。必须是同一天、都是照片还原出来的点；
+    调用前先和用户确认合并哪几个。name 不填就沿用第一个的名字。"""
+    import datetime as _dt
+    ids = list(dict.fromkeys(place_ids))
+    if len(ids) < 2:
+        raise ToolError("至少要两个景点才能合并。")
+    side = _load_json_file(_photo_trip_path())
+    recs = {x["place_id"]: x for x in side.get("stops", [])}
+    trip = _load()
+    for pid in ids:
+        try:
+            pl = trip.place(pid)
+        except KeyError as e:
+            raise ToolError(str(e))
+        if pid not in recs or pl.source != "photo":
+            raise ToolError(f"{pid} 不是从照片还原出来的景点，不能合并。")
+    if len({recs[i]["day"] for i in ids}) != 1:
+        raise ToolError("只能合并同一天的停留点。")
+    bad = name and _guard_text(name)
+    if bad:
+        raise ToolError("名字" + "；".join(bad))
+    keep, rest = ids[0], ids[1:]
+    allrec = [recs[i] for i in ids]
+    files = [f for r in allrec for f in r["files"]]
+    n = sum(r["n"] for r in allrec)
+    start = min(r["start"] for r in allrec)
+    end = max(r["end"] for r in allrec)
+    minutes = int((_dt.datetime.fromisoformat(end) - _dt.datetime.fromisoformat(start)).total_seconds() // 60)
+    wsum = sum(trip.place(i).lat * recs[i]["n"] for i in ids) / n
+    wlon = sum(trip.place(i).lon * recs[i]["n"] for i in ids) / n
+
+    def mutate(t: Trip) -> None:
+        k = t.place(keep)
+        k.lat, k.lon = wsum, wlon
+        k.duration_min = max(15, min(720, minutes + 10))
+        k.notes = f"从照片还原：{n} 张照片，{start[11:16]}–{end[11:16]}（合并了 {len(ids)} 个停留点）"
+        if name:
+            k.name = name
+        t.places = [p for p in t.places if p.id not in rest]
+        for p in t.places:
+            p.backups = [b for b in p.backups if b not in rest]
+        if t.plan:
+            for d in t.plan.days:
+                d.items = [it for it in d.items if it.place_id not in rest]
+            t.plan.unscheduled = [u for u in t.plan.unscheduled if u.place_id not in rest]
+
+    _save(commit(trip, mutate))
+    photos = _ph.load(_photo_index())
+    for x in photos:
+        if x.get("place_id") in rest:
+            x["place_id"] = keep
+    _ph.save(_photo_index(), photos)
+    recs[keep].update({"files": files, "n": n, "start": start, "end": end})
+    side["stops"] = [x for x in side["stops"] if x["place_id"] not in rest]
+    _photo_trip_path().write_text(json.dumps(side, ensure_ascii=False), encoding="utf-8")
+    stories = _load_json_file(_stories_path())
+    if any(i in stories for i in rest):
+        for i in rest:
+            stories.pop(i, None)
+        _stories_path().write_text(json.dumps(stories, ensure_ascii=False), encoding="utf-8")
+    return f"已把 {'、'.join(ids)} 合并成 {keep}（{n} 张照片，{start[11:16]}–{end[11:16]}）。原来这些点上写的介绍和描写已清掉，需要的话对合并后的点重新写。"
 
 
 def view_stop(place_id: str):
@@ -2708,7 +2773,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

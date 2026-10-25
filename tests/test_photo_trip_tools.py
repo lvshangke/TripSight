@@ -75,3 +75,22 @@ def test_view_stop_works_through_the_mcp_server(tmp_path):
     res = asyncio.run(s.build_server().call_tool("view_stop", {"place_id": s._load().places[0].id}))
     blocks = res[0] if isinstance(res, tuple) else res
     assert [b.type for b in blocks] == ["text", "image"]
+
+
+def test_merge_stops_combines_same_day_points(tmp_path):
+    s.import_photo_trip(str(_album(tmp_path)), min_photos=1)
+    t = s._load()
+    ids = [p.id for p in t.places]
+    assert len(ids) >= 2
+    day = {r["place_id"]: r["day"] for r in s._load_json_file(s._photo_trip_path())["stops"]}
+    same = [i for i in ids if day[i] == day[ids[0]]]
+    if len(same) < 2:
+        return
+    before = sum(1 for x in s._ph.load(s._photo_index()) if x["place_id"] in same)
+    s.merge_stops(same, name="合并景区")
+    t2 = s._load()
+    assert [p.id for p in t2.places].count(same[0]) == 1 and not any(i in [p.id for p in t2.places] for i in same[1:])
+    assert t2.place(same[0]).name == "合并景区"
+    assert sum(1 for x in s._ph.load(s._photo_index()) if x["place_id"] == same[0]) == before
+    with pytest.raises(Exception):
+        s.merge_stops([same[0]])
