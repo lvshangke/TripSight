@@ -1233,6 +1233,54 @@ def export_handbook(show_photos: bool = False, video_path: str = "", video_place
     return msg
 
 
+def _amap_hours_lookup(client, city, p) -> Optional[str]:
+    """用和 fill_hours 同样的规则（名字相符、1.5 km 内）查一个景点现在的营业时间，查不到返回 None。"""
+    try:
+        hits = client.search_places(p.name, city, limit=5)
+    except AmapError:
+        return None
+    for h in hits:
+        if (p.name in h.name or h.name in p.name) and haversine_km(p.lat, p.lon, h.lat, h.lon) <= 1.5 and (h.opentime_week or h.opentime_today):
+            return h.opentime_week or h.opentime_today
+    return None
+
+
+def check_trip_changes(temp_delta: float = 5.0) -> dict[str, Any]:
+    """出发前复查：重新查天气和（有高德 key 时）营业时间，只返回和之前记下的相比有实际影响的变化。只读，不改行程。
+    天气只报雨雪/高温这类影响户外的因素出现或消失，以及白天气温变化超过 temp_delta（默认 5°C）；第一次调用只建立基线，不算变化。
+    营业时间只复查来源为高德的景点，变了也不自动改。把变化如实告诉用户，要调整请用 propose_change 提出，由用户确认。
+    出发前 3 天和前 1 天各查一次比较合适；助手支持定时任务的话可以设提醒。"""
+    from .changes import hours_changes, weather_changes
+    trip0 = _load()
+    if trip0.plan is None:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    old = dict(trip0.weather)
+    notes: list[str] = []
+    try:
+        get_weather()
+    except ToolError as e:
+        notes.append(f"天气没能更新：{e}")
+    trip = _load()
+    wc = weather_changes(trip, old, trip.weather, temp_delta)
+    today = date.today()
+    baseline = sum(1 for d in trip.plan.days if (dt := trip.day_date(d.index)) and dt >= today
+                   and dt.isoformat() in trip.weather and dt.isoformat() not in old)
+    hc, unchecked = [], []
+    client = _amap()
+    if client is None:
+        notes.append(f"{_NO_KEY}，营业时间没有复查")
+    elif _is_google(client):
+        notes.append("当前地图后端是 Google，营业时间复查只支持高德来源的数据")
+    else:
+        city = _load_context().get("city")
+        cand = [p for p in trip.places if p.opening_hours and p.hours_source == "amap" and not p.waypoints][:MAX_HOURS_LOOKUPS]
+        fresh = {p.id: _amap_hours_lookup(client, city, p) for p in cand}
+        hc, unchecked = hours_changes(cand, fresh)
+    return {"weather_changes": wc, "hours_changes": hc, "hours_unchecked": unchecked, "baseline_days": baseline, "notes": notes,
+            "summary": ("没有需要注意的变化。" if not wc and not hc else f"天气变化 {len(wc)} 处，营业时间变化 {len(hc)} 处。") +
+                       (f"（{baseline} 天是第一次记录预报，只作为之后对比的基线。）" if baseline else "")}
+
+
 def _parse_dt(text: str, label: str):
     from datetime import datetime
     try:
@@ -2490,7 +2538,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

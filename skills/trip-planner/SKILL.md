@@ -190,7 +190,7 @@ new_trip / set_dates / open_workbench / set_provider / list_trips / switch_trip 
 ## 境外行程（Google Maps）
 - 目的地在境外（含港澳台）时，创建行程后用 `set_provider("google")`；国内行程不用管，默认高德。用户说“这个行程用高德/Google”也用它。
 - 工具返回里出现“数据可能不全”的提醒时，原样转告用户，并建议检查对应的 key（国内 AMAP_KEY，境外 GOOGLE_MAPS_KEY）。
-- 天气始终只用 `get_weather`；高德专属地图只支持国内行程，境外的链接是 Google Maps 网页链接。
+- 天气始终只用 `get_weather`；高德专属地图只支持国内行程，境外的链接是 Google Maps 网页链接。 出发前 3 天、前 1 天可用 `check_trip_changes()` 复查：只读，只报天气和营业时间的实际变化，如实告诉用户，要调整走 `propose_change`；支持定时任务的助手可以设提醒。
 
 ## 日期与网页工作台
 - 用户要改日期 → `set_dates(start_date, end_date)`（清除日期两个都不填）。改前说清影响：天数变了会自动重新分天（已锁定且仍在范围内的保持原位），旧天气作废。
