@@ -45,7 +45,7 @@ def test_view_stop_returns_sheet_and_requires_photo_origin(tmp_path, monkeypatch
     monkeypatch.setattr(s, "_amap", lambda: None)
     pid = s._load().places[0].id
     text, img = s.view_stop(pid)
-    assert "4 张照片" in text and "没有可用的高德 key" in text and img is not None
+    assert "4 张照片" in text.text and "没有可用的高德 key" in text.text and img.mimeType == "image/jpeg" and img.data
     s.new_trip(num_days=1, city="北京")
     s.add_place("故宫", 39.9, 116.4)
     with pytest.raises(s.ToolError):
@@ -66,3 +66,12 @@ def test_story_needs_sources_and_shows_separately_in_handbook(tmp_path):
     page = (root / "index.html").read_text(encoding="utf-8")
     assert "来源：" in page and "example.com/a" in page and "AI 根据照片的描写" in page and "午后的光线很柔" in page
     assert "<img" in page                                      # 默认带照片
+
+
+def test_view_stop_works_through_the_mcp_server(tmp_path):
+    """经 FastMCP 调用：返回图片内容块不能触发序列化错误（真实助手里出现过）。"""
+    import asyncio
+    s.import_photo_trip(str(_album(tmp_path)))
+    res = asyncio.run(s.build_server().call_tool("view_stop", {"place_id": s._load().places[0].id}))
+    blocks = res[0] if isinstance(res, tuple) else res
+    assert [b.type for b in blocks] == ["text", "image"]

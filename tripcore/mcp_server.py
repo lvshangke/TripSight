@@ -1371,12 +1371,13 @@ def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_
     return "\n".join(lines)
 
 
-def view_stop(place_id: str) -> list[Any]:
+def view_stop(place_id: str):
     """看一个从照片还原出来的停留点：返回文字（时间、张数、候选地名）和一张缩略联系图，用来认出这是哪里、写描写。
     候选地名只有在配置了高德 key 时才有：会把这个点的坐标发给高德（用户自己的 key）查 200 米内的景点，候选只是参考，不要直接当真，
     要和用户确认。图里的人脸、路人不要识别、不要猜是谁。照片内容会发给你背后的模型，所以每点只给一张缩小的拼图。"""
     from . import phototrip as _pt
-    from mcp.server.fastmcp import Image
+    import base64
+    from mcp.types import ImageContent, TextContent
     trip = _load()
     try:
         place = trip.place(place_id)
@@ -1404,7 +1405,9 @@ def view_stop(place_id: str) -> list[Any]:
             text.append("200 米内的景点候选（来自高德，仅供参考）：" + ("；".join(cand) if cand else "没有"))
         except AmapError as e:
             text.append(f"候选地名查询失败：{e}")
-    return ["\n".join(text), Image(data=data, format="jpeg")]
+    # 直接返回内容块（不是 FastMCP 的 Image 对象）：有返回类型注解时 FastMCP 会尝试把结果序列化成结构化输出，Image 对象会报序列化错误
+    return [TextContent(type="text", text="\n".join(text)),
+            ImageContent(type="image", data=base64.b64encode(data).decode(), mimeType="image/jpeg")]
 
 
 def save_stop_story(place_id: str, impression: str = "", facts: Optional[list[dict[str, str]]] = None) -> str:
