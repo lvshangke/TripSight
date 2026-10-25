@@ -14,6 +14,9 @@ The LLM only understands you and proposes changes; scheduling, opening hours, ro
 
 <a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight: the LLM only proposes; code schedules and checks"></a>
 
+Plug it into your own chat assistant and plan a trip step by step.  
+**Open source · data stays on your machine · every step checkable and undoable**
+
 > **The LLM only proposes; scheduling, checking and undo are done by code.** In the demo below, dragging the Palace Museum onto a Monday is flagged at once ("closed", "over the pace limit"), and nothing changes until you confirm.
 
 <p><b>Core features</b></p>
