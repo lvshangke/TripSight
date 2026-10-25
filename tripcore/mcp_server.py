@@ -1210,11 +1210,11 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
     return msg
 
 
-def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False) -> str:
+def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
     只写本机 ~/.tripcore/exports/，不联网、不连账号，也不会替用户发布。时间是预计时间，营业时间标了来源；酒店和花费不会出现。
     默认会放用户挂过的照片（含人像；已去掉定位）；用户说要不露脸、或要公开分享前不想带照片时传 show_photos=false；视频只用用户给的原文件：video_path 是视频路径，
-    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。每个景点最多展示 6 张照片。已有导出不会被覆盖。"""
+    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。已有导出不会被覆盖。"""
     trip = _load()
     if trip.plan is None or not trip.plan.days:
         raise ToolError("还没有分天，请先 schedule_days。")
@@ -1231,7 +1231,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
     bm, bm_note = _make_basemap(trip) if basemap else (None, "")
     try:
         res = build_handbook(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm)
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf)
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     if basemap:

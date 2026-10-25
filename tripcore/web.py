@@ -594,10 +594,174 @@ def travelogue_check(body: dict) -> dict[str, Any]:
     return ms.check_travelogue(text, show_costs=bool(body.get("costs")))
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list}
+# ---------- 手册：恢复行程（从相册）和手册编辑、最终导出 ----------
+
+def _stories() -> dict:
+    return ms._load_json_file(ms._stories_path())
+
+
+def _write_stories(data: dict) -> None:
+    try:
+        ms._stories_path().write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as e:
+        raise HttpError(500, f"保存失败：{e}")
+
+
+def hb_state() -> dict[str, Any]:
+    from . import vision as _vi
+    trip = ms._load()
+    folder = ms._photo_dir()
+    photos = _ph.load(ms._photo_index())
+    stories = _stories()
+    side = ms._load_json_file(ms._photo_trip_path())
+    recs = {x["place_id"]: x for x in side.get("stops", [])}
+    order = {}
+    if trip.plan:
+        for d in trip.plan.days:
+            for it in d.items:
+                order[it.place_id] = d.index
+    rows = []
+    for p in sorted(trip.places, key=lambda q: (order.get(q.id, 99), 0)):
+        if p.id not in order:
+            continue
+        rows.append({"id": p.id, "name": p.name, "day": order[p.id] + 1, "restored": p.id in recs,
+                     "start": (recs.get(p.id) or {}).get("start", "")[11:16], "end": (recs.get(p.id) or {}).get("end", "")[11:16],
+                     "photos": [{"id": x["id"], "thumb": _ph.thumb_uri(folder, x["file"], 200, 65)} for x in photos if x.get("place_id") == p.id],
+                     "story": stories.get(p.id) or {}})
+    return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""),
+            "vision": bool(_vi.config()), "max_photos": 6}
+
+
+def hb_import(body: dict) -> dict[str, Any]:
+    folder = str(body.get("folder") or "").strip()
+    if not folder:
+        raise HttpError(400, "先填相册文件夹的路径。")
+    try:
+        radius = int(body.get("radius_m") or 300)
+    except (TypeError, ValueError):
+        raise HttpError(400, "半径要是数字。")
+    try:
+        msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3))
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+    return {"message": msg}
+
+
+def hb_edit(body: dict) -> dict[str, Any]:
+    pid = str(body.get("place_id") or "")
+    if not any(p.id == pid for p in ms._load().places):
+        raise HttpError(404, "找不到这个景点。")
+    try:
+        name = body.get("name")
+        if isinstance(name, str) and name.strip():
+            ms.update_place(pid, name=name.strip())
+        data = _stories()
+        ent = data.get(pid) or {}
+        if "impression" in body:
+            text = str(body.get("impression") or "").strip()
+            if text:
+                ms.save_stop_story(pid, impression=text)       # 复用同样的长度和内容检查
+                data = _stories(); ent = data.get(pid) or {}
+                ent["by"] = "user"
+            else:
+                ent.pop("impression", None); ent.pop("by", None)
+        if "facts" in body:
+            facts = [{"text": str(f.get("text") or ""), "source": str(f.get("source") or "")} for f in (body.get("facts") or []) if isinstance(f, dict) and (f.get("text") or f.get("source"))]
+            if facts:
+                ms.save_stop_story(pid, facts=facts)
+                data = _stories(); ent_f = data.get(pid) or {}
+                ent["facts"] = ent_f.get("facts", [])
+            else:
+                ent.pop("facts", None)
+        if ent:
+            data[pid] = ent
+        else:
+            data.pop(pid, None)
+        _write_stories(data)
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+    return {"ok": True}
+
+
+def hb_merge(body: dict) -> dict[str, Any]:
+    ids = body.get("place_ids")
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise HttpError(400, "要选至少两个景点。")
+    try:
+        return {"message": ms.merge_stops(ids, name=str(body.get("name") or ""))}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def hb_photo_move(body: dict) -> dict[str, Any]:
+    """在同一个景点的照片里调整顺序：to = "front"（设为封面）| "left" | "right"。"""
+    pid, to = str(body.get("id") or ""), str(body.get("to") or "")
+    items = _ph.load(ms._photo_index())
+    row = next((x for x in items if x["id"] == pid), None)
+    if row is None or to not in ("front", "left", "right"):
+        raise HttpError(404, "找不到这张照片。")
+    group = [x for x in items if x.get("place_id") == row.get("place_id")]
+    i = group.index(row)
+    j = 0 if to == "front" else (i - 1 if to == "left" else i + 1)
+    if not 0 <= j < len(group) or j == i:
+        return {"ok": True}
+    group.insert(j, group.pop(i))
+    it = iter(group)
+    items = [next(it) if x.get("place_id") == row.get("place_id") else x for x in items]
+    _ph.save(ms._photo_index(), items)
+    return {"ok": True}
+
+
+def hb_describe(body: dict) -> dict[str, Any]:
+    """用用户配置的视觉模型给这个点的缩略拼图写描写。只在点按钮时调用；返回草稿，不保存。"""
+    from . import phototrip as _pt, vision as _vi
+    import io
+    pid = str(body.get("place_id") or "")
+    trip = ms._load()
+    try:
+        place = trip.place(pid)
+    except KeyError:
+        raise HttpError(404, "找不到这个景点。")
+    if _vi.config() is None:
+        raise HttpError(400, "还没有配置视觉模型（环境变量 DASHSCOPE_API_KEY 和 TRIPSIGHT_VISION_MODEL，模型必须能读图）。")
+    side = ms._load_json_file(ms._photo_trip_path())
+    rec = next((x for x in side.get("stops", []) if x["place_id"] == pid), None)
+    try:
+        if rec is not None and Path(side["folder"]).is_dir():
+            sheet = _pt.contact_sheet(Path(side["folder"]), rec["files"])
+        else:
+            folder = ms._photo_dir()
+            files = [x["file"] for x in _ph.load(ms._photo_index()) if x.get("place_id") == pid]
+            if not files:
+                raise HttpError(400, "这个景点还没有照片。")
+            sheet = _pt.contact_sheet(folder, files)
+        return {"draft": _vi.describe(sheet, place.name)}
+    except ValueError as e:
+        raise HttpError(400, str(e))
+    except _vi.VisionError as e:
+        raise HttpError(502, str(e))
+
+
+def hb_export(body: dict) -> dict[str, Any]:
+    fm = set(body.get("formats") or [])
+    if not fm <= {"html", "cards", "pdf", "obsidian"} or not fm:
+        raise HttpError(400, "至少选一种导出格式。")
+    out: list[str] = []
+    try:
+        if fm & {"html", "cards", "pdf"}:
+            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), pdf="pdf" in fm))
+        if "obsidian" in fm:
+            out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+    return {"message": "\n\n".join(out)}
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
-               "travelogue": travelogue, "travelogue_check": travelogue_check}
+               "travelogue": travelogue, "travelogue_check": travelogue_check,
+               "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):
@@ -675,7 +839,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

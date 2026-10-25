@@ -73,6 +73,7 @@ CSS = """
 .route{width:100%;margin:14px 0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
 .line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:96vw;max-height:94vh}
+@media print{.lb{display:none}.stop{break-inside:avoid}.day{break-before:page}}
 .dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}
 .stop{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 2px 0 var(--line)}
 .stop h3{font-size:20px}.stop h3 b{color:var(--acc);margin-right:6px}.meta{color:var(--sub);font-size:14px;margin-top:2px}
@@ -107,7 +108,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -178,7 +179,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                     f'<li>{e(f["text"])} <small>来源：' + (f'<a href="{e(f["source"])}" rel="noreferrer">{e(f["source"])}</a>' if f["source"].startswith("http") else e(f["source"])) + "</small></li>"
                     for f in sty["facts"]) + "</ul>"
             if sty.get("impression"):
-                body += f'<p class="imp">“{e(sty["impression"])}”<small>AI 根据照片的描写，仅供参考，可修改</small></p>'
+                body += f'<p class="imp">“{e(sty["impression"])}”<small>{"我写的" if sty.get("by") == "user" else "AI 根据照片的描写，仅供参考，可修改"}</small></p>'
             body += "</div>"
             parts.append(body)
             if i < len(st.legs):
@@ -211,6 +212,21 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             skipped.append("卡片图：没有安装 playwright（pip install playwright && python -m playwright install chromium）")
         except Exception as ex:
             skipped.append(f"卡片图失败：{type(ex).__name__}")
+    if pdf:
+        try:
+            from playwright.sync_api import sync_playwright
+            from . import share as _share
+            with sync_playwright() as p:
+                b = _share._launch(p)
+                pg = b.new_page()
+                pg.goto((root / "index.html").resolve().as_uri()); pg.wait_for_timeout(300)
+                pg.pdf(path=str(root / f"{base}.pdf"), format="A4", print_background=True, margin={"top": "12mm", "bottom": "12mm", "left": "10mm", "right": "10mm"})
+                b.close()
+            files.append(f"{base}.pdf")
+        except ImportError:
+            skipped.append("PDF：没有安装 playwright（pip install playwright && python -m playwright install chromium）")
+        except Exception as ex:
+            skipped.append(f"PDF 失败：{type(ex).__name__}")
     for d in ("photos", "media", "cards"):
         if not any((root / d).iterdir()):
             (root / d).rmdir()
