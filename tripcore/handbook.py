@@ -20,6 +20,7 @@ from .timeline import day_visits
 
 WEEK = "一二三四五六日"
 _BAD = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+MAX_PHOTOS = 6          # 每个景点最多展示几张，有几张放几张
 VIDEO_EXT = {".mp4", ".mov", ".webm", ".m4v"}
 e = html.escape
 
@@ -28,7 +29,7 @@ def _hm(m: int) -> str:
     return f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
 
 
-def _route_svg(stops, legs, w=520, h=220) -> str:
+def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
     if len(stops) < 2:
         return ""
     segs = [[(q[0], q[1]) for q in lg.path] if (lg.path and lg.detail_level == "route") else None for lg in legs]
@@ -39,6 +40,16 @@ def _route_svg(stops, legs, w=520, h=220) -> str:
     segs = [[p for p in sg if inb(p)] or [stops[i], stops[i + 1]] for i, sg in enumerate(segs)]   # 超出站点范围的路径点不画
     allp = [p for sg in segs for p in sg] + stops
     la, lo = [p[0] for p in allp], [p[1] for p in allp]
+    if bm is not None:                              # 有底图：投影和高德底图严格对应，路线画在图上
+        from .basemap import Projection, choose_view
+        view = choose_view(stops, w, h, 36)
+        uri = bm.fetch(view)
+        if uri:
+            proj = Projection(view)
+            q = lambda p: proj.xy(p[0], p[1])
+            lines = "".join('<polyline points="' + " ".join(f"{q(p)[0]:.0f},{q(p)[1]:.0f}" for p in sg) + '" class="line bl"/>' for sg in segs)
+            dots = "".join(f'<circle cx="{q(p)[0]:.0f}" cy="{q(p)[1]:.0f}" r="11" class="dot"/><text x="{q(p)[0]:.0f}" y="{q(p)[1] + 4:.0f}" class="dn">{i + 1}</text>' for i, p in enumerate(stops))
+            return f'<svg viewBox="0 0 {w} {h}" class="route"><image href="{uri}" width="{w}" height="{h}"/>{lines}{dots}</svg>'
     k = math.cos(math.radians(sum(la) / len(la)))
     x0, y0 = min(lo), max(la)
     W, H = (max(lo) - x0) * k or 1e-6, (y0 - min(la)) or 1e-6
@@ -60,7 +71,9 @@ CSS = """
 .day{margin-top:36px}.dh{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px;flex-wrap:wrap}
 .dh h2{font-size:26px}.dh span{color:var(--sub);font-size:14px}.wx{color:var(--sub);font-size:14px;margin-top:6px}
 .route{width:100%;margin:14px 0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
-.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}
+.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:96vw;max-height:94vh}
+.dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}
 .stop{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 2px 0 var(--line)}
 .stop h3{font-size:20px}.stop h3 b{color:var(--acc);margin-right:6px}.meta{color:var(--sub);font-size:14px;margin-top:2px}
 .leg{color:var(--sub);font-size:13px;border-left:3px dotted var(--line);margin:0 0 0 18px;padding:2px 0 2px 14px}
@@ -74,10 +87,10 @@ CSS = """
 .foot{margin-top:40px;text-align:center;color:var(--sub);font-size:13px}
 """
 JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previousElementSibling.firstElementChild;t.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})</script>"""
+t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';o.innerHTML='<img src="'+i.src+'">';o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic) -> str:
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None) -> str:
     items = "".join(f'<div class="r"><b>{i + 1}</b><i>{_hm(v.arrive)}</i><span>{e(v.place.name)}</span></div>' for i, v in enumerate(vs))
     pic_html = f'<div class="pic"><img src="{pic}"></div>' if pic else ""
     date = f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else ""
@@ -89,12 +102,12 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .pic{{position:absolute;right:70px;bottom:120px;width:300px;background:#fff;padding:14px 14px 44px;box-shadow:0 10px 26px rgba(0,0,0,.2);transform:rotate(3deg)}}.pic img{{width:100%;display:block}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
-{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330)}{items}</div>{pic_html}<div class="f">时间为预计 · 营业时间以现场为准</div>"""
+{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm)}{items}</div>{pic_html}<div class="f">时间为预计 · 营业时间以现场为准</div>"""
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -137,16 +150,17 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         wx = (trip.weather or {}).get(d.isoformat()) if d else None
         if wx is not None and getattr(wx, "day_weather", ""):
             head += f'<div class="wx">天气预报：{e(wx.day_weather)} {round(wx.day_temp)}°C（预报，非实况）</div>'
-        parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs)]
+        parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs, bm=basemap)]
         first_pic = None
         for i, v in enumerate(vs):
             p = v.place
             hours = f"营业：{e(p.opening_hours)}" if p.opening_hours else "营业时间未核实"
             body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟 · {hours}</div>'
             views, tabs = "", []
-            for ph in by_place.get(p.id, [])[:1]:
-                views += f'<img data-k="photo" src="photos/{ph["file"]}" alt="{e(p.name)}">'; tabs.append(("photo", "照片"))
-                first_pic = first_pic or f"../photos/{ph['file']}"
+            pics = by_place.get(p.id, [])[:MAX_PHOTOS]
+            if pics:
+                views += f'<img data-k="photo" src="photos/{pics[0]["file"]}" alt="{e(p.name)}">'; tabs.append(("photo", "照片"))
+                first_pic = first_pic or f"../photos/{pics[0]['file']}"
             if p.id in vids:
                 views += f'<video data-k="video" {"style=display:none " if tabs else ""}src="{vids[p.id]}" controls loop playsinline preload="none"></video>'; tabs.append(("video", "视频"))
             if views:
@@ -156,6 +170,8 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                     body += '<div class="tabs">' + "".join(f'<button data-k="{k}" class="{"on" if j == 0 else ""}">{nm}</button>' for j, (k, nm) in enumerate(tabs)) + "</div>"
                 else:
                     body += '<div class="tabs" style="display:none"></div>'
+            if len(pics) > 1:
+                body += '<div class="gal">' + "".join(f'<img src="photos/{ph["file"]}" alt="{e(ph.get("caption") or p.name)}" loading="lazy">' for ph in pics[1:]) + "</div>"
             sty = (stories or {}).get(p.id) or {}
             if sty.get("facts"):
                 body += '<ul class="facts">' + "".join(
@@ -187,7 +203,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic), encoding="utf-8")
+                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()

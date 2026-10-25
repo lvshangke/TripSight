@@ -1,5 +1,7 @@
 """行程手册：本地网页文件夹 + 3:4 卡片 + 文案；照片默认不带，不覆盖已有导出。"""
 
+from pathlib import Path
+
 import pytest
 
 pytest.importorskip("mcp")
@@ -51,3 +53,26 @@ def test_handbook_requires_plan():
     s.new_trip(num_days=1, city="北京")
     with pytest.raises(s.ToolError):
         s.export_handbook(cards=False)
+
+
+def test_handbook_shows_up_to_six_photos_and_basemap(tmp_path):
+    import io
+    from PIL import Image
+    from tripcore import handbook as hb
+    from tripcore.basemap import Basemap
+
+    class FakeAmap:
+        def static_map(self, lat, lon, z, w, h):
+            b = io.BytesIO(); Image.new("RGB", (w, h), (200, 220, 200)).save(b, "PNG"); return b.getvalue()
+
+    _trip()
+    trip = s._load()
+    pid = trip.plan.days[0].items[0].place_id
+    pd = tmp_path / "ph"; pd.mkdir()
+    photos = []
+    for i in range(8):
+        Image.new("RGB", (40, 30), (i * 20, 50, 90)).save(pd / f"{i}.jpg"); photos.append({"file": f"{i}.jpg", "place_id": pid, "caption": ""})
+    res = hb.build_handbook(trip, tmp_path / "out", photos=photos, photo_dir=pd, cards=False, basemap=Basemap(FakeAmap()))
+    page = (Path(res["folder"]) / "index.html").read_text(encoding="utf-8")
+    assert page.count('src="photos/') == 6
+    assert '<image href="data:image/jpeg' in page
