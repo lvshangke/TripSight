@@ -71,6 +71,7 @@ CATALOG: dict[str, tuple[str, str, str, str]] = {
     "export_map": (_C[6], "export", "生成地图页，手机版可作为文件发给你。", "生成手机能看的地图"),
     "export_gpx": (_C[6], "export", "导出每天的路线轨迹文件。", "导出轨迹文件"),
     "export_notes": (_C[6], "export", "导出 Obsidian 笔记文件夹和日历文件，照片可选，视频需你指定。", "把行程导出到 Obsidian 和日历"),
+    "export_handbook": (_C[6], "export", "生成行程手册网页、每天一张 3:4 卡片和发布文案，照片视频用原文件。", "把行程做成一份手册，我想发小红书"),
     "export_share": (_C[6], "export", "可分享的网页、长图和路线动画 GIF（8 种风格，可选高德底图），酒店、花费、照片、联网底图默认不带。", "用手账风格生成一张能分享的行程图"),
     "personal_map_payload": (_C[6], "read", "生成高德专属地图所需的参数。", "准备高德专属地图的参数"),
     "create_amap_map": (_C[6], "export", "在高德 App 里生成每天串联好的专属地图并返回链接。", "在高德里生成专属地图"),

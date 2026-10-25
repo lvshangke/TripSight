@@ -1204,6 +1204,35 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
     return msg
 
 
+def export_handbook(show_photos: bool = False, video_path: str = "", video_place: str = "", cards: bool = True) -> str:
+    """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
+    只写本机 ~/.tripcore/exports/，不联网、不连账号，也不会替用户发布。时间是预计时间，营业时间标了来源；酒店和花费不会出现。
+    show_photos=true 才会放用户用 add_photo 挂过的原图（含人脸或路人的照片要先问用户）；视频只用用户给的原文件：video_path 是视频路径，
+    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。已有导出不会被覆盖。"""
+    trip = _load()
+    if trip.plan is None or not trip.plan.days:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    videos = None
+    if video_path or video_place:
+        if not video_path or not video_place:
+            raise ToolError("video_path 和 video_place 要一起给。")
+        vp = Path(video_path).expanduser()
+        if not vp.is_file():
+            raise ToolError(f"找不到视频文件：{video_path}")
+        videos = {_find_place_ref(trip, video_place).id: vp}
+    from .handbook import build_handbook
+    items = _ph.load(_photo_index()) if show_photos else []
+    try:
+        res = build_handbook(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
+                             show_photos=show_photos, videos=videos, cards=cards)
+    except (OSError, ValueError) as e:
+        raise ToolError(f"生成失败：{e}")
+    msg = f"手册已生成：{res['folder']}\n用浏览器打开其中的 index.html；cards/ 里是每天一张 3:4 图，caption.txt 是文案草稿，发布要用户自己操作。"
+    if res["skipped"]:
+        msg += "\n没有生成的部分：" + "；".join(res["skipped"])
+    return msg
+
+
 def _parse_dt(text: str, label: str):
     from datetime import datetime
     try:
@@ -2461,7 +2490,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

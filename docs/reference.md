@@ -123,7 +123,7 @@ tripcore/
 ├── checklist.py review.py prefs.py   定稿清单、旅行复盘、长期偏好
 ├── mapview.py gpx.py textview.py     地图页、GPX、手机/微信文字版
 ├── web.py webpage.py   本机网页工作台
-├── mcp_server.py   MCP 服务（61 个工具）
+├── mcp_server.py   MCP 服务（62 个工具）
 └── doctor.py cli.py    自检与命令行
 skills/             给聊天 Agent 的“说明书”（trip-planner、flyai-search）
 scripts/            install_skills.py（把技能装进 nanobot）、merge_nanobot_config.py（登记到 nanobot 配置，先预览）
@@ -151,9 +151,9 @@ DESIGN.md           设计原则、算法说明
 
 分享页顶部有路线图（SVG，每天一种颜色，不带街道底图、不联网），每天卡片里有当天放大的小图，网页里点「播放路线」会按天画出来，也可以录成 GIF（需 `pip install playwright pillow`；没有 Chromium 会自动试本机 Chrome）。路线图还可以选「高德底图」：默认关闭，打开才联网，用你自己的 `AMAP_KEY`，只发地图中心、缩放和图片大小（不发景点名和路线），图片内嵌进页面，别人打开不用联网；只支持国内行程。分享页有 8 种浅色风格可选（默认、杂志编辑、奶油温柔、手账贴纸、植物清新、新中式墨韵、多巴胺、瑞士极简），风格思路参考了 [Easel](https://github.com/ZJU-REAL/Easel) 的风格库，配色与样式为本项目自写。
 
-全部 61 个工具按类别、读/导出/改动分类的清单见 [docs/TOOLS.md](TOOLS.md)；工作台右上角「更多 → 能力」也能搜索查看，「分享/游记」面板可直接预览分享页、生成游记骨架，景点卡片可「＋照片」。
+全部 62 个工具按类别、读/导出/改动分类的清单见 [docs/TOOLS.md](TOOLS.md)；工作台右上角「更多 → 能力」也能搜索查看，「分享/游记」面板可直接预览分享页、生成游记骨架，景点卡片可「＋照片」。
 
-`tripcore/mcp_server.py` 把 tripcore 包装成 61 个工具，供 nanobot 等 Agent 通过聊天调用：
+`tripcore/mcp_server.py` 把 tripcore 包装成 62 个工具，供 nanobot 等 Agent 通过聊天调用：
 `new_trip` `add_place` `update_place` `remove_place` `add_lodging` `lookup_coords` `refine_routes` `set_transport_prefs` `set_leg_mode` `compare_transport` `fill_hours` `suggest_food` `find_food` `choose_food` `set_travelers` `export_map` `remove_food` `get_weather` `schedule_days` `check_plan`
 `suggest_lodging` `propose_change` `apply_proposal` `undo` `show_trip` `submit_candidates` `adopt_candidates` `compare_with_source` `follow_source_days` 等。
 
@@ -217,6 +217,10 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 - 营业时间按日期判断时支持季节条件（`3~10月`、`10月11日起`、`11月15日起周一闭馆`）；条件复杂就返回“待核实”。
 - `find_food(店名)`：用户自己想吃的店。高德按店名搜索，并用代码算出离已排行程里哪一天、哪个景点最近，作为建议位置（超过 3 km 会警告）；`choose_food` 可指定 `day` / `after_place_id` 改位置。
 - `Trip.meta.travelers`（人数，默认 1，`new_trip(travelers=…)` / `set_travelers`）：`show_trip` 按人数估算门票和已选餐厅，住宿按整间价不乘人数。
+
+## 行程手册（`export_handbook`）
+
+写到 `~/.tripcore/exports/<行程名>-手册/`（重名加 `-2`，不覆盖）：`index.html`（封面、每天路线图、时间表、每站手账卡）、`cards/dayN.png`（3:4，需要 playwright）、`caption.txt`、可选的 `photos/` 和 `media/`。路线图只用行程里的路线，没有底图；时间是预计时间，营业时间标了来源。`show_photos=true` 才放 `add_photo` 挂过的照片；视频要 `video_path` 加 `video_place`，原样复制，不转码、不压缩。不联网、不连账号，发布由用户自己做。
 
 ## Obsidian 笔记与日历（`export_notes`）
 

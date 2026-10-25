@@ -33,7 +33,7 @@ Plug it into your own chat assistant and plan a trip step by step.
 <p><img src="docs/images/demo.gif" width="23%" alt="Drag and check">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="Closed-day check">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="Real routes"></p>
 
 <p><b>Handy before and during the trip</b></p>
-<p><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="61 tools"></p>
+<p><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="62 tools"></p>
 
 <p><b>After the trip: share and publish in one click</b></p>
 <p><img src="docs/images/feat-themes.gif" width="23%" alt="Share themes">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="Export">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="Travelogue">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="Photos"></p>
