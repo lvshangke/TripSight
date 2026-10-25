@@ -76,3 +76,12 @@ def test_handbook_shows_up_to_six_photos_and_basemap(tmp_path):
     page = (Path(res["folder"]) / "index.html").read_text(encoding="utf-8")
     assert page.count('src="photos/') == 6
     assert '<image href="data:image/jpeg' in page
+
+
+def test_handbook_styles_change_colors_and_reject_unknown():
+    _trip()
+    s.export_handbook(cards=False, style="胶片")
+    page = (_root() / "index.html").read_text(encoding="utf-8")
+    assert "--acc:#a4531f" in page
+    with pytest.raises(Exception, match="style"):
+        s.export_handbook(cards=False, style="暗黑")

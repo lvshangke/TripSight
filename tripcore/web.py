@@ -749,7 +749,7 @@ def hb_export(body: dict) -> dict[str, Any]:
     out: list[str] = []
     try:
         if fm & {"html", "cards", "pdf"}:
-            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), pdf="pdf" in fm))
+            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), pdf="pdf" in fm, style=str(body.get("style") or "手账")))
         if "obsidian" in fm:
             out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))
     except ms.ToolError as e:

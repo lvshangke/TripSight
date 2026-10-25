@@ -62,6 +62,26 @@ def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
     return f'<svg viewBox="0 0 {w} {h}" class="route">{lines}{dots}</svg>'
 
 
+THEMES = {      # 只换配色、字体和相框角度，都是浅色底
+    "手账": {},
+    "杂志": {"bg": "#ffffff", "paper": "#ffffff", "ink": "#111111", "sub": "#6b6b6b", "acc": "#d62828", "line": "#dddddd", "tape": "#ffffff", "rot": "0deg", "font": '"Playfair Display","Noto Serif SC","Songti SC",serif'},
+    "清新": {"bg": "#eef6f1", "paper": "#fbfffc", "ink": "#25403a", "sub": "#6b8a80", "acc": "#2e9c7f", "line": "#cfe3d9", "tape": "#bfe6d6", "rot": "-1deg", "font": '"PingFang SC","Noto Sans SC",sans-serif'},
+    "胶片": {"bg": "#e9e0d0", "paper": "#f6efe2", "ink": "#3b2f25", "sub": "#8a7a68", "acc": "#a4531f", "line": "#d3c5ae", "tape": "#d9b98a", "rot": "1.5deg", "font": '"Songti SC","Noto Serif SC",serif'},
+    "海边": {"bg": "#eaf3f9", "paper": "#ffffff", "ink": "#1f3b52", "sub": "#6b8aa3", "acc": "#1f7fbf", "line": "#cfe0ee", "tape": "#bfdcf0", "rot": "-1.5deg", "font": '"PingFang SC","Noto Sans SC",sans-serif'},
+}
+
+
+def theme_css(name: str) -> str:
+    t = THEMES.get(name)
+    if not t:
+        return ""
+    v = {"bg": "--bg", "paper": "--paper", "ink": "--ink", "sub": "--sub", "acc": "--acc", "line": "--line", "tape": "--tape", "rot": "--rot"}
+    css = ":root{" + ";".join(f"{v[k]}:{t[k]}" for k in v if k in t) + "}"
+    if "font" in t:
+        css += "body{font-family:" + t["font"] + "}"
+    return css
+
+
 CSS = """
 :root{--bg:#f6f1e7;--paper:#fffdf8;--ink:#33302b;--sub:#7a7468;--acc:#c4553a;--line:#e3dac8;--tape:#f0d98a}
 *{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font-family:"Noto Serif SC","Songti SC",serif;line-height:1.65}
@@ -78,7 +98,7 @@ CSS = """
 .stop{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 2px 0 var(--line)}
 .stop h3{font-size:20px}.stop h3 b{color:var(--acc);margin-right:6px}.meta{color:var(--sub);font-size:14px;margin-top:2px}
 .leg{color:var(--sub);font-size:13px;border-left:3px dotted var(--line);margin:0 0 0 18px;padding:2px 0 2px 14px}
-.polaroid{position:relative;width:min(300px,78%);margin:14px auto 4px;background:#fff;padding:10px 10px 38px;box-shadow:0 6px 18px rgba(0,0,0,.18);transform:rotate(-2deg)}
+.polaroid{position:relative;width:min(300px,78%);margin:14px auto 4px;background:#fff;padding:10px 10px 38px;box-shadow:0 6px 18px rgba(0,0,0,.18);transform:rotate(var(--rot,-2deg))}
 .polaroid:before{content:"";position:absolute;top:-12px;left:36%;width:80px;height:22px;background:var(--tape);opacity:.8;transform:rotate(3deg)}
 .polaroid img,.polaroid video{width:100%;display:block}.cap{position:absolute;left:0;right:0;bottom:9px;text-align:center;font-size:14px;color:var(--sub)}
 .tabs{display:flex;gap:8px;justify-content:center;margin:6px 0 0}.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:99px;padding:3px 12px;cursor:pointer}
@@ -91,11 +111,11 @@ JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previ
 t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';const m=document.createElement('img');m.src=i.src;o.appendChild(m);o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None) -> str:
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账") -> str:
     items = "".join(f'<div class="r"><b>{i + 1}</b><i>{_hm(v.arrive)}</i><span>{e(v.place.name)}</span></div>' for i, v in enumerate(vs))
     pic_html = f'<div class="pic"><img src="{pic}"></div>' if pic else ""
     date = f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else ""
-    return f"""<!doctype html><meta charset="utf-8"><style>{CSS}
+    return f"""<!doctype html><meta charset="utf-8"><style>{CSS}{theme_css(style)}
 body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-size:30px;letter-spacing:.3em;color:var(--acc)}}
 .t{{font-size:84px;font-weight:700;margin:14px 0 4px}}.s{{font-size:30px;color:var(--sub)}}.route{{margin:30px 0;height:330px}}
 .r{{display:flex;align-items:center;gap:18px;font-size:42px;margin:14px 0}}.r b{{width:56px;height:56px;border-radius:50%;border:3px solid var(--acc);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:28px}}
@@ -108,7 +128,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账") -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -190,7 +210,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         card_jobs.append((day.index, d, vs, km, st.legs, first_pic))
 
     title = e(trip.meta.name)
-    page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}</style>'
+    page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
             f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div></div>'
             f'{"".join(days_html)}<div class="foot">时间为预计时间，营业时间来自地图服务，出发前请再核实。</div></div>{JS}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
@@ -204,7 +224,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap), encoding="utf-8")
+                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()
