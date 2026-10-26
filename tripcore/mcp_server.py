@@ -1307,10 +1307,12 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
     return msg + "\n这是粗剪，没有音乐和特效，剪映里再调；视频若含人脸或路人，发布前提醒用户。"
 
 
-def footprint() -> str:
+def footprint(basemap: bool = False) -> str:
     """足迹统计与地图：把去过的行程合起来——几趟、几天、到过几个城市、大约走了多少公里，并生成一张所有去过的地方的地图页（~/.tripcore/足迹.html）。
     只算“去过”的：从照片还原的行程，以及复盘里标了“去了”的景点；纯计划不算。公里数是每天按先后顺序的直线距离累加，只是下限；
-    城市来自 tag_regions，没标过的行程不会猜。只读本机文件，不联网。"""
+    城市来自 tag_regions，没标过的行程不会猜。默认只读本机文件、不联网。
+    basemap=true 给地图加高德街道底图（仅国内、需要用户自己的 AMAP_KEY）：会联网，只把“地图中心点、缩放级别、图片大小”发给高德，
+    不发地名；但中心点大致反映去过的范围，用之前告诉用户并等他同意。"""
     from . import footprint as _fp
     if _single_file_mode():
         root = trip_path().parent
@@ -1322,12 +1324,26 @@ def footprint() -> str:
     text = _fp.summary(feet)
     if not feet:
         return text
+    bm, note = None, ""
+    if basemap:
+        from .amap import AmapClient
+        from .basemap import Basemap
+        pts = [(p[1], p[2]) for f in feet for p in f.points]
+        if not all(18 <= la <= 54 and 73 <= lo <= 136 for la, lo in pts):
+            note = "有境外的地方，高德底图只支持国内"
+        else:
+            client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+            if client is None:
+                note = "没有 AMAP_KEY（在你自己的配置里设置，不要发给我）"
+            else:
+                bm = Basemap(client, root / "basemap-cache")
     out = root / "足迹.html"
     try:
-        out.write_text(_fp.build_html(feet), encoding="utf-8")
+        out.write_text(_fp.build_html(feet, bm), encoding="utf-8")
     except OSError as e:
         raise ToolError(f"地图页写入失败：{e}")
-    return text + f"\n地图页：{out}（浏览器打开；没有底图，点位按经纬度展开）。"
+    tail = _basemap_report(bm, note) if basemap else "没有底图，点位按经纬度展开（footprint(basemap=true) 可加高德底图）。"
+    return text + f"\n地图页：{out}。{tail}"
 
 
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",

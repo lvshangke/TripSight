@@ -35,3 +35,28 @@ def test_review_visited_counts_and_untagged_note(tmp_path):
     s.record_review("A", "去了")
     out = s.footprint()
     assert "1 个地方" in out and "还没有城市信息" in out
+
+
+def test_basemap_option_without_key_or_abroad(monkeypatch):
+    d = _trip("台州", [("甲", 28.70, 121.40), ("乙", 28.80, 121.50)])
+    (d / "photo_trip.json").write_text("{}", encoding="utf-8")
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    assert "没有加底图：没有 AMAP_KEY" in s.footprint(basemap=True)
+
+
+def test_basemap_view_never_exceeds_static_map_limit():
+    from tripcore.basemap import choose_view
+    v = choose_view([(28.7, 121.4), (28.9, 121.6)], 940, 330, 36)
+    assert max(v.req_size) <= 1024
+    v2 = choose_view([(28.7, 121.4), (28.71, 121.41)], 400, 300, 30)
+    assert v2.ratio == 2 and max(v2.req_size) <= 1024
+
+
+def test_html_embeds_basemap_when_available():
+    f = fp.TripFoot("a", "甲", 1, "", True, [(0, 28.7, 121.4, "x"), (0, 28.8, 121.5, "y")])
+
+    class BM:
+        def fetch(self, v):
+            return "data:image/jpeg;base64,AAAA"
+    assert "<image href=\"data:image/jpeg" in fp.build_html([f], BM())
+    assert "<image" not in fp.build_html([f], None)

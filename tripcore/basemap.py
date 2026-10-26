@@ -45,7 +45,9 @@ class View:
 
     @property
     def ratio(self) -> int:
-        return 2 if self.zoom < 17 else 1          # 请求 2 倍清晰度：缩放级别 +1、图片尺寸 ×2，覆盖的范围不变
+        # 请求 2 倍清晰度：缩放级别 +1、图片尺寸 ×2，覆盖的范围不变。高德静态图单边最多 1024，放大后超过就只能用 1 倍，
+        # 否则图片会被截小、和我们画的路线对不上。
+        return 2 if self.zoom < 17 and max(self.w, self.h) * 2 <= 1024 else 1
 
     @property
     def req_zoom(self) -> int:

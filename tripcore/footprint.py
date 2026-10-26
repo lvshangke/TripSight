@@ -104,11 +104,18 @@ def summary(feet: list[TripFoot]) -> str:
 _COLORS = ["#d9534f", "#2e86ab", "#e0a030", "#5b9a4a", "#8a63b0", "#c0568a", "#3c8f8f", "#8a6d3b"]
 
 
-def build_html(feet: list[TripFoot]) -> str:
+def build_html(feet: list[TripFoot], bm=None) -> str:
     """一张自包含的 HTML：所有去过的地方，按行程分色，同一天的点按先后连线。没有底图（不联网），坐标按经纬度等比例展开。"""
     import math
     pts = [p for f in feet for p in f.points]
     W, H, pad = 1000, 640, 60
+    uri, proj = None, None
+    if bm is not None:                                  # 有底图：投影和高德底图严格对应
+        from .basemap import Projection, choose_view
+        view = choose_view([(p[1], p[2]) for p in pts], W, H, pad)
+        uri = bm.fetch(view)
+        if uri:
+            proj = Projection(view)
     lats, lons = [p[1] for p in pts], [p[2] for p in pts]
     mid = (min(lats) + max(lats)) / 2
     kx = math.cos(math.radians(mid))
@@ -119,6 +126,8 @@ def build_html(feet: list[TripFoot]) -> str:
     oy = (H - span_y * s) / 2
 
     def xy(la, lo):
+        if proj is not None:
+            return proj.xy(la, lo)
         return ox + (lo * kx - min(xs)) * s, oy + (max(lats) - la) * s
 
     body = []
@@ -137,4 +146,4 @@ def build_html(feet: list[TripFoot]) -> str:
 h1{{font-size:22px;margin:0 0 4px}}p{{color:#6b7280;margin:0 0 12px;white-space:pre-line}}svg{{width:100%;height:auto;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 ul{{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px}}li i{{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}}</style>
 <main><h1>我的足迹</h1><p>{escape(summary(feet).split(chr(10), 2)[0] + chr(10) + summary(feet).split(chr(10), 2)[1])}</p>
-<svg viewBox="0 0 {W} {H}" role="img" aria-label="足迹地图">{''.join(body)}</svg><ul>{legend}</ul></main>"""
+<svg viewBox="0 0 {W} {H}" role="img" aria-label="足迹地图">{f'<image href="{uri}" width="{W}" height="{H}"/>' if uri else ''}{''.join(body)}</svg><ul>{legend}</ul></main>"""
