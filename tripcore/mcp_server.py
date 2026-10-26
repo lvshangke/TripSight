@@ -3133,6 +3133,31 @@ TOOLS = [
 ]
 
 
+_PROFILES = {
+    "core": ["行程基础", "景点与住宿", "排程与检查", "路线与交通"],
+    "plan": ["行程基础", "景点与住宿", "排程与检查", "路线与交通", "餐食", "攻略与导入", "偏好"],
+    "review": ["行程基础", "分享与导出", "复盘与游记"],
+}
+
+
+def _selected_tools(spec: Optional[str] = None) -> list:
+    """环境变量 TRIPCORE_TOOLS 可以只暴露一部分工具来省上下文：写档位名（core / plan / review）或目录里的类别名，逗号分隔；
+    不设或写 full 就是全部。open_workbench 总是保留，这样没暴露的功能仍可在工作台里用。"""
+    from .tools_catalog import CATALOG, CATEGORIES
+    spec = (os.environ.get("TRIPCORE_TOOLS", "") if spec is None else spec).strip()
+    if not spec or spec.lower() == "full":
+        return list(TOOLS)
+    want: set[str] = set()
+    for part in [x.strip() for x in spec.replace("，", ",").split(",") if x.strip()]:
+        if part in _PROFILES:
+            want.update(_PROFILES[part])
+        elif part in CATEGORIES:
+            want.add(part)
+        else:
+            raise ValueError(f"TRIPCORE_TOOLS 里的 {part!r} 不认识。可用档位：{'、'.join(_PROFILES)}、full；或类别：{'、'.join(CATEGORIES)}。")
+    return [f for f in TOOLS if f.__name__ == "open_workbench" or CATALOG[f.__name__][0] in want]
+
+
 def build_server():
     """创建 MCP 服务对象。工具出错时抛出的 ToolError 会以文字形式返回给模型。"""
     import functools
@@ -3150,7 +3175,7 @@ def build_server():
                 raise ValueError(str(e)) from None
         return inner
 
-    for fn in TOOLS:
+    for fn in _selected_tools():
         mcp.tool(name=fn.__name__)(wrap(fn))
     return mcp
 

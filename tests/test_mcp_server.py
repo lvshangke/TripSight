@@ -1184,3 +1184,19 @@ def test_relaxed_alternative_is_read_only_and_applies_on_request():
     assert s._load().revision == rev            # 只读：不产生新版本
     out = s.schedule_days(relaxed=True)
     assert "轻松版" in out and s._load().revision == rev + 1
+
+
+def test_tools_env_selects_groups(monkeypatch):
+    from tripcore import mcp_server as ms
+    full = ms._selected_tools("")
+    core = ms._selected_tools("core")
+    names = {f.__name__ for f in core}
+    assert len(full) == len(ms.TOOLS) and 0 < len(core) < len(full)
+    assert "open_workbench" in names and "export_rough_cut" not in names and "add_place" in names
+    assert {f.__name__ for f in ms._selected_tools("分享与导出")} >= {"export_rough_cut", "open_workbench"}
+    import pytest
+    with pytest.raises(ValueError):
+        ms._selected_tools("乱写")
+    monkeypatch.setenv("TRIPCORE_TOOLS", "core")
+    import asyncio
+    assert len(asyncio.run(ms.build_server().list_tools())) == len(core)
