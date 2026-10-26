@@ -645,7 +645,8 @@ def hb_import(body: dict) -> dict[str, Any]:
     except (TypeError, ValueError):
         raise HttpError(400, "半径要是数字。")
     try:
-        msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album)
+        msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album,
+                                track=str(body.get("track") or "").strip())
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"message": msg}

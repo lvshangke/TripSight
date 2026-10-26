@@ -1319,11 +1319,14 @@ def _load_json_file(p: Path) -> dict:
 
 
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
-                      radius_m: int = 300, photos_per_stop: int = 6, album: str = "") -> str:
+                      radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
+                      track: str = "", tz_hours: float = 8.0) -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
     在 Mac 上也可以不给文件夹，改给 album=照片 App 里的相册名，直接只读地读照片库（先用 list_photo_albums 看有哪些相册；需要装 osxphotos 并给终端"完全磁盘访问权限"，不会修改照片库）。
+    track=GPX/KML 轨迹文件（或放了这些文件的文件夹）：用户有运动 App/手表导出的轨迹时，没有定位的照片会按拍摄时间在轨迹上补出位置（时间在轨迹相邻两点之间就插值，否则取 10 分钟内最近的点）；
+    轨迹里的时间是 UTC，照片是当地时间，tz_hours 是当地与 UTC 的时差（默认 8）。轨迹只用来给照片定位，不会单独变成景点。
     景点名先是"月-日 时:分 停留点"，要靠 view_stop 看图和候选地名，再用 update_place 改成真实名字，不要猜。
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
@@ -1345,6 +1348,16 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
             photos, untagged, st = _pt.read_all(root)
         except ValueError as e:
             raise ToolError(str(e))
+    tracked_n = 0
+    if track and untagged:
+        from . import trackfile as _tf
+        try:
+            pts = _tf.read_tracks(track, float(tz_hours))
+        except _tf.TrackError as e:
+            raise ToolError(str(e))
+        got, untagged = _tf.locate(pts, untagged)
+        tracked_n = len(got)
+        photos = sorted(photos + got, key=lambda x: (x.taken, x.file))
     if not photos:
         raise ToolError(f"没有找到带拍摄时间和位置的照片（统计：{st}）。照片要有 GPS，导出时记得勾选位置信息。")
     stops = _pt.cluster(photos, radius_m=max(50, min(int(radius_m), 2000)))
@@ -1390,6 +1403,8 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
              f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if tracked_n:
+        lines.append(f"其中 {tracked_n} 张本来没有定位，是按拍摄时间在轨迹文件上补出的位置（取决于手机时间和轨迹时间是否一致、tz_hours 是否对）。")
     if guessed_n:
         lines.append(f"另有 {guessed_n} 张没有定位的照片，按拍摄时间挂到了时间上最近的点（是推测，可能不准，手册里可以删）。")
     if len(stops) > len(keep):

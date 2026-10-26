@@ -109,3 +109,22 @@ def test_tag_regions_without_key_refuses_and_with_client_stores(monkeypatch, tmp
     monkeypatch.setattr(s, "_is_google", lambda c: False)
     out = s.tag_regions()
     assert "临海 → 仙居" in out and set(s._chapter_labels().values()) == {"临海", "仙居"}
+
+
+def test_import_with_track_locates_untagged_photos(tmp_path):
+    t0 = datetime(2026, 6, 19, 10, 0)
+    for i in range(2):
+        _jpg(tmp_path / f"g{i}.jpg", t0 + timedelta(minutes=2 * i), 28.70, 121.40, color=(10 * i, 90, 200))
+    for i in range(3):                                          # 没有定位，靠轨迹补
+        _jpg(tmp_path / f"n{i}.jpg", t0 + timedelta(hours=3, minutes=i), color=(30 * i, 200, 90))
+    gpx = tmp_path / "t.gpx"
+    gpx.write_text('<gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>'
+                   '<trkpt lat="28.80" lon="121.50"><time>2026-06-19T04:59:00Z</time></trkpt>'
+                   '<trkpt lat="28.80" lon="121.50"><time>2026-06-19T05:05:00Z</time></trkpt>'
+                   '</trkseg></trk></gpx>', encoding="utf-8")
+    out = s.import_photo_trip(str(tmp_path), track=str(gpx), min_photos=2)
+    t = s._load()
+    assert "按拍摄时间在轨迹文件上补出" in out and len(t.places) == 2
+    assert any(abs(p.lat - 28.80) < 1e-6 for p in t.places)
+    with pytest.raises(s.ToolError):
+        s.import_photo_trip(str(tmp_path), track=str(tmp_path / "no.gpx"))
