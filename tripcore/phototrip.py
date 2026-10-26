@@ -34,6 +34,7 @@ class Stop:
     lon: float
     files: list[str] = field(default_factory=list)
     _pts: list[tuple[float, float]] = field(default_factory=list, repr=False)
+    guessed: list[str] = field(default_factory=list)      # 没有定位、按拍摄时间挂上来的照片（推测）
 
     @property
     def n(self) -> int:
@@ -68,6 +69,12 @@ def _open_exif(path: Path):
 
 def read_photos(folder: Path) -> tuple[list[Photo], dict[str, int]]:
     """扫描文件夹（不递归）。返回带时间和位置的照片，以及统计。"""
+    out, _, st = read_all(folder)
+    return out, st
+
+
+def read_all(folder: Path) -> tuple[list[Photo], list[tuple[str, datetime]], dict[str, int]]:
+    """同 read_photos，另外返回有拍摄时间但没有定位的照片 [(文件名, 时间)]。"""
     try:
         from PIL import Image  # noqa: F401
     except ImportError:
@@ -81,6 +88,7 @@ def read_photos(folder: Path) -> tuple[list[Photo], dict[str, int]]:
         pass
     stats = {"images": 0, "with_gps": 0, "no_gps": 0, "no_time": 0, "heic_skipped": 0, "unreadable": 0}
     out: list[Photo] = []
+    untagged: list[tuple[str, datetime]] = []
     for p in sorted(folder.iterdir()):
         ext = p.suffix.lower()
         if not p.is_file() or p.name.startswith("."):
@@ -108,11 +116,32 @@ def read_photos(folder: Path) -> tuple[list[Photo], dict[str, int]]:
         lon = _dms(gps.get(4), gps.get(3, "E")) if gps and 4 in gps else None
         if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
             stats["no_gps"] += 1
+            untagged.append((p.name, taken))
             continue
         stats["with_gps"] += 1
         out.append(Photo(p.name, taken, lat, lon))
     out.sort(key=lambda x: (x.taken, x.file))
-    return out, stats
+    untagged.sort(key=lambda x: (x[1], x[0]))
+    return out, untagged, stats
+
+
+def assign_untagged(stops: list[Stop], untagged: list[tuple[str, datetime]], max_gap_min: float = 45) -> int:
+    """没有定位的照片：拍摄时间落在某个停留点的时段内（或前后 max_gap_min 分钟内）、同一天，就挂到时间上最近的那个点。
+    只是按时间推测，记在 stop.guessed 里；不改变点的位置和时段。返回挂上的张数。"""
+    n = 0
+    for f, t in untagged:
+        best, bd = None, None
+        for sp in stops:
+            if sp.day != t.date():
+                continue
+            d = 0.0 if sp.start <= t <= sp.end else min(abs((t - sp.start).total_seconds()), abs((t - sp.end).total_seconds())) / 60
+            if d <= max_gap_min and (bd is None or d < bd):
+                best, bd = sp, d
+        if best is not None:
+            best.files.append(f)
+            best.guessed.append(f)
+            n += 1
+    return n
 
 
 def cluster(photos: list[Photo], radius_m: float = 300, gap_min: float = 75) -> list[Stop]:

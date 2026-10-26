@@ -60,3 +60,22 @@ def test_best_files_and_contact_sheet(tmp_path):
     assert sheet.format == "JPEG" and not sheet.getexif()
     with pytest.raises(ValueError):
         pt.contact_sheet(tmp_path, ["missing.jpg"])
+
+
+def test_untagged_photos_attach_to_nearest_stop_by_time(tmp_path):
+    t0 = datetime(2026, 6, 19, 10, 0)
+    for i in range(3):
+        _jpg(tmp_path / f"a{i}.jpg", t0 + timedelta(minutes=5 * i), 28.70, 121.40)        # 10:00–10:10
+    for i in range(3):
+        _jpg(tmp_path / f"b{i}.jpg", t0 + timedelta(hours=4, minutes=3 * i), 28.72, 121.42)  # 14:00–14:06
+    _jpg(tmp_path / "in_a.jpg", t0 + timedelta(minutes=7), None)                           # 落在 A 的时段内
+    _jpg(tmp_path / "near_b.jpg", t0 + timedelta(hours=4, minutes=30), None)               # B 结束后 24 分钟
+    _jpg(tmp_path / "far.jpg", t0 + timedelta(hours=7), None)                              # 离谁都远
+    _jpg(tmp_path / "other_day.jpg", t0 + timedelta(days=1, minutes=3), None)
+    photos, untagged, st = pt.read_all(tmp_path)
+    assert len(photos) == 6 and len(untagged) == 4 and st["no_gps"] == 4
+    stops = pt.cluster(photos)
+    assert pt.assign_untagged(stops, untagged) == 2
+    assert stops[0].guessed == ["in_a.jpg"] and stops[1].guessed == ["near_b.jpg"]
+    assert (stops[0].start, stops[0].end) == (t0, t0 + timedelta(minutes=10))               # 不改时段
+    assert pt.read_photos(tmp_path)[0] == photos                                           # 旧接口不变

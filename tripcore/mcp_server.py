@@ -1320,12 +1320,13 @@ def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_
     if not root.is_dir():
         raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
     try:
-        photos, st = _pt.read_photos(root)
+        photos, untagged, st = _pt.read_all(root)
     except ValueError as e:
         raise ToolError(str(e))
     if not photos:
         raise ToolError(f"没有找到带拍摄时间和位置的照片（统计：{st}）。照片要有 GPS，导出时记得勾选位置信息。")
     stops = _pt.cluster(photos, radius_m=max(50, min(int(radius_m), 2000)))
+    guessed_n = _pt.assign_untagged(stops, untagged)
     keep = [s for s in stops if include_passing or s.n >= max(1, int(min_photos))]
     if not keep:
         raise ToolError(f"聚成了 {len(stops)} 个点，但没有一个达到 {min_photos} 张。可以降低 min_photos 或设 include_passing=true。")
@@ -1362,11 +1363,13 @@ def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_
                 failed += 1
     _ph.save(_photo_index(), items)
     _photo_trip_path().write_text(json.dumps({"folder": str(root), "stops": [
-        {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files}
+        {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files, "guessed": sp.guessed}
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
              f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if guessed_n:
+        lines.append(f"另有 {guessed_n} 张没有定位的照片，按拍摄时间挂到了时间上最近的点（是推测，可能不准，手册里可以删）。")
     if len(stops) > len(keep):
         lines.append(f"其余 {len(stops) - len(keep)} 个是路过的零散点，没放进行程（include_passing=true 可保留）。")
     for d in range(ndays):
@@ -1402,6 +1405,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
     keep, rest = ids[0], ids[1:]
     allrec = [recs[i] for i in ids]
     files = [f for r in allrec for f in r["files"]]
+    guessed = [f for r in allrec for f in r.get("guessed", [])]
     n = sum(r["n"] for r in allrec)
     start = min(r["start"] for r in allrec)
     end = max(r["end"] for r in allrec)
@@ -1430,7 +1434,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
         if x.get("place_id") in rest:
             x["place_id"] = keep
     _ph.save(_photo_index(), photos)
-    recs[keep].update({"files": files, "n": n, "start": start, "end": end})
+    recs[keep].update({"files": files, "guessed": guessed, "n": n, "start": start, "end": end})
     side["stops"] = [x for x in side["stops"] if x["place_id"] not in rest]
     _photo_trip_path().write_text(json.dumps(side, ensure_ascii=False), encoding="utf-8")
     stories = _load_json_file(_stories_path())
