@@ -1233,7 +1233,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
     bm, bm_note = _make_basemap(trip) if basemap else (None, "")
     try:
         res = build_handbook(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style)
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels())
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     if basemap:
@@ -1443,6 +1443,48 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
             stories.pop(i, None)
         _stories_path().write_text(json.dumps(stories, ensure_ascii=False), encoding="utf-8")
     return f"已把 {'、'.join(ids)} 合并成 {keep}（{n} 张照片，{start[11:16]}–{end[11:16]}）。原来这些点上写的介绍和描写已清掉，需要的话对合并后的点重新写。"
+
+
+def _regions_path() -> Path:
+    return trip_path().with_name("regions.json")
+
+
+def _chapter_labels() -> dict[str, str]:
+    from .regions import chapter_labels
+    return chapter_labels(_load_json_file(_regions_path()))
+
+
+def tag_regions() -> str:
+    """给行程里每个景点标上所在的城市/区县，手册用它分章（比如临海、仙居、天台）。用高德坐标反查：只把每个点的坐标发给高德（用户自己的 key），
+    结果存在本机，已查过的不再查。没有 key 或某个点查不到就不标、不猜，手册照常按天排。调用前告诉用户会把各点坐标发给高德。"""
+    from .regions import chapter_labels, order_of_appearance
+    trip = _load()
+    client = _amap()
+    if client is None or _is_google(client):
+        raise ToolError("没有可用的高德 key，不能反查城市/区县；手册会按天分，不会乱猜。key 要用户在自己的配置里设置，不要发给我。")
+    ids = [it.place_id for d in (trip.plan.days if trip.plan else []) for it in d.items]
+    cache = _load_json_file(_regions_path())
+    new = fail = 0
+    for pid in ids:
+        if pid in cache:
+            continue
+        pl = trip.place(pid)
+        try:
+            r = client.regeo(pl.lat, pl.lon)
+        except AmapError:
+            fail += 1
+            continue
+        if r:
+            cache[pid] = r
+            new += 1
+    try:
+        _regions_path().write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"保存失败：{e}")
+    labels = chapter_labels(cache)
+    chapters = order_of_appearance(ids, labels)
+    return (f"已标注 {new} 个点" + (f"，{fail} 个没查到" if fail else "") + "。" +
+            ("章节：" + " → ".join(chapters) + "。" if chapters else "还没有可用的章节。"))
 
 
 def view_stop(place_id: str):
@@ -2782,7 +2824,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

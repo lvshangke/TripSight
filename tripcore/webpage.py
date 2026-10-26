@@ -194,7 +194,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
-<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span></div>
+<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b>
 <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
@@ -703,7 +703,7 @@ function hbCard(s, restore) {
     '<div class="bt"><button data-a="left" title="往前">◀</button>' + (i ? '<button data-a="front" title="设为封面">★</button>' : '<span class="tm" title="当前封面">★</span>') + '<button data-a="right" title="往后">▶</button><button data-a="del" title="删除这张">✕</button></div></div>').join('');
   const add = s.photos.length < HB.data.max_photos ? '<label class="add" data-a="add">＋照片<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label>' : '';
   return '<div class="hbs" id="hb_' + esc(s.id) + '"><div class="h">' + (restore ? '<input type="checkbox" class="sel" ' + (HB.sel.has(s.id) ? 'checked' : '') + ' title="选中后可合并">' : '') +
-    '<span class="dy">第 ' + s.day + ' 天</span><input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + '</div>' +
+    '<span class="dy">第 ' + s.day + ' 天</span>' + (s.region ? '<span class="dy">' + esc(s.region) + '</span>' : '') + '<input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + '</div>' +
     '<div class="hbp">' + ph + add + '</div>' +
     '<div class="lb2">我的话 <button data-a="ai"' + (HB.data.vision ? '' : ' disabled title="还没有配置能读图的模型（DASHSCOPE_API_KEY、TRIPSIGHT_VISION_MODEL），先留空或自己写"') + '>用 AI 看图起草</button><span class="tlnote">草稿不会自动保存，改完点“保存”</span></div>' +
     '<textarea class="imp" maxlength="300" placeholder="写几句这里的光线、天气、心情（300 字内）">' + esc(st.impression || '') + '</textarea>' +
@@ -767,6 +767,7 @@ $('hb_pv').onclick = async () => {
   } catch (e) { $('hb_pvo').textContent = e.message; }
 };
 $('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
+$('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r = await api('hb_regions', {}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
 };

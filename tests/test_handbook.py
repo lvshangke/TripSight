@@ -85,3 +85,23 @@ def test_handbook_styles_change_colors_and_reject_unknown():
     assert "--acc:#a4531f" in page
     with pytest.raises(Exception, match="style"):
         s.export_handbook(cards=False, style="暗黑")
+
+
+def test_handbook_shows_chapters_when_regions_known():
+    from tripcore import handbook as hb
+    from tripcore.regions import chapter_labels
+    _trip()
+    t = s._load()
+    ids = [it.place_id for it in t.plan.days[0].items]
+    labels = chapter_labels({ids[0]: {"province": "浙江省", "city": "台州市", "district": "临海市"}, ids[1]: {"province": "浙江省", "city": "台州市", "district": "仙居县"}})
+    assert labels == {ids[0]: "临海", ids[1]: "仙居"}
+    res = hb.build_handbook(t, s.trip_path().with_name("exp2"), cards=False, regions=labels)
+    page = (Path(res["folder"]) / "index.html").read_text(encoding="utf-8")
+    assert "临海 → 仙居" in page and 'class="rg"' in page
+
+
+def test_chapters_by_city_when_trip_spans_cities():
+    from tripcore.regions import chapter_labels
+    r = {"a": {"province": "浙江省", "city": "杭州市", "district": "西湖区"}, "b": {"province": "江苏省", "city": "苏州市", "district": "姑苏区"}}
+    assert chapter_labels(r) == {"a": "杭州", "b": "苏州"}
+    assert chapter_labels({"a": {"province": "", "city": "", "district": ""}}) == {}

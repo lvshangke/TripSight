@@ -628,6 +628,9 @@ def hb_state() -> dict[str, Any]:
                      "start": (recs.get(p.id) or {}).get("start", "")[11:16], "end": (recs.get(p.id) or {}).get("end", "")[11:16],
                      "photos": [{"id": x["id"], "thumb": _ph.thumb_uri(folder, x["file"], 200, 65)} for x in photos if x.get("place_id") == p.id],
                      "story": stories.get(p.id) or {}})
+    labels = ms._chapter_labels()
+    for r in rows:
+        r["region"] = labels.get(r["id"], "")
     return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""),
             "vision": bool(_vi.config()), "max_photos": 6}
 
@@ -681,6 +684,13 @@ def hb_edit(body: dict) -> dict[str, Any]:
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"ok": True}
+
+
+def hb_regions(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.tag_regions()}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
 
 
 def hb_merge(body: dict) -> dict[str, Any]:
@@ -786,7 +796,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "hb_preview": hb_preview, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "hb_preview": hb_preview, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):

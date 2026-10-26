@@ -103,6 +103,7 @@ CSS = """
 .polaroid img,.polaroid video{width:100%;display:block}.cap{position:absolute;left:0;right:0;bottom:9px;text-align:center;font-size:14px;color:var(--sub)}
 .tabs{display:flex;gap:8px;justify-content:center;margin:6px 0 0}.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:99px;padding:3px 12px;cursor:pointer}
 .tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.rg{background:var(--tape);color:var(--ink);border-radius:99px;padding:0 8px;font-size:12px}
 .facts{margin:10px 0 0 18px;font-size:14px;color:var(--ink)}.facts small,.imp small{color:var(--sub);font-size:12px}.facts a{color:var(--sub)}
 .imp{margin-top:10px;padding:8px 12px;border-left:3px solid var(--acc);background:#fbf5ea;font-size:15px;font-style:italic}.imp small{display:block;font-style:normal;margin-top:2px}
 .foot{margin-top:40px;text-align:center;color:var(--sub);font-size:13px}
@@ -128,7 +129,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账") -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -159,6 +160,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         shutil.copy2(vp, dst); files.append(f"media/{dst.name}"); vids[pid] = f"media/{dst.name}"
 
     days_html, card_jobs, km_all, stops_all = [], [], 0.0, 0
+    rg = regions or {}
     for day in trip.plan.days:
         vs, _ = day_visits(trip, day)
         if not vs:
@@ -175,8 +177,9 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         first_pic = None
         for i, v in enumerate(vs):
             p = v.place
+            rgtag = f'<span class="rg">{e(rg[p.id])}</span> · ' if rg.get(p.id) else ''
             hours = f"营业：{e(p.opening_hours)}" if p.opening_hours else "营业时间未核实"
-            body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟 · {hours}</div>'
+            body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{rgtag}{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟 · {hours}</div>'
             views, tabs = "", []
             pics = by_place.get(p.id, [])[:MAX_PHOTOS]
             if pics:
@@ -209,9 +212,13 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         days_html.append("".join(parts))
         card_jobs.append((day.index, d, vs, km, st.legs, first_pic))
 
+    from .regions import order_of_appearance
+    order_ids = [v.place.id for day in trip.plan.days for v in day_visits(trip, day)[0]]
+    chs = order_of_appearance(order_ids, rg)
+    chap_html = '<div class="m">' + ' → '.join(e(c) for c in chs) + '</div>' if len(chs) > 1 else ''
     title = e(trip.meta.name)
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
-            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div></div>'
+            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
             f'{"".join(days_html)}<div class="foot">营业时间来自地图服务，出发前请再核实。</div></div>{JS}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 

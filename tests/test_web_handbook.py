@@ -81,3 +81,11 @@ def test_preview_does_not_create_a_trip(server, tmp_path):
     assert code == 200 and r2["radius_m"] == 2000                       # 半径上限
     assert call(server, "/tok/api/trips")[1] == before
     assert call(server, "/tok/api/hb_preview", {"folder": "/no/such"})[0] == 400
+
+
+def test_regions_route_needs_key(server, tmp_path, monkeypatch):
+    _restore(server, tmp_path)
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    code, r = call(server, "/tok/api/hb_regions", {})
+    assert code == 400 and "高德 key" in r["error"]
+    assert call(server, "/tok/api/hb_state")[1]["stops"][0]["region"] == ""

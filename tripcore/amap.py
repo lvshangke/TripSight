@@ -298,6 +298,16 @@ class AmapClient:
             return None
         return gcj02_to_wgs84(lat_g, lon_g)
 
+    def regeo(self, lat: float, lon: float) -> Optional[dict[str, str]]:
+        """坐标 → 所在省/市/区县（只发这一个坐标）。lat/lon 是 WGS84。直辖市的 city 为空，用省名代替。"""
+        g_lat, g_lon = wgs84_to_gcj02(lat, lon)
+        data = self._get("/v3/geocode/regeo", {"location": f"{g_lon:.6f},{g_lat:.6f}", "extensions": "base"})
+        comp = (data.get("regeocode") or {}).get("addressComponent") or {}
+        province, city, district = _text(comp.get("province")), _text(comp.get("city")), _text(comp.get("district"))
+        if not (province or city or district):
+            return None
+        return {"province": province, "city": city or province, "district": district}
+
     # ---- 天气 ----
     def adcode(self, city: str) -> Optional[str]:
         """城市名 → 行政区划代码 adcode（天气接口需要）。"""

@@ -94,3 +94,18 @@ def test_merge_stops_combines_same_day_points(tmp_path):
     assert sum(1 for x in s._ph.load(s._photo_index()) if x["place_id"] == same[0]) == before
     with pytest.raises(Exception):
         s.merge_stops([same[0]])
+
+
+def test_tag_regions_without_key_refuses_and_with_client_stores(monkeypatch, tmp_path):
+    s.import_photo_trip(str(_album(tmp_path)))
+    monkeypatch.setattr(s, "_amap", lambda: None)
+    with pytest.raises(Exception, match="没有可用的高德 key"):
+        s.tag_regions()
+
+    class Fake:
+        def regeo(self, lat, lon):
+            return {"province": "浙江省", "city": "台州市", "district": "临海市" if lat < 28.71 else "仙居县"}
+    monkeypatch.setattr(s, "_amap", lambda: Fake())
+    monkeypatch.setattr(s, "_is_google", lambda c: False)
+    out = s.tag_regions()
+    assert "临海 → 仙居" in out and set(s._chapter_labels().values()) == {"临海", "仙居"}
