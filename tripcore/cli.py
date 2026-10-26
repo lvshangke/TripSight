@@ -205,6 +205,22 @@ def _cmd_bills_plist(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_run(args: argparse.Namespace) -> int:
+    from .runner import RunError, run_tool
+    try:
+        print(run_tool(args.tool, args.json))
+    except RunError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_tools(args: argparse.Namespace) -> int:
+    from .runner import list_tools
+    print(list_tools(args.category))
+    return 0
+
+
 def _cmd_doctor(args: argparse.Namespace) -> int:
     from .doctor import main as doctor_main
 
@@ -251,6 +267,15 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("bills-plist", help="生成 macOS 定时扫描账单的 launchd 文件（只生成，不替你安装）")
     p.set_defaults(func=_cmd_bills_plist)
+
+    p = sub.add_parser("run", help="直接调用一个工具（和 MCP 同一批函数），参数用 JSON：tripcore run show_trip '{}'")
+    p.add_argument("tool", help="工具名，tripcore tools 可以看全部")
+    p.add_argument("json", nargs="?", default="", help="参数，JSON 对象；没有参数可省略")
+    p.set_defaults(func=_cmd_run)
+
+    p = sub.add_parser("tools", help="列出全部工具（可按类别筛选）")
+    p.add_argument("category", nargs="?", default="")
+    p.set_defaults(func=_cmd_tools)
 
     p = sub.add_parser("doctor", help="自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）")
     p.set_defaults(func=_cmd_doctor)
