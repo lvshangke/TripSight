@@ -1515,6 +1515,10 @@ def _ledger_path() -> Path:
     return trip_path().with_name("expenses.json")
 
 
+def _rules_path() -> Path:
+    return _root_dir() / "merchant_rules.json"
+
+
 def _trip_range(trip: Trip) -> tuple[Any, Any]:
     a, b = trip.day_date(0), trip.day_date(trip.meta.num_days - 1)
     if a is None or b is None:
@@ -1549,7 +1553,7 @@ def import_bills(path: str = "") -> str:
         except _bl.BillError as e:
             notes.append(f"{f.name}：{e}")
             continue
-        r = _bl.add_to_ledger(ledger, txns, a, b, names)
+        r = _bl.add_to_ledger(ledger, txns, a, b, names, _bl.load_rules(_rules_path()))
         for k in tot:
             tot[k] += r[k]
         notes.append(f"{f.name}：{'微信' if txns and txns[0].source == 'wechat' else '支付宝' if txns else ''}账单，读到 {st['rows']} 笔")

@@ -143,6 +143,8 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 .hbs textarea{width:100%;box-sizing:border-box;font:inherit;min-height:48px;border:1px solid #ccc;border-radius:6px;padding:4px 6px}.hbs .fr{display:flex;gap:6px;margin:3px 0}.hbs .fr input{font:inherit;padding:2px 6px;border:1px solid #ccc;border-radius:6px}.hbs .fr input:first-child{flex:2}.hbs .fr input:nth-child(2){flex:1}
 .hbs .lb2{font-size:12px;color:#777;margin:6px 0 2px;display:flex;gap:8px;align-items:center}.hbexp{border-top:2px solid #ddd;margin-top:14px;padding-top:8px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.hbexp b{width:100%}
 #hb_out{width:100%;white-space:pre-wrap;font-size:12px;color:#444;margin:4px 0 0}
+.bls{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.bls .k{border:1px solid #e3e3e3;border-radius:8px;padding:6px 12px;background:#fff}.bls .k b{display:block;font-size:18px}
+.blbar{height:8px;background:#2563eb;border-radius:4px}.bltab{width:100%;border-collapse:collapse;font-size:13px}.bltab td,.bltab th{border-bottom:1px solid #eee;padding:4px 6px;text-align:left}.bltab tr.ex{color:#999}.bltab select{font:inherit;font-size:12px}
 .lgday{margin:8px 0;padding:6px 8px;border:1px solid #eee;border-radius:8px}.lgstop{margin:3px 0 0 6px;font-size:13px}
 .st{display:inline-block;font-size:11px;padding:0 6px;border-radius:10px;color:#fff}.st.ok{background:#3a9d5d}.st.skip{background:#888}.st.chg{background:#d98e04}.st.no{background:#c2410c}
 #pane_log textarea{width:100%;height:110px;font:inherit;font-size:13px;box-sizing:border-box;margin-top:6px}
@@ -179,7 +181,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="帮我在第【几】天的景点附近找午餐，给我几家对比；我选定后请直接加进行程。">找午餐</button><button data-t="帮我在第【几】天的景点附近找晚餐，给我几家对比；我选定后请直接加进行程。">找晚餐</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
-<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
+<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="bill">花费</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
@@ -202,6 +204,10 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label>
 <button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
+<div class="pane" id="pane_bill">
+<div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
+<div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="tlnote" style="width:100%;white-space:pre-wrap"></div></div>
+<div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
@@ -596,7 +602,7 @@ function moShow(tab) {
   moTab = tab;
   document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
-  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else toolsLoad();
+  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else if (tab === 'bill') blLoad(); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 let shareSeq = 0;
@@ -783,6 +789,37 @@ $('hb_exp').onclick = async () => {
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
   try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, basemap: $('hb_bm').checked}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
   $('hb_exp').disabled = false;
+};
+
+let BL = null;
+async function blLoad() {
+  try { BL = await api('bills_state'); } catch (e) { $('bl_list').textContent = e.message; return; }
+  blRender();
+}
+function blRender() {
+  const s = BL.summary;
+  if (!BL.rows.length) { $('bl_sum').innerHTML = ''; $('bl_list').innerHTML = '<div class="tlnote">' + (BL.has_dates ? '还没有导入账单。' : '这个行程还没有设具体日期，没法筛出旅行期间的消费：先在助手里设置日期。') + '</div>'; return; }
+  const max = Math.max(...Object.values(s.by_category), 1);
+  $('bl_sum').innerHTML = '<div class="bls"><div class="k"><span class="tlnote">合计</span><b>' + s.total + ' 元</b>' + s.count + ' 笔</div>' +
+    Object.entries(s.by_category).sort((a, b) => b[1] - a[1]).map(([k, v]) => '<div class="k" style="min-width:90px"><span class="tlnote">' + esc(k) + '</span><b>' + v + '</b><div class="blbar" style="width:' + Math.round(v / max * 100) + '%"></div></div>').join('') + '</div>' +
+    '<div class="tlnote">按天：' + Object.entries(s.by_day).map(([k, v]) => esc(k.slice(5)) + ' ' + v).join('　') + (s.excluded_count ? '　｜　不计入：' + s.excluded_count + ' 笔（转账/群收款，共 ' + s.excluded_total + ' 元）' : '') + '</div>' +
+    '<div class="tlnote">改某一笔的类别时，同一商户的其他消费会一起改，以后导入也沿用（已记住 ' + BL.rules + ' 家）。</div>';
+  const opt = (list, cur, fn) => list.map(x => '<option value="' + esc(fn(x)[0]) + '"' + (fn(x)[0] === cur ? ' selected' : '') + '>' + esc(fn(x)[1]) + '</option>').join('');
+  $('bl_list').innerHTML = '<table class="bltab"><tr><th>时间</th><th>商户</th><th>金额</th><th>类别</th><th>对应景点</th><th>不计入</th></tr>' + BL.rows.map(r =>
+    '<tr class="' + (r.excluded ? 'ex' : '') + '" data-id="' + esc(r.id) + '"><td>' + esc(r.date.slice(5) + ' ' + r.time) + '</td><td>' + esc(r.merchant) + '</td><td>' + r.amount + '</td>' +
+    '<td><select class="c">' + opt(BL.categories, r.category, x => [x, x]) + '</select></td>' +
+    '<td><select class="p"><option value="">—</option>' + opt(BL.places, r.place_id || '', x => [x.id, x.name]) + '</select></td>' +
+    '<td><input type="checkbox" class="x"' + (r.excluded ? ' checked' : '') + '></td></tr>').join('') + '</table>';
+  $('bl_list').querySelectorAll('tr[data-id]').forEach(tr => {
+    const id = tr.dataset.id, send = async o => { try { await api('bills_edit', Object.assign({id: id}, o)); await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; } };
+    tr.querySelector('.c').onchange = e => send({category: e.target.value, remember: true});
+    tr.querySelector('.p').onchange = e => send({place_id: e.target.value});
+    tr.querySelector('.x').onchange = e => send({excluded: e.target.checked});
+  });
+}
+$('bl_go').onclick = async () => {
+  $('bl_msg').textContent = '正在导入…';
+  try { const r = await api('bills_import', {path: $('bl_path').value}); $('bl_msg').textContent = r.message; await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; }
 };
 $('tl_q').oninput = () => { if (toolsData) renderTools(); };
 load();

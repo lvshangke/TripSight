@@ -85,3 +85,4 @@ def test_needs_trip_dates(tmp_path):
     _wx(tmp_path / "a.xlsx")
     with pytest.raises(Exception, match="具体日期"):
         s.import_bills(str(tmp_path / "a.xlsx"))
+

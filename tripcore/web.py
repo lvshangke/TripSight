@@ -814,11 +814,55 @@ def hb_preview(body: dict) -> dict[str, Any]:
             "stops": [{"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M")} for x in keep]}
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state}
+def bills_state() -> dict[str, Any]:
+    from . import bills as _bl
+    trip = ms._load()
+    led = _bl.load(ms._ledger_path())
+    return {"rows": led, "summary": _bl.summarize(led) if led else None, "categories": _bl.CATEGORIES + [_bl.TRANSFER],
+            "places": [{"id": p.id, "name": p.name} for p in trip.places], "has_dates": trip.day_date(0) is not None,
+            "rules": len(_bl.load_rules(ms._rules_path()))}
+
+
+def bills_import(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.import_bills(str(body.get("path") or ""))}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def bills_edit(body: dict) -> dict[str, Any]:
+    from . import bills as _bl
+    led = _bl.load(ms._ledger_path())
+    kw: dict[str, Any] = {}
+    if "category" in body:
+        kw["category"] = str(body["category"])
+    if "place_id" in body:
+        pid = body["place_id"]
+        if pid and not any(p.id == pid for p in ms._load().places):
+            raise HttpError(400, "找不到这个景点。")
+        kw["place_id"] = pid or None
+    if "excluded" in body:
+        kw["excluded"] = bool(body["excluded"])
+    try:
+        row = _bl.edit(led, str(body.get("id") or ""), **kw)
+    except _bl.BillError as e:
+        raise HttpError(400, str(e))
+    if body.get("remember") and "category" in kw and kw["category"] in _bl.CATEGORIES:
+        rules = _bl.load_rules(ms._rules_path())
+        rules[row["merchant"]] = kw["category"]
+        ms._rules_path().write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+        for x in led:                                   # 同一商户已有的消费一起改（被用户单独改过类别的也跟着，所以只改还没排除的）
+            if x["merchant"] == row["merchant"] and not x.get("excluded"):
+                x["category"] = kw["category"]
+    _bl.save(ms._ledger_path(), led)
+    return {"ok": True}
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "bills_import": bills_import, "bills_edit": bills_edit, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):

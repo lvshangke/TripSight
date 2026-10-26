@@ -210,7 +210,8 @@ def _short(s: str, n: int = 14) -> str:
     return s if len(s) <= n else s[:n] + "…"
 
 
-def add_to_ledger(ledger: list[dict[str, Any]], txns: Iterable[Txn], start: date, end: date, place_names: dict[str, str]) -> dict[str, int]:
+def add_to_ledger(ledger: list[dict[str, Any]], txns: Iterable[Txn], start: date, end: date, place_names: dict[str, str],
+                  rules: Optional[dict[str, str]] = None) -> dict[str, int]:
     """把行程日期范围内的交易放进账本（已有的不重复）。place_names = {景点id: 名字}，商户或商品里带景点名就自动挂上。"""
     have = {x["id"] for x in ledger}
     added = outside = dup = 0
@@ -223,7 +224,7 @@ def add_to_ledger(ledger: list[dict[str, Any]], txns: Iterable[Txn], start: date
             continue
         pid = next((i for i, n in place_names.items() if n and (n in t.merchant or n in t.item)), None)
         ledger.append({"id": t.key, "date": t.when.date().isoformat(), "time": t.when.strftime("%H:%M"), "amount": round(t.amount, 2),
-                       "category": t.category, "merchant": _short(t.merchant), "source": t.source, "place_id": pid, "excluded": t.transfer})
+                       "category": (rules or {}).get(_short(t.merchant), t.category) if not t.transfer else t.category, "merchant": _short(t.merchant), "source": t.source, "place_id": pid, "excluded": t.transfer})
         have.add(t.key)
         added += 1
     ledger.sort(key=lambda x: (x["date"], x["time"]))
@@ -241,3 +242,26 @@ def summarize(ledger: list[dict[str, Any]]) -> dict[str, Any]:
     ex = [x for x in ledger if x.get("excluded")]
     return {"total": round(sum(x["amount"] for x in use), 2), "count": len(use), "by_category": by_cat, "by_day": dict(sorted(by_day.items())),
             "excluded_count": len(ex), "excluded_total": round(sum(x["amount"] for x in ex), 2)}
+
+
+def load_rules(path: Path) -> dict[str, str]:
+    try:
+        d = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return {k: v for k, v in d.items() if v in CATEGORIES} if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def edit(ledger: list[dict[str, Any]], rid: str, *, category: Optional[str] = None, place_id: Optional[str] = ..., excluded: Optional[bool] = None) -> dict[str, Any]:
+    row = next((x for x in ledger if x["id"] == rid), None)
+    if row is None:
+        raise BillError("找不到这笔消费。")
+    if category is not None:
+        if category not in CATEGORIES + [TRANSFER]:
+            raise BillError("类别只能是：" + "、".join(CATEGORIES))
+        row["category"] = category
+    if place_id is not ...:
+        row["place_id"] = place_id or None
+    if excluded is not None:
+        row["excluded"] = bool(excluded)
+    return row
