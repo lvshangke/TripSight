@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
+photos = ["osxphotos>=0.70"]                  # 可选：Mac 上直接读照片 App 的相册（只读）
 image = ["playwright>=1.40", "pillow>=10"]     # 可选：export_share 长图（playwright）、照片去定位（pillow）
 
 [project.scripts]

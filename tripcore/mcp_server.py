@@ -1307,22 +1307,33 @@ def _load_json_file(p: Path) -> dict:
         return {}
 
 
-def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_passing: bool = False,
-                      radius_m: int = 300, photos_per_stop: int = 6) -> str:
+def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
+                      radius_m: int = 300, photos_per_stop: int = 6, album: str = "") -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
+    在 Mac 上也可以不给文件夹，改给 album=照片 App 里的相册名，直接只读地读照片库（先用 list_photo_albums 看有哪些相册；需要装 osxphotos 并给终端"完全磁盘访问权限"，不会修改照片库）。
     景点名先是"月-日 时:分 停留点"，要靠 view_stop 看图和候选地名，再用 update_place 改成真实名字，不要猜。
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
     from .models import DayItem, DayPlan, Plan, PlaceStatus
-    root = Path(folder).expanduser()
-    if not root.is_dir():
-        raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
-    try:
-        photos, untagged, st = _pt.read_all(root)
-    except ValueError as e:
-        raise ToolError(str(e))
+    if album:
+        from . import photoslib as _pl
+        root = Path("/")                       # 相册模式下 Photo.file 是绝对路径，Path("/") / 绝对路径 就是它本身
+        try:
+            photos, untagged, st = _pl.read_album(album)
+        except _pl.PhotosLibError as e:
+            raise ToolError(str(e))
+    else:
+        if not folder:
+            raise ToolError("要给照片文件夹 folder，或者（Mac 上）照片 App 的相册名 album。")
+        root = Path(folder).expanduser()
+        if not root.is_dir():
+            raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+        try:
+            photos, untagged, st = _pt.read_all(root)
+        except ValueError as e:
+            raise ToolError(str(e))
     if not photos:
         raise ToolError(f"没有找到带拍摄时间和位置的照片（统计：{st}）。照片要有 GPS，导出时记得勾选位置信息。")
     stops = _pt.cluster(photos, radius_m=max(50, min(int(radius_m), 2000)))
@@ -1362,7 +1373,7 @@ def import_photo_trip(folder: str, name: str = "", min_photos: int = 3, include_
             except _ph.PhotoError:
                 failed += 1
     _ph.save(_photo_index(), items)
-    _photo_trip_path().write_text(json.dumps({"folder": str(root), "stops": [
+    _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "stops": [
         {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files, "guessed": sp.guessed}
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
@@ -1485,6 +1496,19 @@ def tag_regions() -> str:
     chapters = order_of_appearance(ids, labels)
     return (f"已标注 {new} 个点" + (f"，{fail} 个没查到" if fail else "") + "。" +
             ("章节：" + " → ".join(chapters) + "。" if chapters else "还没有可用的章节。"))
+
+
+def list_photo_albums() -> str:
+    """列出 Mac 照片 App 里的相册（名字和照片张数），只读，不联网，不返回照片。给 import_photo_trip(album=...) 选相册用。
+    只在 macOS 上、装了 osxphotos 时可用；没装或没权限会说明怎么办。"""
+    from . import photoslib as _pl
+    try:
+        rows = _pl.list_albums()
+    except _pl.PhotosLibError as e:
+        raise ToolError(str(e))
+    if not rows:
+        return "照片 App 里没有找到有照片的相册。"
+    return "照片 App 里的相册：\n" + "\n".join(f"- {r['name']}（{r['count']} 张）" for r in rows)
 
 
 def view_stop(place_id: str):
@@ -2824,7 +2848,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

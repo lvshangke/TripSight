@@ -631,20 +631,21 @@ def hb_state() -> dict[str, Any]:
     labels = ms._chapter_labels()
     for r in rows:
         r["region"] = labels.get(r["id"], "")
-    return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""),
+    return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""), "album": side.get("album", ""),
             "vision": bool(_vi.config()), "max_photos": 6}
 
 
 def hb_import(body: dict) -> dict[str, Any]:
     folder = str(body.get("folder") or "").strip()
-    if not folder:
-        raise HttpError(400, "先填相册文件夹的路径。")
+    album = str(body.get("album") or "").strip()
+    if not folder and not album:
+        raise HttpError(400, "先填照片文件夹的路径，或选一个照片 App 的相册。")
     try:
         radius = int(body.get("radius_m") or 300)
     except (TypeError, ValueError):
         raise HttpError(400, "半径要是数字。")
     try:
-        msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3))
+        msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album)
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"message": msg}
@@ -767,11 +768,28 @@ def hb_export(body: dict) -> dict[str, Any]:
     return {"message": "\n\n".join(out)}
 
 
+def ms_photoslib_error():
+    from . import photoslib as _pl
+    return _pl.PhotosLibError
+
+
+def hb_albums(body: dict) -> dict[str, Any]:
+    from . import photoslib as _pl
+    ok, why = _pl.available()
+    if not ok:
+        raise HttpError(400, why)
+    try:
+        return {"albums": _pl.list_albums()}
+    except _pl.PhotosLibError as e:
+        raise HttpError(400, str(e))
+
+
 def hb_preview(body: dict) -> dict[str, Any]:
     """导入前预览：按这个半径会聚出几处、每处在哪、有多少张；不新建行程、不写任何文件。"""
     from . import phototrip as _pt
+    album = str(body.get("album") or "").strip()
     folder = Path(str(body.get("folder") or "").strip()).expanduser()
-    if not str(body.get("folder") or "").strip() or not folder.is_dir():
+    if not album and (not str(body.get("folder") or "").strip() or not folder.is_dir()):
         raise HttpError(400, "找不到这个文件夹，请填完整路径。")
     try:
         radius = max(50, min(int(body.get("radius_m") or 300), 2000))
@@ -779,8 +797,12 @@ def hb_preview(body: dict) -> dict[str, Any]:
     except (TypeError, ValueError):
         raise HttpError(400, "半径要是数字。")
     try:
-        photos, untagged, st = _pt.read_all(folder)
-    except ValueError as e:
+        if album:
+            from . import photoslib as _pl
+            photos, untagged, st = _pl.read_album(album)
+        else:
+            photos, untagged, st = _pt.read_all(folder)
+    except (ValueError, ms_photoslib_error()) as e:
         raise HttpError(400, str(e))
     if not photos:
         raise HttpError(400, f"没有找到带位置的照片（统计：{st}）。")
@@ -796,7 +818,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "hb_preview": hb_preview, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):
@@ -874,7 +896,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

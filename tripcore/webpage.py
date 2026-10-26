@@ -191,7 +191,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="hbtop"><div class="seg"><button data-m="restore" class="on">恢复行程</button><button data-m="plan">计划行程</button></div>
 <span class="tlnote" id="hb_hint"></span></div>
 <div id="hb_import" class="hbimp"><b>从相册文件夹恢复</b>
-<input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
+<label>来源 <select id="hb_src"><option value="folder">文件夹</option><option value="album">照片 App 相册（Mac）</option></select></label><select id="hb_album" style="display:none"><option value="">先点“读取相册列表”</option></select><button id="hb_al" style="display:none">读取相册列表</button><input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
@@ -751,14 +751,21 @@ function hbWire(s) {
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { HB.mode = b.dataset.m; if (HB.data) hbRender(); });
 $('hb_go').onclick = async () => {
   $('hb_go').disabled = true; $('hb_list').textContent = '正在读取照片，几十秒内…';
-  try { const r = await api('hb_import', {folder: $('hb_folder').value, radius_m: +$('hb_r').value}); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
+  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value})); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
   $('hb_go').disabled = false;
 };
 
+const hbSrc = o => Object.assign(o, $('hb_src').value === 'album' ? {album: $('hb_album').value} : {folder: $('hb_folder').value});
+function hbSrcUi() { const a = $('hb_src').value === 'album'; $('hb_folder').style.display = a ? 'none' : ''; $('hb_album').style.display = a ? '' : 'none'; $('hb_al').style.display = a ? '' : 'none'; }
+$('hb_src').onchange = hbSrcUi;
+$('hb_al').onclick = async () => {
+  try { const r = await api('hb_albums', {}); $('hb_album').innerHTML = r.albums.map(a => '<option value="' + esc(a.name) + '">' + esc(a.name) + '（' + a.count + ' 张）</option>').join('') || '<option value="">没有相册</option>'; }
+  catch (e) { $('hb_pvo').textContent = e.message; }
+};
 $('hb_pv').onclick = async () => {
   $('hb_pvo').textContent = '正在预览…';
   try {
-    const r = await api('hb_preview', {folder: $('hb_folder').value, radius_m: +$('hb_r').value});
+    const r = await api('hb_preview', hbSrc({radius_m: +$('hb_r').value}));
     const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180);
     const W = 520, H = 200, dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 40) / dx, (H - 40) / dy);
     const X = s => 20 + (s.lon - Math.min(...lo)) * k * sc, Y = s => H - 20 - (s.lat - Math.min(...la)) * sc;
