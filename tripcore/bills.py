@@ -236,9 +236,9 @@ def add_to_ledger(ledger: list[dict[str, Any]], txns: Iterable[Txn], start: date
     return {"added": added, "outside": outside, "duplicate": dup}
 
 
-def summarize(ledger: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize(ledger: list[dict[str, Any]], categories: Optional[list[str]] = None) -> dict[str, Any]:
     """只返回汇总数字（不含商户名）：总额、按类别、按天、被排除（转账等）的笔数和金额。"""
-    use = [x for x in ledger if not x.get("excluded")]
+    use = [x for x in ledger if not x.get("excluded") and (categories is None or x["category"] in categories)]
     by_cat: dict[str, float] = {}
     by_day: dict[str, float] = {}
     for x in use:

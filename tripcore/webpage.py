@@ -203,7 +203,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label>
-<button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
+<label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
 <div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="tlnote" style="width:100%;white-space:pre-wrap"></div></div>
@@ -789,10 +789,11 @@ $('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r 
 $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
 };
+$('hb_sp').onchange = () => { $('hb_spc').style.display = $('hb_sp').checked ? '' : 'none'; };
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, basemap: $('hb_bm').checked}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, basemap: $('hb_bm').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
   $('hb_exp').disabled = false;
 };
 

@@ -107,3 +107,17 @@ def test_applepay_lines_and_scan_watch_folder(tmp_path, monkeypatch):
     assert "新记 1 笔" in s.scan_bills()
     with pytest.raises(Exception, match="不是已存在的文件夹"):
         s.set_bills_watch([str(tmp_path / "nope")])
+
+
+def test_handbook_spending_page_is_optional_and_selective(tmp_path):
+    _trip(); _wx(tmp_path / "a.xlsx"); _ali(tmp_path / "b.csv")
+    s.import_bills(str(tmp_path))
+    s.export_handbook(cards=False)
+    off = (next(p for p in s.trip_path().with_name("exports").iterdir() if p.is_dir()) / "index.html").read_text(encoding="utf-8")
+    assert "后记" not in off
+    s.export_handbook(cards=False, show_spending=True, spending_categories=["餐饮", "交通"])
+    page = (sorted(p for p in s.trip_path().with_name("exports").iterdir() if p.is_dir())[-1] / "index.html").read_text(encoding="utf-8")
+    assert "后记" in page and "餐饮" in page and "交通" in page and "门票" not in page.split("后记")[1]
+    assert "某某面馆" not in page and "滴滴" not in page                      # 没有商户名
+    with pytest.raises(Exception, match="类别只能是"):
+        s.export_handbook(cards=False, show_spending=True, spending_categories=["乱写"])
