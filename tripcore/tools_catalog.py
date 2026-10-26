@@ -76,6 +76,8 @@ CATALOG: dict[str, tuple[str, str, str, str]] = {
     "tag_regions": (_C[7], "change", "给各景点标上所在的城市/区县（高德坐标反查），手册用它分章。", "给手册按城市分章"),
     "merge_stops": (_C[7], "change", "把同一天里几个照片还原的停留点合并成一个（如同一景区里的多个点）。", "把神仙居里那几个点合并成一个"),
     "import_bills": (_C[7], "change", "导入微信/支付宝账单文件（本机解析），筛出旅行期间的消费放进账本。", "把下载的微信账单导进来看看这次花了多少"),
+    "scan_bills": (_C[7], "change", "扫描盯着的文件夹，把新账单和 Apple Pay 记录自动导入账本。", "看看有没有新账单要记"),
+    "set_bills_watch": (_C[7], "change", "设置要盯的账单文件夹（推荐 iCloud 云盘的 TripSight账单）。", "盯着 iCloud 里的 TripSight账单 文件夹"),
     "spending_summary": (_C[7], "read", "旅行消费统计：总额、按类别、按天，和估算对比（只有汇总数字）。", "这次旅行一共花了多少钱"),
     "list_photo_albums": (_C[7], "read", "列出 Mac 照片 App 里的相册（只读），用来选相册还原旅程。", "我照片 App 里有哪些相册"),
     "import_photo_trip": (_C[7], "change", "从一个照片文件夹还原走过的旅程：按拍摄时间和位置聚成停留点，新建一个行程。", "用这个相册还原一下我的台州旅程"),

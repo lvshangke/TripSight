@@ -1526,6 +1526,33 @@ def _trip_range(trip: Trip) -> tuple[Any, Any]:
     return a, b
 
 
+def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], list[str]]:
+    from . import bills as _bl
+    a, b = _trip_range(trip)
+    ledger = _bl.load(_ledger_path())
+    names = {pl.id: pl.name for pl in trip.places}
+    rules = _bl.load_rules(_rules_path())
+    tot = {"added": 0, "outside": 0, "duplicate": 0}
+    notes: list[str] = []
+    for f in files:
+        try:
+            if f.suffix.lower() == ".txt":
+                txns = _bl.parse_applepay(f.read_text(encoding="utf-8", errors="ignore"))
+                st = {"rows": len(txns)}
+            else:
+                txns, st = _bl.parse(_bl.read_rows(f))
+        except (_bl.BillError, OSError) as e:
+            notes.append(f"{f.name}：{e}")
+            continue
+        r = _bl.add_to_ledger(ledger, txns, a, b, names, rules)
+        for k in tot:
+            tot[k] += r[k]
+        label = {"wechat": "微信", "alipay": "支付宝", "applepay": "Apple Pay"}.get(txns[0].source, "") if txns else ""
+        notes.append(f"{f.name}：{label}账单，读到 {st['rows']} 笔")
+    _bl.save(_ledger_path(), ledger)
+    return tot, notes
+
+
 def import_bills(path: str = "") -> str:
     """导入微信/支付宝导出的账单文件，筛出这次行程期间的消费放进本机账本，之后用 spending_summary 看统计。
     path 是用户给的账单文件，或一个文件夹（会在里面找账单文件，不递归；不给就看用户的“下载”文件夹）。支持微信 .xlsx/.csv、支付宝 .csv/.xlsx/.numbers。
@@ -1543,23 +1570,75 @@ def import_bills(path: str = "") -> str:
         files = [p]
     else:
         raise ToolError(f"找不到：{p}（请让用户确认路径；不会自动查找）。")
-    ledger = _bl.load(_ledger_path())
-    names = {pl.id: pl.name for pl in trip.places}
-    tot = {"added": 0, "outside": 0, "duplicate": 0}
-    notes = []
-    for f in files:
-        try:
-            txns, st = _bl.parse(_bl.read_rows(f))
-        except _bl.BillError as e:
-            notes.append(f"{f.name}：{e}")
-            continue
-        r = _bl.add_to_ledger(ledger, txns, a, b, names, _bl.load_rules(_rules_path()))
-        for k in tot:
-            tot[k] += r[k]
-        notes.append(f"{f.name}：{'微信' if txns and txns[0].source == 'wechat' else '支付宝' if txns else ''}账单，读到 {st['rows']} 笔")
-    _bl.save(_ledger_path(), ledger)
+    tot, notes = _ingest_bill_files(trip, files)
     return (f"账单已导入：行程期间（{a}～{b}）新记 {tot['added']} 笔，期间之外 {tot['outside']} 笔没记，重复 {tot['duplicate']} 笔。\n"
             + "\n".join(notes) + "\n用 spending_summary 看统计；商户明细只在工作台里给用户看，需要改分类让用户去工作台改。")
+
+
+def _watch_path() -> Path:
+    return _root_dir() / "bills_watch.json"
+
+
+def _watch_folders() -> list[Path]:
+    from . import bills as _bl
+    cfg = _load_json_file(_watch_path()).get("folders")
+    if isinstance(cfg, list) and cfg:
+        return [Path(x).expanduser() for x in cfg if isinstance(x, str)]
+    ic = _bl.icloud_folder()
+    return [ic] if ic.is_dir() else []
+
+
+def set_bills_watch(folders: list[str]) -> str:
+    """设置要“盯着”的账单文件夹（用户给的路径，必须已存在）：之后每次扫描会把里面新出现的微信/支付宝账单和 Apple Pay 记录自动导入。
+    推荐：iPhone 把账单文件存进 iCloud 云盘的“TripSight账单”文件夹，Mac 上盯这个文件夹。传空列表就恢复默认（有 iCloud 的 TripSight账单 文件夹就盯它）。
+    只读这些文件夹，不会移动或删除里面的文件。"""
+    out = []
+    for f in folders:
+        p = Path(f).expanduser()
+        if not p.is_dir():
+            raise ToolError(f"不是已存在的文件夹：{f}")
+        out.append(str(p))
+    try:
+        _watch_path().write_text(json.dumps({"folders": out}, ensure_ascii=False), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"保存失败：{e}")
+    return "已设置盯这些文件夹：" + ("、".join(out) if out else "（默认）") + "。"
+
+
+def scan_bills() -> str:
+    """扫描“盯着”的文件夹，把新出现的账单（微信/支付宝导出文件、iPhone 快捷指令追加的 Apple Pay 记录）自动导入当前行程的账本。
+    每个文件只处理一次（文件没变就不重复读）；Apple Pay 记录文件是不断追加的，每次都会读，但已记过的不会重复。只读，不移动不删除文件。
+    返回只有笔数。可以让用户在工作台“花费”页点“立即扫描”，或用 `python -m tripcore bills-scan` 定时跑。"""
+    from . import bills as _bl
+    trip = _load()
+    _trip_range(trip)
+    folders = _watch_folders()
+    if not folders:
+        raise ToolError("还没有设置要盯的文件夹：用 set_bills_watch 设置，或在 iCloud 云盘里建一个“TripSight账单”文件夹。")
+    seen_p = _root_dir() / "bills_seen.json"
+    seen = _load_json_file(seen_p)
+    files: list[Path] = []
+    for fo in folders:
+        if not fo.is_dir():
+            continue
+        for f in sorted(fo.iterdir()):
+            if not f.is_file() or f.name.startswith(".") or f.suffix.lower() not in _bl.SUFFIXES:
+                continue
+            sig = f"{f}|{f.stat().st_size}|{int(f.stat().st_mtime)}"
+            if seen.get(str(f)) == sig and f.suffix.lower() != ".txt":
+                continue
+            kind = _bl.sniff(f)
+            seen[str(f)] = sig
+            if kind:
+                files.append(f)
+    try:
+        seen_p.write_text(json.dumps(seen, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+    if not files:
+        return "没有新的账单。"
+    tot, notes = _ingest_bill_files(trip, files)
+    return f"扫描到 {len(files)} 个账单文件，新记 {tot['added']} 笔（期间之外 {tot['outside']}，重复 {tot['duplicate']}）。\n" + "\n".join(notes)
 
 
 def spending_summary() -> str:
@@ -2925,7 +3004,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

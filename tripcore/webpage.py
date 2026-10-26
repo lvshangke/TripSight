@@ -207,6 +207,11 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
 <div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="tlnote" style="width:100%;white-space:pre-wrap"></div></div>
+<details class="hbimp" id="bl_auto"><summary><b>自动导入</b> <span class="tlnote" id="bl_watchn"></span></summary>
+<div style="width:100%"><div class="tlnote">盯着这些文件夹（每行一个），里面新出现的微信/支付宝账单和 Apple Pay 记录会自动记进账本。推荐：iPhone 把账单存进 iCloud 云盘的“TripSight账单”文件夹。只读，不会移动或删除里面的文件。</div>
+<textarea id="bl_watch" rows="3" style="width:100%;box-sizing:border-box;font:inherit" placeholder="例如 ~/Library/Mobile Documents/com~apple~CloudDocs/TripSight账单"></textarea>
+<button id="bl_wsave">保存</button> <button id="bl_scan" class="pri">立即扫描</button> <span class="tlnote" id="bl_wmsg"></span>
+<details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
@@ -794,6 +799,8 @@ $('hb_exp').onclick = async () => {
 let BL = null;
 async function blLoad() {
   try { BL = await api('bills_state'); } catch (e) { $('bl_list').textContent = e.message; return; }
+  $('bl_watch').value = BL.watch.join('\n'); $('bl_watchn').textContent = BL.watch.length ? '（正在盯 ' + BL.watch.length + ' 个文件夹）' : '（还没设置）';
+  $('bl_steps').innerHTML = BL.shortcut.map(x => '<li>' + esc(x) + '</li>').join('');
   blRender();
 }
 function blRender() {
@@ -817,6 +824,8 @@ function blRender() {
     tr.querySelector('.x').onchange = e => send({excluded: e.target.checked});
   });
 }
+$('bl_wsave').onclick = async () => { try { const r = await api('bills_watch', {folders: $('bl_watch').value.split('\n')}); $('bl_wmsg').textContent = r.message; await blLoad(); } catch (e) { $('bl_wmsg').textContent = e.message; } };
+$('bl_scan').onclick = async () => { $('bl_wmsg').textContent = '正在扫描…'; try { const r = await api('bills_scan', {}); $('bl_wmsg').textContent = r.message; await blLoad(); } catch (e) { $('bl_wmsg').textContent = e.message; } };
 $('bl_go').onclick = async () => {
   $('bl_msg').textContent = '正在导入…';
   try { const r = await api('bills_import', {path: $('bl_path').value}); $('bl_msg').textContent = r.message; await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; }

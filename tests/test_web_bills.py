@@ -29,3 +29,14 @@ def test_import_edit_remember(server, tmp_path):
     assert call(server, "/tok/api/bills_edit", {"id": row["id"], "category": "乱写"})[0] == 400
     assert call(server, "/tok/api/bills_edit", {"id": "nope", "excluded": True})[0] == 400
     assert call(server, "/tok/api/bills_edit", {"id": row["id"], "place_id": "zzz"})[0] == 400
+
+
+def test_watch_and_scan_routes(server, tmp_path):
+    _trip()
+    w = tmp_path / "w"; w.mkdir(); _wx(w / "a.xlsx")
+    assert call(server, "/tok/api/bills_watch", {"folders": [str(w)]})[0] == 200
+    st = call(server, "/tok/api/bills_state")[1]
+    assert st["watch"] == [str(w)] and len(st["shortcut"]) >= 4
+    code, r = call(server, "/tok/api/bills_scan", {})
+    assert code == 200 and "新记" in r["message"]
+    assert call(server, "/tok/api/bills_watch", {"folders": ["/no/such/dir"]})[0] == 400

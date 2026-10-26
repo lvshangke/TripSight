@@ -21,7 +21,7 @@ from typing import Any, Iterable, Optional
 
 CATEGORIES = ["门票", "餐饮", "交通", "住宿", "购物", "其他"]
 TRANSFER = "转账"            # 个人转账/群收款：不计入消费，单独列出
-SUFFIXES = {".csv", ".xlsx", ".numbers"}
+SUFFIXES = {".csv", ".xlsx", ".numbers", ".txt"}      # .txt 是 iPhone 快捷指令追加的 Apple Pay 记录
 
 _ALIPAY_MAP = {
     "餐饮美食": "餐饮", "交通出行": "交通", "酒店旅游": "住宿", "旅游出行": "住宿", "文化休闲": "门票",
@@ -90,7 +90,12 @@ def read_rows(path: Path) -> list[list[Any]]:
 
 
 def sniff(path: Path) -> Optional[str]:
-    """不读全文，只看表头判断是不是微信/支付宝账单；不是返回 None。"""
+    """不读全文，只看表头判断是不是微信/支付宝账单（.txt 则看是不是 Apple Pay 记录）；不是返回 None。"""
+    if path.suffix.lower() == ".txt":
+        try:
+            return "applepay" if parse_applepay(path.read_text(encoding="utf-8", errors="ignore")) else None
+        except OSError:
+            return None
     try:
         rows = read_rows(path)
     except Exception:
@@ -265,3 +270,47 @@ def edit(ledger: list[dict[str, Any]], rid: str, *, category: Optional[str] = No
     if excluded is not None:
         row["excluded"] = bool(excluded)
     return row
+
+
+# ---------------- Apple Pay（iPhone 快捷指令追加的文本） ----------------
+
+def parse_applepay(text: str) -> list[Txn]:
+    """每行一笔：`2026-11-07 12:30|60.00|商户名`（分隔符可以是 | 逗号 或制表符；日期可以带秒；# 开头是注释）。认不出的行跳过。
+    快捷指令的“交易”自动化只对 Apple Pay / 钱包里的卡触发，微信和支付宝的付款不在里面。"""
+    out: list[Txn] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.replace("\t", "|").replace("，", ",").replace(",", "|").split("|")]
+        if len(parts) < 3:
+            continue
+        when = None
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
+            try:
+                when = datetime.strptime(parts[0], fmt)
+                break
+            except ValueError:
+                continue
+        amount = _amount(parts[1])
+        if when is None or amount is None or amount <= 0:
+            continue
+        merchant = parts[2]
+        key = hashlib.sha1(("applepay" + line).encode()).hexdigest()[:16]
+        out.append(Txn(when, amount, merchant, "", "applepay", _guess(merchant), key))
+    return out
+
+
+# ---------------- 自动盯文件夹 ----------------
+
+SHORTCUT_STEPS = [
+    "打开“快捷指令” → 底部“自动化” → 右上角 + → 选“交易”（据我所知它在你用 Apple Pay 付款时触发）。",
+    "选要记的卡片，选“立即运行”，下一步“新建空白自动化”。",
+    "添加操作“文本”，内容依次点变量：当前日期（格式 yyyy-MM-dd HH:mm）、竖线 |、金额、竖线 |、商家。",
+    "再添加操作“添加到文本文件”：选 iCloud 云盘里的 TripSight账单 文件夹下的 applepay.txt，勾选“换行”。",
+    "完成。Mac 上只要盯着这个文件夹，下一次扫描就会自动记进账本。微信和支付宝的付款这个方法抓不到，它们要靠导出账单。",
+]
+
+
+def icloud_folder() -> Path:
+    return Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs" / "TripSight账单"

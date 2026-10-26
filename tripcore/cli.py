@@ -171,6 +171,40 @@ def _cmd_web(args: argparse.Namespace) -> int:
     return serve(port=args.port, url_file=args.url_file, open_browser=args.open, idle_seconds=args.idle_minutes * 60)
 
 
+def _cmd_bills_scan(args: argparse.Namespace) -> int:
+    from . import mcp_server as ms
+    try:
+        print(ms.scan_bills())
+    except ms.ToolError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_bills_plist(args: argparse.Namespace) -> int:
+    """生成一个 macOS 定时任务文件（launchd），每 10 分钟扫描一次账单文件夹。只生成文件，不替你安装：安装命令会打印出来，由你自己运行。"""
+    from pathlib import Path
+    out = Path.home() / ".tripcore" / "com.tripsight.bills.plist"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.tripsight.bills</string>
+<key>ProgramArguments</key><array><string>{sys.executable}</string><string>-m</string><string>tripcore</string><string>bills-scan</string></array>
+<key>StartInterval</key><integer>600</integer>
+<key>RunAtLoad</key><true/>
+<key>StandardOutPath</key><string>{Path.home()}/.tripcore/bills-scan.log</string>
+<key>StandardErrorPath</key><string>{Path.home()}/.tripcore/bills-scan.log</string>
+</dict></plist>
+''', encoding="utf-8")
+    print(f"已生成：{out}")
+    print("要启用，请你自己运行：")
+    print(f"  cp {out} ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.tripsight.bills.plist")
+    print("要停用：launchctl unload ~/Library/LaunchAgents/com.tripsight.bills.plist（再删掉那个文件）。")
+    print("如果日志里提示没有权限读 iCloud 云盘，请在“系统设置 → 隐私与安全性 → 完全磁盘访问权限”里给这个 Python 打开。")
+    return 0
+
+
 def _cmd_doctor(args: argparse.Namespace) -> int:
     from .doctor import main as doctor_main
 
@@ -211,6 +245,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--open", action="store_true", help="启动后自动用浏览器打开")
     p.add_argument("--idle-minutes", type=float, default=120, help="空闲多久自动退出")
     p.set_defaults(func=_cmd_web)
+
+    p = sub.add_parser("bills-scan", help="扫描盯着的账单文件夹，把新账单自动导入当前行程的账本")
+    p.set_defaults(func=_cmd_bills_scan)
+
+    p = sub.add_parser("bills-plist", help="生成 macOS 定时扫描账单的 launchd 文件（只生成，不替你安装）")
+    p.set_defaults(func=_cmd_bills_plist)
 
     p = sub.add_parser("doctor", help="自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）")
     p.set_defaults(func=_cmd_doctor)

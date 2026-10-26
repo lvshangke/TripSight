@@ -820,12 +820,30 @@ def bills_state() -> dict[str, Any]:
     led = _bl.load(ms._ledger_path())
     return {"rows": led, "summary": _bl.summarize(led) if led else None, "categories": _bl.CATEGORIES + [_bl.TRANSFER],
             "places": [{"id": p.id, "name": p.name} for p in trip.places], "has_dates": trip.day_date(0) is not None,
-            "rules": len(_bl.load_rules(ms._rules_path()))}
+            "rules": len(_bl.load_rules(ms._rules_path())), "watch": [str(x) for x in ms._watch_folders()],
+            "shortcut": _bl.SHORTCUT_STEPS, "icloud": str(_bl.icloud_folder())}
 
 
 def bills_import(body: dict) -> dict[str, Any]:
     try:
         return {"message": ms.import_bills(str(body.get("path") or ""))}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def bills_scan(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.scan_bills()}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def bills_watch(body: dict) -> dict[str, Any]:
+    fs = body.get("folders")
+    if not isinstance(fs, list) or not all(isinstance(x, str) for x in fs):
+        raise HttpError(400, "文件夹列表格式不对。")
+    try:
+        return {"message": ms.set_bills_watch([x.strip() for x in fs if x.strip()])}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
@@ -862,7 +880,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):

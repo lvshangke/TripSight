@@ -86,3 +86,24 @@ def test_needs_trip_dates(tmp_path):
     with pytest.raises(Exception, match="具体日期"):
         s.import_bills(str(tmp_path / "a.xlsx"))
 
+
+
+def test_applepay_lines_and_scan_watch_folder(tmp_path, monkeypatch):
+    txt = "# 快捷指令追加\n2026-11-07 12:30|18.00|某咖啡店\n2026-11-08 09:00,45.5,某地铁\n坏行\n2026-11-08 10:00|-3|退款\n"
+    ts = bl.parse_applepay(txt)
+    assert [t.amount for t in ts] == [18.0, 45.5] and {t.source for t in ts} == {"applepay"}
+    _trip()
+    watch = tmp_path / "watch"; watch.mkdir()
+    (watch / "applepay.txt").write_text(txt, encoding="utf-8")
+    _wx(watch / "wx.xlsx")
+    (watch / "readme.txt").write_text("随便写的", encoding="utf-8")
+    s.set_bills_watch([str(watch)])
+    out = s.scan_bills()
+    assert "扫描到 2 个账单文件" in out and "新记" in out
+    n1 = len(bl.load(s._ledger_path()))
+    assert s.scan_bills() and len(bl.load(s._ledger_path())) == n1                   # 再扫不重复记（Apple Pay 文件会重读，但按行去重）
+    with (watch / "applepay.txt").open("a", encoding="utf-8") as f:
+        f.write("2026-11-08 18:00|66|某餐厅\n")
+    assert "新记 1 笔" in s.scan_bills()
+    with pytest.raises(Exception, match="不是已存在的文件夹"):
+        s.set_bills_watch([str(tmp_path / "nope")])
