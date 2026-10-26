@@ -755,13 +755,15 @@ def hb_describe(body: dict) -> dict[str, Any]:
 
 def hb_export(body: dict) -> dict[str, Any]:
     fm = set(body.get("formats") or [])
-    if not fm <= {"html", "cards", "pdf", "obsidian"} or not fm:
+    if not fm <= {"html", "cards", "pdf", "obsidian", "moments"} or not fm:
         raise HttpError(400, "至少选一种导出格式。")
     out: list[str] = []
     try:
         if fm & {"html", "cards", "pdf"}:
             out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
                                        show_spending=bool(body.get("spending")), spending_categories=[str(c) for c in (body.get("spending_cats") or [])] or None))
+        if "moments" in fm:
+            out.append(ms.export_moments())
         if "obsidian" in fm:
             out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))
     except ms.ToolError as e:

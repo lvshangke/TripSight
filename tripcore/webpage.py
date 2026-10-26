@@ -201,7 +201,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div class="hbexp"><b>确定最终版并导出</b>
 <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
-<label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
+<label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label><label><input type="checkbox" class="hbf" value="moments"> 朋友圈九宫格</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label>
 <label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">

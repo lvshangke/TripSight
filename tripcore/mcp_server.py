@@ -1678,6 +1678,26 @@ def spending_summary() -> str:
     return "\n".join(lines)
 
 
+def export_moments(count: int = 0) -> str:
+    """生成朋友圈九宫格素材：从行程里已挂的照片挑 9/6/4/3/2/1 张（count=0 自动，也可以指定其中一个），裁成方图，配一段文案
+    （行程名、路线，加上用户自己写在“我的话”里的句子；没有就留空，不替用户编感受），再附一份发布前检查清单。
+    只写本机 ~/.tripcore/exports/，不联网、不连账号，不会替用户发布，由用户自己用 AirDrop 或照片发到手机再发朋友圈。
+    照片可能含人脸，返回时提醒用户发之前检查；照片已去掉定位。"""
+    from .moments import build_moments
+    trip = _load()
+    if trip.plan is None or not trip.plan.days:
+        raise ToolError("还没有分天，请先 schedule_days。")
+    try:
+        res = build_moments(trip, trip_path().with_name("exports"), photos=_ph.load(_photo_index()), photo_dir=_photo_dir(),
+                            stories=_load_json_file(_stories_path()), count=count)
+    except (OSError, ValueError) as e:
+        raise ToolError(f"生成失败：{e}")
+    msg = f"朋友圈素材已生成：{res['folder']}（{res['count']} 张方图 + 文案 + 发布前检查）。\n文案草稿：\n{res['caption']}"
+    if res["skipped"]:
+        msg += "\n没生成的：" + "；".join(res["skipped"])
+    return msg + "\n发之前请用户看一遍“发布前检查.txt”（人脸、住处、实时位置）。想加一两句自己的话，在手册的“我的话”里写好再重新导出。"
+
+
 def view_stop(place_id: str):
     """看一个从照片还原出来的停留点：返回文字（时间、张数、候选地名）和一张缩略联系图，用来认出这是哪里、写描写。
     候选地名只有在配置了高德 key 时才有：会把这个点的坐标发给高德（用户自己的 key）查 200 米内的景点，候选只是参考，不要直接当真，
@@ -3015,7 +3035,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_moments, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
