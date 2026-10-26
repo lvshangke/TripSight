@@ -1307,6 +1307,29 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
     return msg + "\n这是粗剪，没有音乐和特效，剪映里再调；视频若含人脸或路人，发布前提醒用户。"
 
 
+def footprint() -> str:
+    """足迹统计与地图：把去过的行程合起来——几趟、几天、到过几个城市、大约走了多少公里，并生成一张所有去过的地方的地图页（~/.tripcore/足迹.html）。
+    只算“去过”的：从照片还原的行程，以及复盘里标了“去了”的景点；纯计划不算。公里数是每天按先后顺序的直线距离累加，只是下限；
+    城市来自 tag_regions，没标过的行程不会猜。只读本机文件，不联网。"""
+    from . import footprint as _fp
+    if _single_file_mode():
+        root = trip_path().parent
+        feet = _fp.collect_dirs([root])
+    else:
+        root = _root_dir()
+        _ws.migrate_legacy(root)
+        feet = _fp.collect(_ws.trips_dir(root))
+    text = _fp.summary(feet)
+    if not feet:
+        return text
+    out = root / "足迹.html"
+    try:
+        out.write_text(_fp.build_html(feet), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"地图页写入失败：{e}")
+    return text + f"\n地图页：{out}（浏览器打开；没有底图，点位按经纬度展开）。"
+
+
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
                     show_spending: bool = False, spending_categories: Optional[list[str]] = None) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
@@ -3127,7 +3150,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
