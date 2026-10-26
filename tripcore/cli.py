@@ -221,6 +221,16 @@ def _cmd_tools(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_help_tool(args: argparse.Namespace) -> int:
+    from .runner import RunError, help_tool
+    try:
+        print(help_tool(args.tool))
+    except RunError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_doctor(args: argparse.Namespace) -> int:
     from .doctor import main as doctor_main
 
@@ -276,6 +286,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("tools", help="列出全部工具（可按类别筛选）")
     p.add_argument("category", nargs="?", default="")
     p.set_defaults(func=_cmd_tools)
+
+    p = sub.add_parser("help", help="看一个工具的参数和完整说明：tripcore help export_handbook")
+    p.add_argument("tool")
+    p.set_defaults(func=_cmd_help_tool)
 
     p = sub.add_parser("doctor", help="自检：依赖、技能、nanobot、key 是否就绪（只读，不显示 key）")
     p.set_defaults(func=_cmd_doctor)

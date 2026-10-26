@@ -285,3 +285,21 @@ nanobot 配置（写进 `tools.mcpServers`，把 python 路径换成 trip_env �
 | `core` | 32 | 约 7000 | 行程基础、景点住宿、排程检查、路线交通 |
 
 也可以直接写类别名，逗号分隔，例如 `TRIPCORE_TOOLS="行程基础,分享与导出"`。`open_workbench` 总是保留，没暴露的功能仍然可以在工作台里用。MCP 配置示例：`"env": { "TRIPCORE_TOOLS": "plan" }`。Claude Code 这类会自动延迟加载工具说明的客户端，不用设。
+
+## 技能 + 命令行：按需加载（推荐省上下文的配置）
+
+参考 Easel 的“三层加载”：技能的 `name` + `description` 常驻（约 100 token/个），触发后才读正文，细节用到才查。
+
+- **技能拆成 7 个**：`trip-planner`（核心流程和铁律，常驻）、`trip-routes`、`trip-hours-weather`、`trip-food`、`trip-sources`、`trip-export`、`trip-review`，各有各的触发描述，正文只在用到时才读。
+- **工具调用有两条路，调的是同一批函数**：MCP 工具直接调用；或在终端 `tripcore run 工具名 '{"参数": 值}'`。看用法：`tripcore help 工具名`；看全部：`tripcore tools [类别]`。返回图片的工具会把图存成文件并打印路径。
+- **推荐配置**：MCP 里设 `"env": { "TRIPCORE_TOOLS": "core" }`（32 个工具），其余功能由技能指引，用命令行调用。
+
+估算每轮对话常驻的内容（粗估，±30%）：
+
+| 配置 | MCP 工具说明 | 技能 | 合计 |
+|---|---|---|---|
+| 以前：全部 MCP + 一个大技能 | 约 18400 | 约 11700 | 约 30000 |
+| 现在默认（全部 MCP + 拆分技能） | 约 18400 | 约 4200 + 600 | 约 23000 |
+| 推荐：core MCP + 拆分技能 | 约 7000 | 约 4200 + 600 | 约 11800 |
+
+用到某个场景时再多读对应技能（约 800–2700）。命令行路线需要助手能执行终端命令（Claude Code、nanobot 等可以）；只能聊天的客户端请继续用完整 MCP。

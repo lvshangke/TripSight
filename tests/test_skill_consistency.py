@@ -7,7 +7,8 @@ from pathlib import Path
 
 from tripcore.mcp_server import TOOLS
 
-SKILL = Path(__file__).resolve().parent.parent / "skills" / "trip-planner" / "SKILL.md"
+SKILLS = Path(__file__).resolve().parent.parent / "skills"
+TRIP_SKILLS = sorted(d for d in SKILLS.iterdir() if d.name.startswith("trip-"))
 # skill 里出现的、不是 tripcore 工具的 snake_case 名字（返回字段、外部工具、数据字段等）
 NOT_TOOLS = {
     "search_near", "not_found", "source_days", "suggested_tags", "unmapped_days",
@@ -20,7 +21,8 @@ NOT_TOOLS = {
 
 
 def _text() -> str:
-    return SKILL.read_text(encoding="utf-8")
+    """所有 trip-* 技能合在一起（工具按场景分散在不同技能里）。"""
+    return "\n".join((d / "SKILL.md").read_text(encoding="utf-8") for d in TRIP_SKILLS)
 
 
 def test_every_tool_is_mentioned_and_no_unknown_tool_referenced():
@@ -42,5 +44,18 @@ def test_parameter_assignments_exist():
     assert not bad, f"skill 里 `参数=值` 的参数名不存在：{bad}"
 
 
-def test_skill_body_length():
-    assert len(_text().splitlines()) <= 200, "SKILL.md 超过 200 行，请拆分到 references/ 或精简"
+def test_each_skill_is_short_and_routable():
+    assert {d.name for d in TRIP_SKILLS} >= {"trip-planner", "trip-routes", "trip-hours-weather", "trip-food", "trip-sources", "trip-export", "trip-review"}
+    for d in TRIP_SKILLS:
+        txt = (d / "SKILL.md").read_text(encoding="utf-8")
+        assert len(txt.splitlines()) <= 200, f"{d.name} 超过 200 行，请拆分或精简"
+        m = re.match(r"---\nname: " + d.name + r"\ndescription: (.+)\n", txt)
+        assert m and len(m.group(1)) >= 30, f"{d.name} 的 description 要写清触发场景"
+
+
+def test_only_planner_is_always_loaded_and_safety_rules_travel_with_skills():
+    for d in TRIP_SKILLS:
+        txt = (d / "SKILL.md").read_text(encoding="utf-8")
+        assert ("always: true" in txt) == (d.name == "trip-planner")
+        if d.name != "trip-planner":
+            assert "tripcore run" in txt and "事实只来自工具或用户" in txt, f"{d.name} 要说明命令行调用方式和基本规则"

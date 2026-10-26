@@ -92,3 +92,11 @@ def list_tools(category: str = "") -> str:
             rows.append(f"【{cat}】")
             rows += [f"  {n}：{CATALOG[n][2]}" for n in names]
     return "\n".join(rows) or f"没有这个类别：{category}（可用：{'、'.join(CATEGORIES)}）"
+
+
+def help_tool(name: str) -> str:
+    tools = tool_map()
+    if name not in tools:
+        raise RunError(f"没有叫 {name} 的工具。用 tripcore tools 看全部。")
+    fn = tools[name]
+    return f"{name}{inspect.signature(fn)}\n\n{inspect.getdoc(fn) or ''}"
