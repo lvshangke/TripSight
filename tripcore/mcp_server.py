@@ -1511,6 +1511,79 @@ def list_photo_albums() -> str:
     return "照片 App 里的相册：\n" + "\n".join(f"- {r['name']}（{r['count']} 张）" for r in rows)
 
 
+def _ledger_path() -> Path:
+    return trip_path().with_name("expenses.json")
+
+
+def _trip_range(trip: Trip) -> tuple[Any, Any]:
+    a, b = trip.day_date(0), trip.day_date(trip.meta.num_days - 1)
+    if a is None or b is None:
+        raise ToolError("这个行程还没有定具体日期，没法从账单里筛出旅行期间的消费。请先 set_dates。")
+    return a, b
+
+
+def import_bills(path: str = "") -> str:
+    """导入微信/支付宝导出的账单文件，筛出这次行程期间的消费放进本机账本，之后用 spending_summary 看统计。
+    path 是用户给的账单文件，或一个文件夹（会在里面找账单文件，不递归；不给就看用户的“下载”文件夹）。支持微信 .xlsx/.csv、支付宝 .csv/.xlsx/.numbers。
+    只在本机解析；账单内容不会出现在返回里（只有笔数），也不要让用户把账单内容贴给你。不计入：收入、不计收支、关闭/失败的交易；
+    个人转账和群收款单独列出不计入总额。重复导入同一份账单不会重复记。行程要有具体日期。"""
+    from . import bills as _bl
+    trip = _load()
+    a, b = _trip_range(trip)
+    p = Path(path).expanduser() if path.strip() else Path.home() / "Downloads"
+    if p.is_dir():
+        files = [f for f in sorted(p.iterdir()) if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in _bl.SUFFIXES and _bl.sniff(f)]
+        if not files:
+            raise ToolError(f"在 {p} 里没有找到微信/支付宝的账单文件。")
+    elif p.is_file():
+        files = [p]
+    else:
+        raise ToolError(f"找不到：{p}（请让用户确认路径；不会自动查找）。")
+    ledger = _bl.load(_ledger_path())
+    names = {pl.id: pl.name for pl in trip.places}
+    tot = {"added": 0, "outside": 0, "duplicate": 0}
+    notes = []
+    for f in files:
+        try:
+            txns, st = _bl.parse(_bl.read_rows(f))
+        except _bl.BillError as e:
+            notes.append(f"{f.name}：{e}")
+            continue
+        r = _bl.add_to_ledger(ledger, txns, a, b, names)
+        for k in tot:
+            tot[k] += r[k]
+        notes.append(f"{f.name}：{'微信' if txns and txns[0].source == 'wechat' else '支付宝' if txns else ''}账单，读到 {st['rows']} 笔")
+    _bl.save(_ledger_path(), ledger)
+    return (f"账单已导入：行程期间（{a}～{b}）新记 {tot['added']} 笔，期间之外 {tot['outside']} 笔没记，重复 {tot['duplicate']} 笔。\n"
+            + "\n".join(notes) + "\n用 spending_summary 看统计；商户明细只在工作台里给用户看，需要改分类让用户去工作台改。")
+
+
+def spending_summary() -> str:
+    """这次旅行的消费统计：总额、按类别、按天，以及和行程里估算（门票、住宿）的对比。只有汇总数字，没有商户和明细。
+    数据来自 import_bills 导入的账单，没导入就是空的。金额是用户的真实消费，只如实转述，不要做理财建议。"""
+    from . import bills as _bl
+    from .metrics import estimate_cost
+    trip = _load()
+    ledger = _bl.load(_ledger_path())
+    if not ledger:
+        return "还没有导入账单：先让用户用 import_bills 导入微信/支付宝账单文件。"
+    s = _bl.summarize(ledger)
+    est = estimate_cost(trip)
+    lines = [f"旅行期间共 {s['count']} 笔消费，合计 {s['total']:g} 元。"]
+    lines.append("按类别：" + "，".join(f"{k} {v:g}" for k, v in sorted(s["by_category"].items(), key=lambda kv: -kv[1])) + "。")
+    lines.append("按天：" + "，".join(f"{k[5:]} {v:g}" for k, v in s["by_day"].items()) + "。")
+    cmp = []
+    if est.tickets:
+        cmp.append(f"门票估算 {est.tickets:g}，实际 {s['by_category'].get('门票', 0):g}")
+    if est.lodging:
+        cmp.append(f"住宿估算 {est.lodging:g}，实际 {s['by_category'].get('住宿', 0):g}")
+    if cmp:
+        lines.append("和估算对比：" + "；".join(cmp) + "（估算只含已排入行程的门票和已选酒店；账单里没标明用途的归“其他”，对不上很正常）。")
+    if s["excluded_count"]:
+        lines.append(f"另有 {s['excluded_count']} 笔（{s['excluded_total']:g} 元）是个人转账/群收款，没计入，用户可在工作台里改。")
+    return "\n".join(lines)
+
+
 def view_stop(place_id: str):
     """看一个从照片还原出来的停留点：返回文字（时间、张数、候选地名）和一张缩略联系图，用来认出这是哪里、写描写。
     候选地名只有在配置了高德 key 时才有：会把这个点的坐标发给高德（用户自己的 key）查 200 米内的景点，候选只是参考，不要直接当真，
@@ -2848,7 +2921,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
