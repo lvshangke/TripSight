@@ -1210,6 +1210,103 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
     return msg
 
 
+def _video_stops() -> tuple[list[dict], list[dict]]:
+    """行程里的景点：(用于归片的 stops, 按行程顺序的 order)。时段来自照片还原的记录，没有就只能靠位置。"""
+    import datetime as _dt
+    trip = _load()
+    if trip.plan is None or not any(d.items for d in trip.plan.days):
+        raise ToolError("行程还没有分天（或这一天没有景点），先排好行程或用照片还原行程。")
+    side = {x["place_id"]: x for x in _load_json_file(_photo_trip_path()).get("stops", [])}
+    stops, order = [], []
+    for i, d in enumerate(trip.plan.days):
+        dd = trip.day_date(i)
+        for it in d.items:
+            pl = trip.place(it.place_id)
+            rec = side.get(pl.id)
+            stops.append({"id": pl.id, "day": dd, "lat": pl.lat, "lon": pl.lon,
+                          "start": _dt.datetime.fromisoformat(rec["start"]) if rec else None,
+                          "end": _dt.datetime.fromisoformat(rec["end"]) if rec else None})
+            order.append({"id": pl.id, "name": pl.name, "day": i, "date": dd.isoformat() if dd else "", "lat": pl.lat, "lon": pl.lon})
+    return stops, order
+
+
+def _video_scan(folder: str):
+    from . import video as _v
+    root = Path(folder).expanduser()
+    if not root.is_dir():
+        raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+    try:
+        clips, bad = _v.scan(root)
+    except _v.VideoError as e:
+        raise ToolError(str(e))
+    if not clips:
+        raise ToolError("文件夹里没有读到视频（支持 .mov / .mp4 / .m4v，不递归子文件夹）。")
+    stops, order = _video_stops()
+    n = _v.assign(clips, stops)
+    return _v, clips, bad, n, order
+
+
+def scan_videos(folder: str) -> str:
+    """整理用户的视频素材：扫描 folder（用户给的文件夹，不递归）里的 .mov/.mp4/.m4v，读拍摄时间、位置（iPhone 视频自带）、时长，
+    按拍摄时间和位置归到行程里的各个景点，返回每个景点有几段、多长，以及归不上的。只读元数据，不看画面内容；需要本机装好 ffmpeg。
+    归不上的多半是没带位置、时间又对不上，让用户检查或手动指定；要出粗剪片用 export_rough_cut。"""
+    _v, clips, bad, n, order = _video_scan(folder)
+    names = {o["id"]: o["name"] for o in order}
+    per: dict[str, list] = {}
+    for c in clips:
+        per.setdefault(c.stop or "", []).append(c)
+    lines = [f"读到 {len(clips)} 段视频（共 {sum(c.dur for c in clips) / 60:.1f} 分钟）" + (f"，另有 {bad} 个读不了" if bad else "") + f"，归到景点 {n} 段。"]
+    for o in order:
+        cs = per.get(o["id"])
+        if cs:
+            lines.append(f"第{o['day'] + 1}天 {o['id']} {o['name']}：{len(cs)} 段，{sum(c.dur for c in cs):.0f} 秒")
+    lost = per.get("", [])
+    if lost:
+        lines.append(f"归不上的 {len(lost)} 段：" + "、".join(c.file for c in lost[:10]) + ("…" if len(lost) > 10 else ""))
+    return "\n".join(lines)
+
+
+def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
+                     jianying_dir: str = "", draft_name: str = "") -> str:
+    """把用户的视频素材按行程顺序粗剪成一条片子：每个景点取中间一段（最多 clip_max 秒），景点开头显示地名，每天前插一张“第N天”卡片和一张当天真实路线的小卡片。
+    target_seconds=0 表示不限长度，否则自动按素材量缩短每段、必要时每个景点删几段。输出到 ~/.tripcore/exports/粗剪/：粗剪.mp4、字幕 .srt、片段清单 .md。
+    jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；草稿格式随剪映版本变，打不开就用 mp4+srt）。
+    不自带音乐、不加特效，创意部分留给用户在剪映里做；视频内容不会交给模型。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
+    import datetime as _dt
+    _v, clips, bad, n, order = _video_scan(folder)
+    try:
+        segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards))
+        size = _v._canvas(clips)
+        out_dir = trip_path().with_name("exports") / "粗剪"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        mp4 = out_dir / "粗剪.mp4"
+        _v.render(segs, mp4, out_dir / "_work", size)
+        (out_dir / "粗剪.srt").write_text(_v.srt(segs), encoding="utf-8")
+        total = sum(s.secs for s in segs)
+        rows = [f"# 粗剪片段清单（共 {total:.0f} 秒）", ""] + [
+            f"- 第{s.day + 1}天 {s.lower}：{s.clip.file} 从 {s.offset:.0f}s 取 {s.secs:.1f}s" for s in segs if s.kind == "clip"]
+        (out_dir / "片段清单.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
+        draft = ""
+        if jianying_dir:
+            jd = Path(jianying_dir).expanduser()
+            if not jd.is_dir():
+                raise ToolError(f"剪映草稿文件夹不存在：{jianying_dir}（请让用户确认路径）。")
+            try:
+                draft = _v.jianying_draft(segs, size, jd, draft_name or f"{_load().meta.name}-粗剪", out_dir / "_work")
+            except _v.VideoError as e:
+                draft = f"（没生成剪映草稿：{e}）"
+    except _v.VideoError as e:
+        raise ToolError(str(e))
+    except OSError as e:
+        raise ToolError(f"写入失败：{e}")
+    msg = f"已粗剪：{mp4}（{total:.0f} 秒，{size[0]}×{size[1]}，用了 {sum(1 for s in segs if s.kind == 'clip')} 段）\n字幕 {out_dir / '粗剪.srt'}，清单 {out_dir / '片段清单.md'}。"
+    if n < len(clips):
+        msg += f"\n另有 {len(clips) - n} 段没归到景点，没放进去。"
+    if draft:
+        msg += f"\n剪映草稿：{draft}"
+    return msg + "\n这是粗剪，没有音乐和特效，剪映里再调；视频若含人脸或路人，发布前提醒用户。"
+
+
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
                     show_spending: bool = False, spending_categories: Optional[list[str]] = None) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
@@ -3030,7 +3127,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
