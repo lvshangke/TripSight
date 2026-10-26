@@ -70,3 +70,14 @@ def test_vision_http_errors_are_readable(monkeypatch):
     monkeypatch.setattr(vision.urllib.request, "urlopen", boom)
     with pytest.raises(vision.VisionError, match="400"):
         vision.describe(b"x", "某地")
+
+
+def test_preview_does_not_create_a_trip(server, tmp_path):
+    from tests.test_photo_trip_tools import _album
+    before = call(server, "/tok/api/trips")[1]
+    code, r = call(server, "/tok/api/hb_preview", {"folder": str(_album(tmp_path)), "radius_m": 300})
+    assert code == 200 and r["kept"] == 2 and r["total"] == 3 and r["dropped"] == 1 and r["stops"][0]["n"] >= 3
+    code, r2 = call(server, "/tok/api/hb_preview", {"folder": str(_album(tmp_path)), "radius_m": 5000})
+    assert code == 200 and r2["radius_m"] == 2000                       # 半径上限
+    assert call(server, "/tok/api/trips")[1] == before
+    assert call(server, "/tok/api/hb_preview", {"folder": "/no/such"})[0] == 400

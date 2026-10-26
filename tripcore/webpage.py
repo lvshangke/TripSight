@@ -193,7 +193,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="hb_import" class="hbimp"><b>从相册文件夹恢复</b>
 <input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
-<button id="hb_go" class="pri">读取照片</button><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
+<button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b>
@@ -754,6 +754,19 @@ $('hb_go').onclick = async () => {
   try { const r = await api('hb_import', {folder: $('hb_folder').value, radius_m: +$('hb_r').value}); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
   $('hb_go').disabled = false;
 };
+
+$('hb_pv').onclick = async () => {
+  $('hb_pvo').textContent = '正在预览…';
+  try {
+    const r = await api('hb_preview', {folder: $('hb_folder').value, radius_m: +$('hb_r').value});
+    const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180);
+    const W = 520, H = 200, dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 40) / dx, (H - 40) / dy);
+    const X = s => 20 + (s.lon - Math.min(...lo)) * k * sc, Y = s => H - 20 - (s.lat - Math.min(...la)) * sc;
+    const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:520px;background:#eef3e8;border-radius:6px">' + r.stops.map((s, i) => '<circle cx="' + X(s).toFixed(0) + '" cy="' + Y(s).toFixed(0) + '" r="' + (4 + Math.min(10, Math.sqrt(s.n))).toFixed(0) + '" fill="#c4553a55" stroke="#c4553a"><title>' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '</title></circle>').join('') + '</svg>';
+    $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。圆越大照片越多，觉得太碎就换“大景区”再预览。</div>' + svg;
+  } catch (e) { $('hb_pvo').textContent = e.message; }
+};
+$('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
 $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
 };

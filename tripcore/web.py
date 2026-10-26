@@ -757,11 +757,36 @@ def hb_export(body: dict) -> dict[str, Any]:
     return {"message": "\n\n".join(out)}
 
 
+def hb_preview(body: dict) -> dict[str, Any]:
+    """导入前预览：按这个半径会聚出几处、每处在哪、有多少张；不新建行程、不写任何文件。"""
+    from . import phototrip as _pt
+    folder = Path(str(body.get("folder") or "").strip()).expanduser()
+    if not str(body.get("folder") or "").strip() or not folder.is_dir():
+        raise HttpError(400, "找不到这个文件夹，请填完整路径。")
+    try:
+        radius = max(50, min(int(body.get("radius_m") or 300), 2000))
+        mn = max(1, int(body.get("min_photos") or 3))
+    except (TypeError, ValueError):
+        raise HttpError(400, "半径要是数字。")
+    try:
+        photos, untagged, st = _pt.read_all(folder)
+    except ValueError as e:
+        raise HttpError(400, str(e))
+    if not photos:
+        raise HttpError(400, f"没有找到带位置的照片（统计：{st}）。")
+    stops = _pt.cluster(photos, radius_m=radius)
+    keep = [x for x in stops if x.n >= mn]
+    guessed = _pt.assign_untagged(stops, untagged)
+    return {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
+            "untagged": len(untagged), "guessed": guessed, "stats": st,
+            "stops": [{"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M")} for x in keep]}
+
+
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "hb_preview": hb_preview, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
 
 
 def make_handler(token: str, state: dict):
@@ -839,7 +864,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""
