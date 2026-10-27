@@ -40,6 +40,10 @@ def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
     segs = [[p for p in sg if inb(p)] or [stops[i], stops[i + 1]] for i, sg in enumerate(segs)]   # 超出站点范围的路径点不画
     allp = [p for sg in segs for p in sg] + stops
     la, lo = [p[0] for p in allp], [p[1] for p in allp]
+    cls = [f"m-{lg.mode}" + ("" if lg.detail_level != "estimate" else " est") for lg in legs]
+    cls += ["m-drive est"] * (len(segs) - len(cls))
+    modes = [lg.mode for lg in legs]
+    leg_svg = _mode_legend(modes, w, h)
     if bm is not None:                              # 有底图：投影和高德底图严格对应，路线画在图上
         from .basemap import Projection, choose_view
         view = choose_view(stops, w, h, 36)
@@ -47,19 +51,35 @@ def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
         if uri:
             proj = Projection(view)
             q = lambda p: proj.xy(p[0], p[1])
-            lines = "".join('<polyline points="' + " ".join(f"{q(p)[0]:.0f},{q(p)[1]:.0f}" for p in sg) + '" class="line bl"/>' for sg in segs)
+            lines = "".join('<polyline points="' + " ".join(f"{q(p)[0]:.0f},{q(p)[1]:.0f}" for p in sg) + f'" class="line bl {cls[i]}"/>' for i, sg in enumerate(segs))
             dots = "".join(f'<circle cx="{q(p)[0]:.0f}" cy="{q(p)[1]:.0f}" r="11" class="dot"/><text x="{q(p)[0]:.0f}" y="{q(p)[1] + 4:.0f}" class="dn">{i + 1}</text>' for i, p in enumerate(stops))
-            return f'<svg viewBox="0 0 {w} {h}" class="route"><image href="{uri}" width="{w}" height="{h}"/>{lines}{dots}</svg>'
+            return f'<svg viewBox="0 0 {w} {h}" class="route"><image href="{uri}" width="{w}" height="{h}"/>{lines}{dots}{leg_svg}</svg>'
     k = math.cos(math.radians(sum(la) / len(la)))
     x0, y0 = min(lo), max(la)
     W, H = (max(lo) - x0) * k or 1e-6, (y0 - min(la)) or 1e-6
-    sc = min((w - 60) / W, (h - 50) / H)
-    ox, oy = (w - W * sc) / 2, (h - H * sc) / 2
+    sc = min((w - 60) / W, (h - 90) / H)                       # 底部留出图例的位置
+    ox, oy = (w - W * sc) / 2, (h - 28 - H * sc) / 2
     pr = lambda p: (ox + (p[1] - x0) * k * sc, oy + (y0 - p[0]) * sc)
-    lines = "".join('<polyline points="' + " ".join(f"{pr(p)[0]:.0f},{pr(p)[1]:.0f}" for p in sg) + '" class="line"/>' for sg in segs)
+    lines = "".join('<polyline points="' + " ".join(f"{pr(p)[0]:.0f},{pr(p)[1]:.0f}" for p in sg) + f'" class="line {cls[i]}"/>' for i, sg in enumerate(segs))
     dots = "".join(f'<circle cx="{pr(p)[0]:.0f}" cy="{pr(p)[1]:.0f}" r="11" class="dot"/><text x="{pr(p)[0]:.0f}" y="{pr(p)[1] + 4:.0f}" class="dn">{i + 1}</text>'
                    for i, p in enumerate(stops))
-    return f'<svg viewBox="0 0 {w} {h}" class="route">{lines}{dots}</svg>'
+    return f'<svg viewBox="0 0 {w} {h}" class="route">{lines}{dots}{leg_svg}</svg>'
+
+
+_MODE_NAMES = {"walk": "步行", "transit": "公交/地铁", "drive": "驾车"}
+
+
+def _mode_legend(modes, w, h) -> str:
+    """图例画在图里（跟着图一起缩放）：用线型区分交通方式，不只靠颜色；淡色表示估算的路线。只在图里出现不止一种方式、或有估算时才画。"""
+    present = [m for m in ("walk", "transit", "drive") if m in modes]
+    if not present:
+        return ""
+    x, items = 12.0, []
+    for m in present:
+        items.append(f'<line x1="{x:.0f}" y1="{h - 14}" x2="{x + 26:.0f}" y2="{h - 14}" class="line lg m-{m}"/>'
+                     f'<text x="{x + 32:.0f}" y="{h - 10}" class="lt">{_MODE_NAMES[m]}</text>')
+        x += 32 + 14 * len(_MODE_NAMES[m]) + 14
+    return f'<rect x="4" y="{h - 28}" width="{x - 4:.0f}" height="24" rx="6" class="lgbg"/>' + "".join(items)
 
 
 THEMES = {      # 只换配色、字体和相框角度，都是浅色底
@@ -91,7 +111,7 @@ CSS = """
 .day{margin-top:36px}.dh{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px;flex-wrap:wrap}
 .dh h2{font-size:26px}.dh span{color:var(--sub);font-size:14px}.wx{color:var(--sub);font-size:14px;margin-top:6px}
 .route{width:100%;margin:14px 0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
-.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
+.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.m-walk{stroke-dasharray:1 7!important}.m-transit{stroke-dasharray:none!important}.m-drive{stroke-dasharray:14 7!important}.est{opacity:.5}.lg{stroke-width:3}.lgbg{fill:#fff;opacity:.85}.lt{font-size:12px;fill:#33302b;font-family:sans-serif}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:96vw;max-height:94vh}
 @media print{.lb{display:none}.stop{break-inside:avoid}.day{break-before:page}}
 .dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}

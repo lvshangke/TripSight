@@ -105,3 +105,14 @@ def test_chapters_by_city_when_trip_spans_cities():
     r = {"a": {"province": "浙江省", "city": "杭州市", "district": "西湖区"}, "b": {"province": "江苏省", "city": "苏州市", "district": "姑苏区"}}
     assert chapter_labels(r) == {"a": "杭州", "b": "苏州"}
     assert chapter_labels({"a": {"province": "", "city": "", "district": ""}}) == {}
+
+
+def test_route_svg_styles_segments_by_mode_with_legend():
+    from tripcore.handbook import _route_svg
+    from tripcore.models import Leg
+    stops = [(30.0, 120.0), (30.01, 120.01), (30.05, 120.05)]
+    legs = [Leg(from_id="a", to_id="b", mode="walk", distance_km=1, minutes=12, detail_level="route"),
+            Leg(from_id="b", to_id="c", mode="drive", distance_km=6, minutes=15)]
+    svg = _route_svg(stops, legs)
+    assert "m-walk" in svg and "m-drive est" in svg and "步行" in svg and "驾车" in svg
+    assert "公交" not in svg                                    # 图例只列出现过的方式
