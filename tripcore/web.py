@@ -762,7 +762,7 @@ def hb_export(body: dict) -> dict[str, Any]:
     out: list[str] = []
     try:
         if fm & {"html", "cards", "pdf"}:
-            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
+            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), thumb_pins=bool(body.get("thumb_pins")), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
                                        show_spending=bool(body.get("spending")), spending_categories=[str(c) for c in (body.get("spending_cats") or [])] or None))
         if "obsidian" in fm:
             out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))

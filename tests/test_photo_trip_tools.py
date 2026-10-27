@@ -163,3 +163,15 @@ def test_remove_linked_photo_keeps_original(tmp_path):
     pid = ph.load(s._photo_index())[0]["id"]
     s.remove_photo(pid)
     assert f.exists() and not ph.load(s._photo_index())
+
+
+def test_handbook_thumb_pins_end_to_end(tmp_path):
+    (tmp_path / "a").mkdir()
+    s.import_photo_trip(str(_album(tmp_path / "a")), link_photos=True)
+    out = s.export_handbook(show_photos=True, cards=False, thumb_pins=True)
+    html = next(Path(s.trip_path().with_name("exports")).rglob("index.html")).read_text(encoding="utf-8")
+    assert 'class="pinr"' in html and "clip-path=\"url(#pin" in html
+    html2 = next(Path(s.trip_path().with_name("exports")).glob("*-2/index.html")).read_text(encoding="utf-8") if False else ""
+    s.export_handbook(show_photos=True, cards=False, thumb_pins=False)
+    plain = sorted(Path(s.trip_path().with_name("exports")).rglob("index.html"))[-1].read_text(encoding="utf-8")
+    assert 'class="pinr"' not in plain

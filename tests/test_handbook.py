@@ -116,3 +116,18 @@ def test_route_svg_styles_segments_by_mode_with_legend():
     svg = _route_svg(stops, legs)
     assert "m-walk" in svg and "m-drive est" in svg and "步行" in svg and "驾车" in svg
     assert "公交" not in svg                                    # 图例只列出现过的方式
+
+
+def test_route_svg_thumbnail_pins_use_unique_clip_ids():
+    from tripcore.handbook import _route_svg
+    from tripcore.models import Leg
+    stops = [(30.0, 120.0), (30.01, 120.01), (30.05, 120.05)]
+    legs = [Leg(from_id="a", to_id="b", mode="walk", distance_km=1, minutes=12),
+            Leg(from_id="b", to_id="c", mode="walk", distance_km=6, minutes=15)]
+    a = _route_svg(stops, legs, pins=["data:image/jpeg;base64,AA", None, "data:image/jpeg;base64,BB"])
+    b = _route_svg(stops, legs, pins=["data:image/jpeg;base64,AA", None, None])
+    import re
+    ids = re.findall(r'<clipPath id="(pin\d+)"', a + b)
+    assert len(ids) == 3 and len(set(ids)) == 3                  # 同一页里多张图，clipPath 不重名
+    assert a.count("<image") == 2 and "pinr" in a
+    assert "<image" not in _route_svg(stops, legs)

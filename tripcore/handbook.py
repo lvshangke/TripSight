@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import html
+import itertools
 import math
 import re
 import shutil
@@ -29,7 +30,22 @@ def _hm(m: int) -> str:
     return f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
 
 
-def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
+_PIN_IDS = itertools.count(1)
+
+
+def _dot(i, x, y, pin) -> str:
+    """路线图上的一个点：有缩略图就用圆形照片当图钉（带白边和小序号），没有就是带序号的圆点。"""
+    if not pin:
+        return f'<circle cx="{x:.0f}" cy="{y:.0f}" r="11" class="dot"/><text x="{x:.0f}" y="{y + 4:.0f}" class="dn">{i + 1}</text>'
+    cid = f"pin{next(_PIN_IDS)}"
+    r = 19
+    return (f'<clipPath id="{cid}"><circle cx="{x:.0f}" cy="{y:.0f}" r="{r}"/></clipPath>'
+            f'<image href="{pin}" x="{x - r:.0f}" y="{y - r:.0f}" width="{2 * r}" height="{2 * r}" preserveAspectRatio="xMidYMid slice" clip-path="url(#{cid})"/>'
+            f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r}" class="pinr"/>'
+            f'<circle cx="{x - r + 3:.0f}" cy="{y - r + 3:.0f}" r="8" class="pinb"/><text x="{x - r + 3:.0f}" y="{y - r + 7:.0f}" class="pinn">{i + 1}</text>')
+
+
+def _route_svg(stops, legs, w=520, h=220, bm=None, pins=None) -> str:
     if len(stops) < 2:
         return ""
     segs = [[(q[0], q[1]) for q in lg.path] if (lg.path and lg.detail_level == "route") else None for lg in legs]
@@ -52,7 +68,7 @@ def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
             proj = Projection(view)
             q = lambda p: proj.xy(p[0], p[1])
             lines = "".join('<polyline points="' + " ".join(f"{q(p)[0]:.0f},{q(p)[1]:.0f}" for p in sg) + f'" class="line bl {cls[i]}"/>' for i, sg in enumerate(segs))
-            dots = "".join(f'<circle cx="{q(p)[0]:.0f}" cy="{q(p)[1]:.0f}" r="11" class="dot"/><text x="{q(p)[0]:.0f}" y="{q(p)[1] + 4:.0f}" class="dn">{i + 1}</text>' for i, p in enumerate(stops))
+            dots = "".join(_dot(i, q(p)[0], q(p)[1], pins[i] if pins else None) for i, p in enumerate(stops))
             return f'<svg viewBox="0 0 {w} {h}" class="route"><image href="{uri}" width="{w}" height="{h}"/>{lines}{dots}{leg_svg}</svg>'
     k = math.cos(math.radians(sum(la) / len(la)))
     x0, y0 = min(lo), max(la)
@@ -61,8 +77,7 @@ def _route_svg(stops, legs, w=520, h=220, bm=None) -> str:
     ox, oy = (w - W * sc) / 2, (h - 28 - H * sc) / 2
     pr = lambda p: (ox + (p[1] - x0) * k * sc, oy + (y0 - p[0]) * sc)
     lines = "".join('<polyline points="' + " ".join(f"{pr(p)[0]:.0f},{pr(p)[1]:.0f}" for p in sg) + f'" class="line {cls[i]}"/>' for i, sg in enumerate(segs))
-    dots = "".join(f'<circle cx="{pr(p)[0]:.0f}" cy="{pr(p)[1]:.0f}" r="11" class="dot"/><text x="{pr(p)[0]:.0f}" y="{pr(p)[1] + 4:.0f}" class="dn">{i + 1}</text>'
-                   for i, p in enumerate(stops))
+    dots = "".join(_dot(i, pr(p)[0], pr(p)[1], pins[i] if pins else None) for i, p in enumerate(stops))
     return f'<svg viewBox="0 0 {w} {h}" class="route">{lines}{dots}{leg_svg}</svg>'
 
 
@@ -111,7 +126,7 @@ CSS = """
 .day{margin-top:36px}.dh{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px;flex-wrap:wrap}
 .dh h2{font-size:26px}.dh span{color:var(--sub);font-size:14px}.wx{color:var(--sub);font-size:14px;margin-top:6px}
 .route{width:100%;margin:14px 0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
-.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.m-walk{stroke-dasharray:1 7!important}.m-transit{stroke-dasharray:none!important}.m-drive{stroke-dasharray:14 7!important}.est{opacity:.5}.lg{stroke-width:3}.lgbg{fill:#fff;opacity:.85}.lt{font-size:12px;fill:#33302b;font-family:sans-serif}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
+.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.m-walk{stroke-dasharray:1 7!important}.m-transit{stroke-dasharray:none!important}.m-drive{stroke-dasharray:14 7!important}.est{opacity:.5}.pinr{fill:none;stroke:#fff;stroke-width:3}.pinb{fill:var(--acc)}.pinn{font-size:10px;fill:#fff;text-anchor:middle;font-family:sans-serif;font-weight:700}.lg{stroke-width:3}.lgbg{fill:#fff;opacity:.85}.lt{font-size:12px;fill:#33302b;font-family:sans-serif}.gal{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.gal img{width:calc(33.3% - 4px);aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:96vw;max-height:94vh}
 @media print{.lb{display:none}.stop{break-inside:avoid}.day{break-before:page}}
 .dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}
@@ -133,7 +148,7 @@ JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previ
 t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';const m=document.createElement('img');m.src=i.src;o.appendChild(m);o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账") -> str:
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None) -> str:
     items = "".join(f'<div class="r"><b>{i + 1}</b><i>{_hm(v.arrive)}</i><span>{e(v.place.name)}</span></div>' for i, v in enumerate(vs))
     pic_html = f'<div class="pic"><img src="{pic}"></div>' if pic else ""
     date = f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else ""
@@ -145,12 +160,12 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .pic{{position:absolute;right:70px;bottom:120px;width:300px;background:#fff;padding:14px 14px 44px;box-shadow:0 10px 26px rgba(0,0,0,.2);transform:rotate(3deg)}}.pic img{{width:100%;display:block}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
-{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm)}{items}</div>{pic_html}<div class="f">营业时间以现场为准</div>"""
+{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}<div class="f">营业时间以现场为准</div>"""
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -173,6 +188,13 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 continue
             files.append(f"photos/{ph['file']}")
             by_place.setdefault(ph["place_id"], []).append({"file": ph["file"], "caption": ph.get("caption", "")})
+    pin_of: dict[str, str] = {}
+    if thumb_pins and photo_dir:                          # 路线图上用每个点的第一张照片当图钉（96 像素小图，内嵌，现场从原文件生成）
+        from . import photos as _phm
+        for pid, lst in by_place.items():
+            u = _phm.thumb_uri(Path(photo_dir), lst[0]["file"], 96, 72)
+            if u:
+                pin_of[pid] = u
     vids: dict[str, str] = {}
     for pid, vp in (videos or {}).items():
         vp = Path(vp)
@@ -195,7 +217,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         wx = (trip.weather or {}).get(d.isoformat()) if d else None
         if wx is not None and getattr(wx, "day_weather", ""):
             head += f'<div class="wx">天气预报：{e(wx.day_weather)} {round(wx.day_temp)}°C（预报，非实况）</div>'
-        parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs, bm=basemap)]
+        parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs, bm=basemap, pins=[pin_of.get(v.place.id) for v in vs] if thumb_pins else None)]
         first_pic = None
         for i, v in enumerate(vs):
             p = v.place
@@ -258,7 +280,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style), encoding="utf-8")
+                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()
