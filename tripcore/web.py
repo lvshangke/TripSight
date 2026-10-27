@@ -646,7 +646,7 @@ def hb_import(body: dict) -> dict[str, Any]:
         raise HttpError(400, "半径要是数字。")
     try:
         msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album,
-                                track=str(body.get("track") or "").strip())
+                                track=str(body.get("track") or "").strip(), link_photos=bool(body.get("link_photos")))
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"message": msg}
@@ -743,10 +743,11 @@ def hb_describe(body: dict) -> dict[str, Any]:
             sheet = _pt.contact_sheet(Path(side["folder"]), rec["files"])
         else:
             folder = ms._photo_dir()
-            files = [x["file"] for x in _ph.load(ms._photo_index()) if x.get("place_id") == pid]
-            if not files:
-                raise HttpError(400, "这个景点还没有照片。")
-            sheet = _pt.contact_sheet(folder, files)
+            names = [x["file"] for x in _ph.load(ms._photo_index()) if x.get("place_id") == pid]
+            paths = [str(q) for q in (_ph.resolve(folder, n) for n in names) if q is not None]
+            if not paths:
+                raise HttpError(400, "这个景点还没有可用的照片（只引用的照片，原文件可能被移走了）。")
+            sheet = _pt.contact_sheet(Path("/"), paths)
         return {"draft": _vi.describe(sheet, place.name)}
     except ValueError as e:
         raise HttpError(400, str(e))

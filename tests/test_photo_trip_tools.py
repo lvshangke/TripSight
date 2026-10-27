@@ -128,3 +128,38 @@ def test_import_with_track_locates_untagged_photos(tmp_path):
     assert any(abs(p.lat - 28.80) < 1e-6 for p in t.places)
     with pytest.raises(s.ToolError):
         s.import_photo_trip(str(tmp_path), track=str(tmp_path / "no.gpx"))
+
+
+def test_link_photos_does_not_copy_and_exports_without_location(tmp_path):
+    from tripcore import photos as ph
+    src = _album(tmp_path / "a") if (tmp_path / "a").mkdir() is None else None
+    s.import_photo_trip(str(src), link_photos=True)
+    d = s._photo_dir()
+    items = ph.load(s._photo_index())
+    assert items and all(x.get("ref") for x in items)
+    assert not list(d.glob("*.jpg"))                                  # 行程目录里没有副本
+    assert all(ph.thumb_uri(d, x["file"]) for x in items)             # 缩略图现场从原文件生成
+    out = s.export_handbook(show_photos=True, cards=False)
+    folder = Path(out.split("已生成：")[1].split("\n")[0].strip()) if "已生成：" in out else None
+    pics = list(Path(s.trip_path().with_name("exports")).rglob("photos/*.jpg"))
+    assert pics and all(not Image.open(p).getexif() for p in pics)    # 导出的是去掉定位的版本
+    # 原文件被移走：不崩，提示缺失
+    for f in Path(src).glob("*.jpg"):
+        f.rename(f.with_suffix(".moved"))
+    out2 = s.export_handbook(show_photos=True, cards=False)
+    assert "照片缺失" in out2
+    assert not any(ph.thumb_uri(d, x["file"]) for x in items)
+
+
+def test_remove_linked_photo_keeps_original(tmp_path):
+    from tripcore import photos as ph
+    t0 = datetime(2026, 6, 19, 10, 0)
+    from tests.test_phototrip import _jpg
+    f = tmp_path / "x.jpg"; _jpg(f, t0, 28.7, 121.4)
+    s.new_trip(name="t", num_days=1)
+    s.add_place("甲", 28.7, 121.4, duration_min=60)
+    out = s.add_photo(str(f), place="甲", link=True)
+    assert "没有复制" in out
+    pid = ph.load(s._photo_index())[0]["id"]
+    s.remove_photo(pid)
+    assert f.exists() and not ph.load(s._photo_index())

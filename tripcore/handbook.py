@@ -165,12 +165,13 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     by_place: dict[str, list[dict]] = {}
     if show_photos and photos and photo_dir:
         for ph in photos:
-            src = Path(photo_dir) / ph["file"]
-            if not src.exists() or not ph.get("place_id"):
-                if not src.exists():
-                    skipped.append(f"照片缺失：{ph['file']}")
+            if not ph.get("place_id"):
                 continue
-            shutil.copy2(src, root / "photos" / ph["file"]); files.append(f"photos/{ph['file']}")
+            from . import photos as _phm
+            if not _phm.export_to(Path(photo_dir), ph["file"], root / "photos" / ph["file"]):
+                skipped.append(f"照片缺失（原文件被移动或删除了？）：{ph['file']}")
+                continue
+            files.append(f"photos/{ph['file']}")
             by_place.setdefault(ph["place_id"], []).append({"file": ph["file"], "caption": ph.get("caption", "")})
     vids: dict[str, str] = {}
     for pid, vp in (videos or {}).items():

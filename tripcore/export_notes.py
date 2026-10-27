@@ -118,9 +118,10 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     by_day: dict[int, list[dict]] = {}
     if include_photos and photos and photo_dir:
         for ph in photos:
-            src = Path(photo_dir) / ph["file"]
-            if not src.exists():
-                skipped.append(f"照片缺失：{ph['file']}"); continue
+            from . import photos as _phm
+            src = _phm.resolve(Path(photo_dir), ph["file"])
+            if src is None:
+                skipped.append(f"照片缺失（原文件被移动或删除了？）：{ph['file']}"); continue
             dst_dir = att / "photos"; dst_dir.mkdir(exist_ok=True)
             dst = dst_dir / f"{ph['id']}.jpg"
             try:

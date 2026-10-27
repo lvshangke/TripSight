@@ -194,6 +194,7 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <span class="tlnote" id="hb_hint"></span></div>
 <div id="hb_import" class="hbimp"><b>从相册文件夹恢复</b>
 <label>来源 <select id="hb_src"><option value="folder">文件夹</option><option value="album">照片 App 相册（Mac）</option></select></label><select id="hb_album" style="display:none"><option value="">先点“读取相册列表”</option></select><button id="hb_al" style="display:none">读取相册列表</button><input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
+<label title="不在行程目录里存照片副本，省磁盘；导出时才从原文件缩小并去掉定位。原文件被移走或删除后图会缺失"><input type="checkbox" id="hb_link"> 只引用照片（不复制）</label>
 <input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置">
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
@@ -763,7 +764,7 @@ function hbWire(s) {
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { HB.mode = b.dataset.m; if (HB.data) hbRender(); });
 $('hb_go').onclick = async () => {
   $('hb_go').disabled = true; $('hb_list').textContent = '正在读取照片，几十秒内…';
-  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value})); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
+  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value, link_photos: $('hb_link').checked})); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
   $('hb_go').disabled = false;
 };
 

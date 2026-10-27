@@ -1456,13 +1456,15 @@ def _load_json_file(p: Path) -> dict:
 
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
                       radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
-                      track: str = "", tz_hours: float = 8.0) -> str:
+                      track: str = "", tz_hours: float = 8.0, link_photos: bool = False) -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
     在 Mac 上也可以不给文件夹，改给 album=照片 App 里的相册名，直接只读地读照片库（先用 list_photo_albums 看有哪些相册；需要装 osxphotos 并给终端"完全磁盘访问权限"，不会修改照片库）。
     track=GPX/KML 轨迹文件（或放了这些文件的文件夹）：用户有运动 App/手表导出的轨迹时，没有定位的照片会按拍摄时间在轨迹上补出位置（时间在轨迹相邻两点之间就插值，否则取 10 分钟内最近的点）；
     轨迹里的时间是 UTC，照片是当地时间，tz_hours 是当地与 UTC 的时差（默认 8）。轨迹只用来给照片定位，不会单独变成景点。
+    link_photos=true 时照片只引用不复制（不在行程目录存副本，省磁盘）：记下原文件路径，导出时才现场缩小并去掉定位；
+    原文件之后被移动或删除，对应的图就缺了（导出会提示）。默认 false，复制一份缩小去定位的副本。
     景点名先是"月-日 时:分 停留点"，要靠 view_stop 看图和候选地名，再用 update_place 改成真实名字，不要猜。
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
@@ -1528,7 +1530,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
             if len(items) >= _ph.MAX_TOTAL:
                 break
             try:
-                _ph.add(_photo_dir(), items, str(root / f), pid, None, "")
+                (_ph.add_ref if link_photos else _ph.add)(_photo_dir(), items, str(root / f), pid, None, "")
                 attached += 1
             except _ph.PhotoError:
                 failed += 1
@@ -2048,10 +2050,10 @@ def _photo_index() -> Path:
     return trip_path().with_name("photos.json")
 
 
-def add_photo(path: str, place: str = "", day: Optional[int] = None, caption: str = "") -> str:
+def add_photo(path: str, place: str = "", day: Optional[int] = None, caption: str = "", link: bool = False) -> str:
     """把用户自己拍的一张照片挂到某个景点（place：景点名或 id）或某一天（day 从 1 起），二选一。path 是用户电脑上的图片路径（jpg/png/webp，≤20MB）。
     存入时会重新编码、去掉拍摄定位等元数据并缩小；没有安装 Pillow 就拒绝保存。只用用户给的照片，不要自己去网上找图；
-    说明 caption 只写用户说的话，不要替照片编内容。照片不会自动公开：export_share 要 show_photos=true、游记里只引用编号和说明。"""
+    link=true 只引用不复制（不存副本、省磁盘，导出时才现场缩小去定位；原文件被移走就缺图），默认复制。说明 caption 只写用户说的话，不要替照片编内容。照片不会自动公开：export_share 要 show_photos=true、游记里只引用编号和说明。"""
     trip = _load()
     pid = _find_place_ref(trip, place).id if place.strip() else None
     if day is not None and not (1 <= day <= trip.meta.num_days):
@@ -2061,12 +2063,12 @@ def add_photo(path: str, place: str = "", day: Optional[int] = None, caption: st
         raise ToolError("说明里" + "；".join(bad))
     items = _ph.load(_photo_index())
     try:
-        rec = _ph.add(_photo_dir(), items, path, pid, day, caption)
+        rec = (_ph.add_ref if link else _ph.add)(_photo_dir(), items, path, pid, day, caption)
         _ph.save(_photo_index(), items)
     except _ph.PhotoError as e:
         raise ToolError(f"没有保存：{e}")
     where = f"「{trip.place(pid).name}」" if pid else f"第 {day} 天"
-    return f"已把照片（编号 {rec['id']}）挂在{where}，已去掉定位信息。默认不会公开，分享时要你同意。"
+    return f"已把照片（编号 {rec['id']}）挂在{where}，" + ("只记了原文件路径，没有复制（原文件移走或删除后会缺图）；导出时才去掉定位。" if link else "已去掉定位信息。") + "默认不会公开，分享时要你同意。"
 
 
 def remove_photo(photo_id: str) -> str:
