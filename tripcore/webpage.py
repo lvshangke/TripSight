@@ -181,12 +181,12 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="帮我在第【几】天的景点附近找午餐，给我几家对比；我选定后请直接加进行程。">找午餐</button><button data-t="帮我在第【几】天的景点附近找晚餐，给我几家对比；我选定后请直接加进行程。">找晚餐</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
-<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="bill">花费</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
+<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="bill">花费</button><button data-t="vid">视频</button><button data-t="fp">足迹</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
-<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><div id="sh_err"></div>
+<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><button id="sh_cal" title="生成 .ics 日历文件，你自己双击导入；不连你的账号">导出日历（.ics）</button><div id="sh_err"></div>
 <div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
 <div class="ph"><iframe id="sh_frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
 <div class="pane" id="pane_hb">
@@ -215,6 +215,20 @@ button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 <button id="bl_wsave">保存</button> <button id="bl_scan" class="pri">立即扫描</button> <span class="tlnote" id="bl_wmsg"></span>
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_sum"></div><div id="bl_list"></div></div>
+<div class="pane" id="pane_vid">
+<div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button id="vd_scan">整理归类</button>
+<div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
+<pre id="vd_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
+<div class="hbimp"><b>粗剪</b><label>目标时长（秒，0 = 不限）<input id="vd_t" type="number" value="60" min="0" style="width:70px"></label><label>每段最长（秒）<input id="vd_m" type="number" value="8" min="2" max="30" style="width:60px"></label>
+<label><input type="checkbox" id="vd_c" checked> 每天前加“第N天”和路线卡片</label>
+<input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button id="vd_cut" class="pri">生成粗剪</button>
+<div class="tlnote" style="width:100%">输出到 ~/.tripcore/exports/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
+<pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
+<div class="pane" id="pane_fp">
+<div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
+<div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程，和复盘里标了“去了”的景点；纯计划不算。公里数是直线距离累加，只是下限。城市来自“标城市”，没标的不猜。</div></div>
+<pre id="fp_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
+<div class="ph" style="height:480px"><iframe id="fp_frame" sandbox title="足迹地图" style="width:100%;height:100%;border:0;background:#fff"></iframe></div></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
@@ -609,7 +623,7 @@ function moShow(tab) {
   moTab = tab;
   document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
-  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else if (tab === 'bill') blLoad(); else toolsLoad();
+  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else if (tab === 'bill') blLoad(); else if (tab === 'vid') {} else if (tab === 'fp') fpLoad(false); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 let shareSeq = 0;
@@ -688,6 +702,19 @@ function photoRow(row, pid) {
   wrap.appendChild(lab); row.querySelector('.sub').appendChild(wrap);
 }
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
+$('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
+$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', {folder: $('vd_path').value}); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
+$('vd_cut').onclick = async () => {
+  $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
+  try { const r = await api('video_cut', {folder: $('vd_path').value, target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
+  catch (e) { $('vd_out').textContent = e.message; } finally { $('vd_cut').disabled = false; }
+};
+async function fpLoad(withBm) {
+  $('fp_msg').textContent = '正在汇总…';
+  try { const r = withBm ? await api('fp_build', {basemap: true}) : await api('fp_state'); $('fp_msg').textContent = r.message; $('fp_frame').srcdoc = r.html || ''; }
+  catch (e) { $('fp_msg').textContent = e.message; $('fp_frame').srcdoc = ''; }
+}
+$('fp_go').onclick = () => fpLoad($('fp_bm').checked);
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
 ['sh_l', 'sh_c', 'sh_p', 'sh_t', 'sh_b'].forEach(id => $(id).onchange = shareRefresh);
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };

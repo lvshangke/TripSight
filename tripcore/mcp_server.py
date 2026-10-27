@@ -1346,6 +1346,29 @@ def footprint(basemap: bool = False) -> str:
     return text + f"\n地图页：{out}。{tail}"
 
 
+def export_calendar(folder: str = "") -> str:
+    """把行程导出成日历文件（.ics）：每个景点一个事件（到达—离开时间），备注里有建议停留时长和营业时间来源。行程必须已有确定日期。
+    默认写到 ~/.tripcore/exports/；folder 是用户给的已存在的文件夹（不要自己去找）。只生成文件，不连任何账号、不会写进用户的日历；
+    用户自己双击文件导入（苹果日历 / Google 日历都行）。时间是按停留时长和交通估算的，不是预约，导入后提醒用户出发前核实。"""
+    from .export_notes import _safe, build_ics
+    trip = _load()
+    target = trip_path().with_name("exports")
+    if folder:
+        target = Path(folder).expanduser()
+        if not target.is_dir():
+            raise ToolError(f"文件夹不存在：{folder}（不会自动创建，请确认路径）。")
+    try:
+        text = build_ics(trip)
+        target.mkdir(parents=True, exist_ok=True)
+        out = target / f"{_safe(trip.meta.name, 'TripSight 行程')}.ics"
+        out.write_text(text, encoding="utf-8", newline="")
+    except ValueError as e:
+        raise ToolError(str(e))
+    except OSError as e:
+        raise ToolError(f"写入失败：{e}")
+    return f"已导出日历文件：{out}（{text.count('BEGIN:VEVENT')} 个事件）。双击导入你的日历；时间是估算的，出发前请核实。"
+
+
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
                     show_spending: bool = False, spending_categories: Optional[list[str]] = None, thumb_pins: bool = False) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
@@ -3168,7 +3191,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

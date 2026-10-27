@@ -879,11 +879,57 @@ def bills_edit(body: dict) -> dict[str, Any]:
     return {"ok": True}
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state}
+def cal_export(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.export_calendar()}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def video_scan(body: dict) -> dict[str, Any]:
+    folder = str(body.get("folder") or "").strip()
+    if not folder:
+        raise HttpError(400, "先填视频文件夹的完整路径。")
+    try:
+        return {"message": ms.scan_videos(folder)}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def video_cut(body: dict) -> dict[str, Any]:
+    folder = str(body.get("folder") or "").strip()
+    if not folder:
+        raise HttpError(400, "先填视频文件夹的完整路径。")
+    try:
+        target = int(body.get("target_seconds") or 0)
+        clip_max = int(body.get("clip_max") or 8)
+    except (TypeError, ValueError):
+        raise HttpError(400, "时长要填数字。")
+    try:
+        return {"message": ms.export_rough_cut(folder, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
+                                               jianying_dir=str(body.get("jianying_dir") or "").strip())}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def fp_build(body: dict) -> dict[str, Any]:
+    try:
+        msg = ms.footprint(basemap=bool(body.get("basemap")))
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+    f = ms.trip_path().parent / "足迹.html" if ms._single_file_mode() else ms._root_dir() / "足迹.html"
+    try:
+        html = f.read_text(encoding="utf-8") if f.exists() and "地图页" in msg else ""
+    except OSError:
+        html = ""
+    return {"message": msg, "html": html}
+
+
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state, "fp_state": lambda: fp_build({})}
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
