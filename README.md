@@ -43,7 +43,7 @@
 <p><img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="真实路线"></p>
 
 <p><b>出行前后随时可用</b></p>
-<p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="66 个工具"></p>
+<p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力"></p>
 
 <p><b>回程之后：一键分享发布</b></p>
 <p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p>
@@ -64,7 +64,7 @@
 <p>
 <img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;
 <img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;
-<img src="docs/images/feat-tools.gif" width="23%" alt="66 个工具">
+<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力">
 </p>
 
 <p><b>回程之后：一键分享发布</b></p>
@@ -93,7 +93,7 @@ TripSight 把它们拆开解决：
 
 - **景点从哪来都行**：大模型推荐、别人的攻略（贴正文，逐条核对后挑选）、你自己想去的，统一排进同一份行程；酒店、到达和离开的大交通、日期和季节也直接参与分天和营业时间检查。
 - **事实不靠编**：坐标、营业时间、路线、天气只来自地图服务和工具，查不到就写“待核实”；营业时间在分天和排序时就会避开闭馆日。
-- **每一步可确认、可撤销**：大模型只听懂意图、提出修改；排程、检查、查路线、记版本由确定性代码（通过 MCP 提供 66 个工具）完成；所有修改先成为提案，你确认才生效，`undo` 可连续撤销。
+- **每一步可确认、可撤销**：大模型只听懂意图、提出修改；排程、检查、查路线、记版本由确定性代码（通过 MCP 提供 77 个工具）完成；所有修改先成为提案，你确认才生效，`undo` 可连续撤销。
 - **路线不用反复查**：配置高德后一次补全每一段真实路线，再一键生成每天串联好的专属地图。
 - **不绑定模型，数据在你电脑上**：任何支持 MCP 的聊天 Agent 都能接（仓库附带 [nanobot](https://github.com/HKUDS/nanobot) 的接入配置）；行程是本机 JSON，网页工作台只监听 `127.0.0.1`，API key 只放在你自己的配置里。
 
@@ -147,8 +147,11 @@ TripSight 把它们拆开解决：
 | **攻略转行程** | 粘贴游记/攻略 → 原文逐字核对 → 提交时自动查高德（已匹配/有歧义/没找到）并附跳转链接 → 你挑选后加入；识别“第N天/Day N”，可对照或照搬游记的分天；每个景点带可展开的游记原文；顺路路线（如 citywalk）可整条作为一项 |
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；Open-Meteo 与高德天气预报 |
 | **带走行程** | 微信文字版、手机版 HTML 地图、高德 App 专属地图、GPX、本机网页工作台 |
+| **旅行后：照片还原与手册** | 从照片文件夹或 Mac 照片 App 的相册还原走过的行程（按时间和位置聚成停留点，可合并、改名，可用 GPX/KML 轨迹给没定位的照片补位置）；每个景点最多 6 张照片，可只引用不复制；生成网页手册、每天一张 3:4 卡片、PDF、Obsidian 笔记，多种版式，路线图可加高德底图、按交通方式区分线型、用缩略图当图钉；照片内容的文字描写只写画面里看得到的，标明是 AI 写的 |
+| **花费** | 导入微信 / 支付宝账单（本机解析，内容不交给模型），自动盯着文件夹（含 iCloud 云盘）导入，iPhone 快捷指令记 Apple Pay；按类别统计、可改类别并记住商户，可选放进手册后记 |
+| **视频与足迹** | 视频按拍摄时间和位置归到景点，按行程顺序粗剪成片（景点名、每天路线卡片，不加音乐特效），可同时生成剪映草稿；足迹汇总去过几趟、几个城市、大约多少公里，并画足迹地图 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、444 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、530 个自动化测试 |
 
 ## 🔎 数据来源与验证程度
 
@@ -195,7 +198,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 | Agent | 做法 | 状态 |
 |---|---|---|
 | [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
-| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再让它读 `skills/trip-planner/SKILL.md`，助手才知道该按什么流程使用这 66 个工具 | 按 MCP 标准接入，**未逐个测试** |
+| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 77 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
 
 `tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
 
@@ -213,7 +216,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 - [docs/features.md](docs/features.md)：功能详解与“满配效果”
 - [docs/reference.md](docs/reference.md)：命令行、行程数据格式、代码结构、MCP 工具与接口详解
 - [docs/limitations.md](docs/limitations.md)：已知局限与后续计划
-- [docs/TOOLS.md](docs/TOOLS.md)：全部 66 个工具清单
+- [docs/TOOLS.md](docs/TOOLS.md)：全部 77 个工具清单
 - [DESIGN.md](DESIGN.md)：设计原则与算法
 
 ## 📄 许可证
