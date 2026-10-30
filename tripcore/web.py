@@ -626,7 +626,7 @@ def hb_state() -> dict[str, Any]:
             continue
         rows.append({"id": p.id, "name": p.name, "day": order[p.id] + 1, "restored": p.id in recs,
                      "start": (recs.get(p.id) or {}).get("start", "")[11:16], "end": (recs.get(p.id) or {}).get("end", "")[11:16],
-                     "photos": [{"id": x["id"], "thumb": _ph.thumb_uri(folder, x["file"], 200, 65)} for x in photos if x.get("place_id") == p.id],
+                     "photos": [{"id": x["id"], "hide": bool(x.get("hide")), "thumb": _ph.thumb_uri(folder, x["file"], 200, 65)} for x in photos if x.get("place_id") == p.id],
                      "story": stories.get(p.id) or {}})
     labels = ms._chapter_labels()
     for r in rows:
@@ -710,8 +710,21 @@ def hb_photo_move(body: dict) -> dict[str, Any]:
     pid, to = str(body.get("id") or ""), str(body.get("to") or "")
     items = _ph.load(ms._photo_index())
     row = next((x for x in items if x["id"] == pid), None)
-    if row is None or to not in ("front", "left", "right"):
+    if row is None or to not in ("front", "left", "right", "hide", "place"):
         raise HttpError(404, "找不到这张照片。")
+    if to == "hide":                                          # 切换“放进/不放进手册”
+        row["hide"] = not row.get("hide")
+        _ph.save(ms._photo_index(), items)
+        return {"ok": True, "hide": bool(row["hide"])}
+    if to == "place":                                         # 拖动排序：把这张放到 before 那张的前面（同一景点内）；before 为空则放最后
+        group = [x for x in items if x.get("place_id") == row.get("place_id")]
+        tgt = next((x for x in group if x["id"] == str(body.get("before") or "")), None)
+        group.remove(row)
+        group.insert(group.index(tgt) if tgt in group else len(group), row)
+        it = iter(group)
+        items = [next(it) if x.get("place_id") == row.get("place_id") else x for x in items]
+        _ph.save(ms._photo_index(), items)
+        return {"ok": True}
     group = [x for x in items if x.get("place_id") == row.get("place_id")]
     i = group.index(row)
     j = 0 if to == "front" else (i - 1 if to == "left" else i + 1)
@@ -769,6 +782,23 @@ def hb_export(body: dict) -> dict[str, Any]:
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"message": "\n\n".join(out)}
+
+
+def reveal_exports(body: dict) -> dict[str, Any]:
+    """在访达（或系统文件管理器）里打开导出文件夹。path 可不填；填了必须在导出文件夹之内。"""
+    root = ms.export_root()
+    root.mkdir(parents=True, exist_ok=True)
+    target = root
+    if body.get("path"):
+        cand = Path(str(body["path"])).expanduser().resolve()
+        if root.resolve() not in cand.parents and cand != root.resolve():
+            raise HttpError(400, "只能打开导出文件夹里的内容。")
+        target = cand
+    try:
+        subprocess.Popen(["open", str(target)] if sys.platform == "darwin" else ["xdg-open", str(target)])
+    except OSError as e:
+        raise HttpError(400, f"打不开：{e}")
+    return {"path": str(target)}
 
 
 def ms_photoslib_error():
@@ -929,7 +959,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):

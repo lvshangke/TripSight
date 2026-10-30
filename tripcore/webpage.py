@@ -198,6 +198,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #prev{background:var(--acc-soft);border-top-color:var(--acc)}
 .tchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .seg button.on{background:var(--acc);border-color:var(--acc)}
+.hbp .c{cursor:grab;transition:transform .15s,opacity .15s}.hbp .c.drag{opacity:.35}.hbp .c.over{transform:scale(1.06)}.hbp .c.over img{outline:2px dashed var(--acc)}.hbp .c.off img{opacity:.35;filter:grayscale(1)}
+.hbp .bt{justify-content:center;gap:4px}.hbp::after{content:"可以直接拖动照片调整顺序，第一张是封面";font-size:12px;color:var(--sub);align-self:center;margin-left:6px}
 </style></head><body>
 <div id="app"><div id="side">
 <header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
@@ -238,7 +240,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
-<label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button><pre id="hb_out"></pre></div></div>
+<label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
 <div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="tlnote" style="width:100%;white-space:pre-wrap"></div></div>
@@ -255,7 +257,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div class="hbimp"><b>粗剪</b><label>目标时长（秒，0 = 不限）<input id="vd_t" type="number" value="60" min="0" style="width:70px"></label><label>每段最长（秒）<input id="vd_m" type="number" value="8" min="2" max="30" style="width:60px"></label>
 <label><input type="checkbox" id="vd_c" checked> 每天前加“第N天”和路线卡片</label>
 <input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button id="vd_cut" class="pri">生成粗剪</button>
-<div class="tlnote" style="width:100%">输出到 ~/.tripcore/exports/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
+<div class="tlnote" style="width:100%">输出到 ~/Documents/TripSight/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
 <pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
 <div class="pane" id="pane_fp">
 <div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
@@ -772,8 +774,8 @@ function hbRender() {
 }
 function hbCard(s, restore) {
   const st = s.story || {}, facts = (st.facts || []).concat([{text: '', source: ''}]);
-  const ph = s.photos.map((p, i) => '<div class="c' + (i === 0 ? ' cover' : '') + '" data-p="' + esc(p.id) + '"><img src="' + esc(p.thumb) + '" alt="">' +
-    '<div class="bt"><button data-a="left" title="往前">◀</button>' + (i ? '<button data-a="front" title="设为封面">★</button>' : '<span class="tm" title="当前封面">★</span>') + '<button data-a="right" title="往后">▶</button><button data-a="del" title="删除这张">✕</button></div></div>').join('');
+  const ph = s.photos.map((p, i) => '<div class="c' + (i === 0 ? ' cover' : '') + (p.hide ? ' off' : '') + '" draggable="true" data-p="' + esc(p.id) + '"><img src="' + esc(p.thumb) + '" alt="" draggable="false">' +
+    '<div class="bt">' + (i ? '<button data-a="front" title="设为封面">★</button>' : '<span class="tm" title="当前封面">★</span>') + '<button data-a="hide" title="' + (p.hide ? '现在不放进手册，点一下放进去' : '放进手册（点一下改为不放）') + '">' + (p.hide ? '🚫' : '👁') + '</button><button data-a="del" title="删除这张">✕</button></div></div>').join('');
   const add = s.photos.length < HB.data.max_photos ? '<label class="add" data-a="add">＋照片<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label>' : '';
   return '<div class="hbs" id="hb_' + esc(s.id) + '"><div class="h">' + (restore ? '<input type="checkbox" class="sel" ' + (HB.sel.has(s.id) ? 'checked' : '') + ' title="选中后可合并">' : '') +
     '<span class="dy">第 ' + s.day + ' 天</span>' + (s.region ? '<span class="dy">' + esc(s.region) + '</span>' : '') + '<input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + '</div>' +
@@ -789,7 +791,14 @@ function hbWire(s) {
   const note = (t, err) => { m.textContent = t; m.style.color = err ? '#b91c1c' : '#555'; };
   const sel = box.querySelector('.sel'); if (sel) sel.onchange = () => { sel.checked ? HB.sel.add(s.id) : HB.sel.delete(s.id); };
   const lbList = s.photos.map(p => ({id: p.id, thumb: p.thumb, caption: ''}));
+  let dragId = null;
   box.querySelectorAll('.hbp .c').forEach((c, i) => {
+    c.ondragstart = ev => { dragId = c.dataset.p; c.classList.add('drag'); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', dragId); };
+    c.ondragend = () => { c.classList.remove('drag'); box.querySelectorAll('.hbp .over').forEach(x => x.classList.remove('over')); };
+    c.ondragover = ev => { if (dragId && dragId !== c.dataset.p) { ev.preventDefault(); c.classList.add('over'); } };
+    c.ondragleave = () => c.classList.remove('over');
+    c.ondrop = async ev => { ev.preventDefault(); if (!dragId || dragId === c.dataset.p) return;
+      try { await api('hb_photo_move', {id: dragId, to: 'place', before: c.dataset.p}); await hbLoad(); } catch (e) { note(e.message, true); } };
     c.querySelector('img').onclick = () => lbOpen(lbList, i);
     c.querySelectorAll('button').forEach(b => b.onclick = async () => {
       try {
@@ -852,6 +861,7 @@ $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
 };
 $('hb_sp').onchange = () => { $('hb_spc').style.display = $('hb_sp').checked ? '' : 'none'; };
+$('hb_open').onclick = async () => { try { const r = await api('reveal_exports', {}); $('hb_out').textContent = '已打开：' + r.path; } catch (e) { $('hb_out').textContent = e.message; } };
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';

@@ -105,7 +105,7 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     n = 2
     while root.exists():
         root = out_root / f"{base}-{n}"; n += 1
-    att = root / "附件"
+    att = root / "attachments"
     (root / "景点").mkdir(parents=True)
     att.mkdir()
     files: list[str] = []
@@ -118,6 +118,8 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     by_day: dict[int, list[dict]] = {}
     if include_photos and photos and photo_dir:
         for ph in photos:
+            if ph.get("hide"):
+                continue
             from . import photos as _phm
             src = _phm.resolve(Path(photo_dir), ph["file"])
             if src is None:
@@ -129,7 +131,7 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             except ValueError as e:
                 skipped.append(str(e)); continue
             files.append(str(dst.relative_to(root)))
-            item = {"name": dst.name, "caption": ph.get("caption", "")}
+            item = {"name": f"attachments/photos/{dst.name}", "caption": ph.get("caption", "")}
             if ph.get("place_id"):
                 by_place.setdefault(ph["place_id"], []).append(item)
             elif ph.get("day") is not None:
@@ -162,20 +164,22 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             place_days.setdefault(p.id, []).append(day.index)
             body += [f"## {i + 1}. [[{_safe(p.name)}]]  {_hm(v.arrive)}–{_hm(v.leave)}",
                      f"- 建议停留 {p.duration_min} 分钟",
-                     f"- 营业：{p.opening_hours}（{p.hours_source or '来源未标注'}）" if p.opening_hours else "- 营业：未核实"]
+                     ]
+            if p.opening_hours:
+                body.append(f"- 营业：{p.opening_hours}（{p.hours_source or '来源未标注'}）")
             for it in by_place.get(p.id, []):
-                body.append(f"![[{it['name']}]]" + (f"\n*{it['caption']}*" if it["caption"] else ""))
+                body.append(f"![{it['caption']}]({it['name']})" + (f"\n*{it['caption']}*" if it["caption"] else ""))
             if i < len(st.legs):
                 lg = st.legs[i]
                 body += ["", f"> 前往下一站：{lg.note or lg.mode} · {lg.distance_km} km · {lg.minutes} 分钟"
                              + ("" if lg.detail_level != "estimate" else "（估算）")]
             body.append("")
         for it in by_day.get(day.index, []):
-            body.append(f"![[{it['name']}]]" + (f"\n*{it['caption']}*" if it["caption"] else ""))
+            body.append(f"![{it['caption']}]({it['name']})" + (f"\n*{it['caption']}*" if it["caption"] else ""))
         if with_gpx:
             try:
-                (att / f"第{day.index + 1}天.gpx").write_text(build_gpx(trip, day.index), encoding="utf-8")
-                files.append(f"附件/第{day.index + 1}天.gpx"); body.append(f"轨迹文件：[[第{day.index + 1}天.gpx]]")
+                (att / f"day{day.index + 1}.gpx").write_text(build_gpx(trip, day.index), encoding="utf-8")
+                files.append(f"attachments/day{day.index + 1}.gpx"); body.append(f"轨迹文件：[第{day.index + 1}天.gpx](attachments/day{day.index + 1}.gpx)")
             except Exception as e:
                 skipped.append(f"第{day.index + 1}天 GPX：{e}")
         vid = (videos or {}).get(day.index)
@@ -183,9 +187,9 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             vp = Path(vid)
             if vp.exists():
                 (att / "video").mkdir(exist_ok=True)
-                dst = att / "video" / f"vlog-第{day.index + 1}天{vp.suffix}"
+                dst = att / "video" / f"vlog-day{day.index + 1}{vp.suffix}"
                 shutil.copy2(vp, dst); files.append(str(dst.relative_to(root)))
-                body += ["", f"![[{dst.name}]]"]
+                body += ["", f"![](attachments/video/{dst.name})"]
             else:
                 skipped.append(f"视频缺失：{vp}")
         w(root / f"{title}.md", "\n".join(fm + body) + "\n")
@@ -196,15 +200,16 @@ def build_obsidian(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             continue
         fm = ["---", f"title: {_y(p.name)}", "type: place", f"lat: {p.lat}", f"lon: {p.lon}",
               "days: [" + ", ".join(str(i + 1) for i in place_days[p.id]) + "]", "tags: [tripsight, place]", "---", ""]
-        body = [f"# {p.name}", "", "来自行程的事实信息（时间/营业时间以现场为准）：", f"- 建议停留 {p.duration_min} 分钟"]
-        body.append(f"- 营业：{p.opening_hours}（{p.hours_source or '来源未标注'}）" if p.opening_hours else "- 营业：未核实")
+        body = [f"# {p.name}", "", f"- 建议停留 {p.duration_min} 分钟"]
+        if p.opening_hours:
+            body.append(f"- 营业：{p.opening_hours}（{p.hours_source or '来源未标注'}）")
         body += ["", "出现在：" + "、".join(f"[[第{i + 1}天]]" for i in place_days[p.id]), "", "## 我的笔记", ""]
         w(root / "景点" / f"{_safe(p.name)}.md", "\n".join(fm + body) + "\n")
 
     n_days = len(trip.plan.days)
     head = ["---", f"title: {_y(trip.meta.name)}", "type: trip", f"days: {n_days}", f"distance_km: {round(total_km, 2)}",
             "tags: [tripsight]", "---", "", f"# {trip.meta.name}", "", *day_links, "",
-            "> 由 TripSight 导出。天气为预报，营业时间来自地图服务，出发前请再核实。", ""]
+            "> 由 TripSight 导出。", ""]
     w(root / f"{_safe(trip.meta.name)}.md", "\n".join(head))
     try:
         (root / f"{base}.ics").write_text(build_ics(trip), encoding="utf-8", newline="")

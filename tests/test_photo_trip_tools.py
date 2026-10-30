@@ -28,7 +28,7 @@ def test_import_creates_new_trip_with_locked_days_and_strips_location(tmp_path):
     t = s._load()
     assert t.meta.num_days == 1 and t.meta.start_date.isoformat() == "2026-06-19"
     assert [len(d.items) for d in t.plan.days] == [2] and all(i.locked for d in t.plan.days for i in d.items)
-    assert all(p.source == "photo" and "停留点" in p.name for p in t.places) and "路过" in out
+    assert all(p.source == "photo" and "停留点" not in p.name and p.name[:2].isdigit() for p in t.places) and "路过" in out
     items = s._ph.load(s._photo_index())
     assert items and all(not Image.open(s._photo_dir() / x["file"]).getexif() for x in items)
 
@@ -175,3 +175,39 @@ def test_handbook_thumb_pins_end_to_end(tmp_path):
     s.export_handbook(show_photos=True, cards=False, thumb_pins=False)
     plain = sorted(Path(s.trip_path().with_name("exports")).rglob("index.html"))[-1].read_text(encoding="utf-8")
     assert 'class="pinr"' not in plain
+
+
+def test_auto_name_uses_amap_where_and_falls_back(tmp_path, monkeypatch):
+    class Fake:
+        def where(self, lat, lon):
+            return {"name": "紫阳古街", "district": "临海市", "city": "台州"}
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda cls, log_path=None: Fake()))
+    s.import_photo_trip(str(_album(tmp_path)))
+    assert {p.name.split(" ")[0] for p in s._load().places} == {"紫阳古街"}
+
+
+def test_hide_and_drag_order(tmp_path):
+    from tripcore import web, photos as ph
+    s.import_photo_trip(str(_album(tmp_path)))
+    items = ph.load(s._photo_index())
+    pid = items[0]["place_id"]
+    grp = [x for x in items if x["place_id"] == pid]
+    if len(grp) >= 2:
+        web.hb_photo_move({"id": grp[-1]["id"], "to": "place", "before": grp[0]["id"]})
+        assert [x["id"] for x in ph.load(s._photo_index()) if x["place_id"] == pid][0] == grp[-1]["id"]
+    assert web.hb_photo_move({"id": grp[0]["id"], "to": "hide"})["hide"] is True
+
+
+def test_obsidian_uses_relative_markdown_images_and_skips_hidden(tmp_path, monkeypatch):
+    from tripcore import photos as ph
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    items = ph.load(s._photo_index())
+    items[0]["hide"] = True
+    ph.save(s._photo_index(), items)
+    msg = s.export_notes()
+    root = Path(msg.split("已导出到：")[1].splitlines()[0])
+    assert root.parent == tmp_path / "out" and (root / "attachments").is_dir()
+    md = "\n".join(f.read_text(encoding="utf-8") for f in root.glob("*.md"))
+    assert "](attachments/photos/" in md and "![[" not in md
+    assert len(list((root / "attachments" / "photos").glob("*.jpg"))) == len(items) - 1

@@ -308,6 +308,30 @@ class AmapClient:
             return None
         return {"province": province, "city": city or province, "district": district}
 
+    def where(self, lat: float, lon: float) -> Optional[dict[str, str]]:
+        """坐标 → 这里叫什么：{"name": 景区/小区/最近地标 名, "district": 区县, "city": 城市}。只发这一个坐标。
+        优先用 AOI（景区、公园、小区这类有范围的地方），其次 150 米内最近的 POI，最后是街道名；都没有就不给 name，不猜。"""
+        g_lat, g_lon = wgs84_to_gcj02(lat, lon)
+        data = self._get("/v3/geocode/regeo", {"location": f"{g_lon:.6f},{g_lat:.6f}", "extensions": "all", "radius": 200, "roadlevel": 0})
+        rg = data.get("regeocode") or {}
+        comp = rg.get("addressComponent") or {}
+        province, city, district = _text(comp.get("province")), _text(comp.get("city")), _text(comp.get("district"))
+        name = ""
+        aois = [a for a in (rg.get("aois") or []) if isinstance(a, dict) and _text(a.get("name"))]
+        if aois:
+            name = _text(aois[0].get("name"))
+        else:
+            pois = [x for x in (rg.get("pois") or []) if isinstance(x, dict) and _text(x.get("name"))]
+            best = min(pois, key=lambda x: _num(x.get("distance")) if _num(x.get("distance")) is not None else 1e9, default=None)
+            if best is not None and (_num(best.get("distance")) or 0) <= 150:
+                name = _text(best.get("name"))
+        if not name:
+            st = comp.get("streetNumber") or {}
+            name = _text(st.get("street") if isinstance(st, dict) else "")
+        if not (name or district or city):
+            return None
+        return {"name": name, "district": district, "city": city or province}
+
     # ---- 天气 ----
     def adcode(self, city: str) -> Optional[str]:
         """城市名 → 行政区划代码 adcode（天气接口需要）。"""

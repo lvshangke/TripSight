@@ -91,6 +91,17 @@ def _root_dir() -> Path:
     return Path(p).expanduser().parent if p else Path.home() / ".tripcore"
 
 
+def export_root() -> Path:
+    """所有导出（手册、Obsidian、日历、粗剪）统一放的文件夹：环境变量 TRIPCORE_EXPORT_DIR；
+    否则 ~/Documents/TripSight（好找）；测试里用 TRIPCORE_FILE 时放在它旁边的 exports。"""
+    e = os.environ.get("TRIPCORE_EXPORT_DIR")
+    if e:
+        return Path(e).expanduser()
+    if os.environ.get("TRIPCORE_FILE"):
+        return trip_path().with_name("exports")
+    return Path.home() / "Documents" / "TripSight"
+
+
 def trip_path() -> Path:
     p = os.environ.get("TRIPCORE_FILE")
     if p:
@@ -1175,7 +1186,7 @@ def export_gpx(day: Optional[int] = None) -> str:
 
 def export_notes(include_photos: bool = True, video_path: str = "", video_day: Optional[int] = None, folder: str = "") -> str:
     """把行程导出成本地文件：一个 Obsidian 笔记文件夹（每天一篇、每个景点一篇、[[双链]]、路线轨迹、你挂过的照片）和一个日历 .ics 文件。
-    默认写到本机 ~/.tripcore/exports/；用户想直接放进自己的 Obsidian 库时，让他给出库里的文件夹路径填到 folder（必须是已存在的文件夹，
+    默认写到本机 ~/Documents/TripSight/；用户想直接放进自己的 Obsidian 库时，让他给出库里的文件夹路径填到 folder（必须是已存在的文件夹，
     不要自己去找用户的库），会在里面新建一个行程文件夹。不联网、不连任何账号；日历要用户自己双击导入。时间只是估算，营业时间标了来源。
     video_path 是用户电脑上某天的 vlog 视频路径，video_day 是它属于第几天（从 1 起），两个都给才会放进笔记；不给就不带视频。
     已有同名导出文件夹时不会覆盖，会新建 -2、-3。行程没设日期时只导出笔记，不导出日历。"""
@@ -1192,7 +1203,7 @@ def export_notes(include_photos: bool = True, video_path: str = "", video_day: O
             raise ToolError(f"找不到视频文件：{video_path}")
         videos = {video_day - 1: vp}
     from .export_notes import build_obsidian
-    target = trip_path().with_name("exports")
+    target = export_root()
     if folder:
         target = Path(folder).expanduser()
         if not target.is_dir():
@@ -1269,7 +1280,7 @@ def scan_videos(folder: str) -> str:
 def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
                      jianying_dir: str = "", draft_name: str = "") -> str:
     """把用户的视频素材按行程顺序粗剪成一条片子：每个景点取中间一段（最多 clip_max 秒），景点开头显示地名，每天前插一张“第N天”卡片和一张当天真实路线的小卡片。
-    target_seconds=0 表示不限长度，否则自动按素材量缩短每段、必要时每个景点删几段。输出到 ~/.tripcore/exports/粗剪/：粗剪.mp4、字幕 .srt、片段清单 .md。
+    target_seconds=0 表示不限长度，否则自动按素材量缩短每段、必要时每个景点删几段。输出到 ~/Documents/TripSight/粗剪/：粗剪.mp4、字幕 .srt、片段清单 .md。
     jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；草稿格式随剪映版本变，打不开就用 mp4+srt）。
     不自带音乐、不加特效，创意部分留给用户在剪映里做；视频内容不会交给模型。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
     import datetime as _dt
@@ -1277,7 +1288,7 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
     try:
         segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards))
         size = _v._canvas(clips)
-        out_dir = trip_path().with_name("exports") / "粗剪"
+        out_dir = export_root() / "粗剪"
         out_dir.mkdir(parents=True, exist_ok=True)
         mp4 = out_dir / "粗剪.mp4"
         _v.render(segs, mp4, out_dir / "_work", size)
@@ -1348,11 +1359,11 @@ def footprint(basemap: bool = False) -> str:
 
 def export_calendar(folder: str = "") -> str:
     """把行程导出成日历文件（.ics）：每个景点一个事件（到达—离开时间），备注里有建议停留时长和营业时间来源。行程必须已有确定日期。
-    默认写到 ~/.tripcore/exports/；folder 是用户给的已存在的文件夹（不要自己去找）。只生成文件，不连任何账号、不会写进用户的日历；
+    默认写到 ~/Documents/TripSight/；folder 是用户给的已存在的文件夹（不要自己去找）。只生成文件，不连任何账号、不会写进用户的日历；
     用户自己双击文件导入（苹果日历 / Google 日历都行）。时间是按停留时长和交通估算的，不是预约，导入后提醒用户出发前核实。"""
     from .export_notes import _safe, build_ics
     trip = _load()
-    target = trip_path().with_name("exports")
+    target = export_root()
     if folder:
         target = Path(folder).expanduser()
         if not target.is_dir():
@@ -1372,7 +1383,7 @@ def export_calendar(folder: str = "") -> str:
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
                     show_spending: bool = False, spending_categories: Optional[list[str]] = None, thumb_pins: bool = False) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
-    只写本机 ~/.tripcore/exports/，不联网、不连账号，也不会替用户发布。时间只是估算，营业时间标了来源；酒店和花费不会出现。
+    只写本机 ~/Documents/TripSight/，不联网、不连账号，也不会替用户发布。时间只是估算，营业时间标了来源；酒店和花费不会出现。
     默认会放用户挂过的照片（含人像；已去掉定位）；用户说要不露脸、或要公开分享前不想带照片时传 show_photos=false；视频只用用户给的原文件：video_path 是视频路径，
     video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。style 是版式风格：手账（默认）/ 杂志 / 清新 / 胶片 / 海边，只换配色字体，网页、卡片图、PDF 都跟着变。show_spending=true 在手册最后加一页“后记：这一趟的花费”（只有总额和各类别金额，没有商户和明细；数据来自 import_bills 导入的账单，默认不放；放之前要问用户，花费属于隐私），spending_categories 可以只选某几类（门票/餐饮/交通/住宿/购物/其他）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。thumb_pins=true 让路线图上有照片的点用圆形缩略图当图钉（没照片的点仍是数字圆点，需要 show_photos）。已有导出不会被覆盖。"""
     trip = _load()
@@ -1402,7 +1413,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
             raise ToolError("类别只能是：" + "、".join(_bl.CATEGORIES))
         spend = _bl.summarize(led, spending_categories or None)
     try:
-        res = build_handbook(trip, trip_path().with_name("exports"), photos=items, photo_dir=_photo_dir(),
+        res = build_handbook(trip, export_root(), photos=items, photo_dir=_photo_dir(),
                              show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins)
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
@@ -1477,9 +1488,39 @@ def _load_json_file(p: Path) -> dict:
         return {}
 
 
+def _stop_names(keep: list) -> tuple[list[str], int]:
+    """给每个停留点起名：高德反查（景区/小区/最近地标/街道）；没有 key 或查不到就写“区县 · 时间”，不猜。
+    同名的点加上时间区分。返回 (名字列表, 查到真实名字的个数)。只发每个点的坐标，不发照片。"""
+    client = None
+    try:
+        client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+    except Exception:
+        client = None
+    names: list[str] = []
+    found = 0
+    for sp in keep:
+        w = None
+        if client is not None:
+            try:
+                w = client.where(sp.lat, sp.lon)
+            except Exception:
+                w = None
+        nm = (w or {}).get("name", "")
+        if nm:
+            found += 1
+        else:
+            area = (w or {}).get("district") or (w or {}).get("city") or ""
+            nm = f"{area} · {sp.start:%H:%M}" if area else f"{sp.start:%m-%d %H:%M}"
+        names.append(nm[:40])
+    cnt: dict[str, int] = {}
+    for nm in names:
+        cnt[nm] = cnt.get(nm, 0) + 1
+    return [f"{nm} {sp.start:%H:%M}" if cnt[nm] > 1 and found else nm for nm, sp in zip(names, keep)], found
+
+
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
                       radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
-                      track: str = "", tz_hours: float = 8.0, link_photos: bool = False) -> str:
+                      track: str = "", tz_hours: float = 8.0, link_photos: bool = False, auto_name: bool = True) -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
@@ -1488,7 +1529,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     轨迹里的时间是 UTC，照片是当地时间，tz_hours 是当地与 UTC 的时差（默认 8）。轨迹只用来给照片定位，不会单独变成景点。
     link_photos=true 时照片只引用不复制（不在行程目录存副本，省磁盘）：记下原文件路径，导出时才现场缩小并去掉定位；
     原文件之后被移动或删除，对应的图就缺了（导出会提示）。默认 false，复制一份缩小去定位的副本。
-    景点名先是"月-日 时:分 停留点"，要靠 view_stop 看图和候选地名，再用 update_place 改成真实名字，不要猜。
+    景点名：有高德 key 时按每个点的坐标反查景区/小区/最近地标（auto_name=true，只发坐标；不想发就设 false）；查不到写“区县 · 时间”，再靠 view_stop 看图和候选地名、用 update_place 改成真实名字，不要猜。
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
     from .models import DayItem, DayPlan, Plan, PlaceStatus
@@ -1533,13 +1574,14 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     new_trip(name=name or f"照片还原 {first:%m.%d}-{last:%m.%d}", num_days=ndays, start_date=first.isoformat(),
              end_date=last.isoformat(), mode="drive")
     ids: list[str] = []
+    stop_names, named = _stop_names(keep) if auto_name else ([f"{sp.start:%m-%d %H:%M} 停留点" for sp in keep], 0)
 
     def mutate(t: Trip) -> None:
         days = [DayPlan(index=i) for i in range(ndays)]
-        for sp in keep:
+        for sp, nm in zip(keep, stop_names):
             pid = _next_id("p", [p.id for p in t.places])
             t.places.append(Place(
-                id=pid, name=f"{sp.start:%m-%d %H:%M} 停留点", lat=sp.lat, lon=sp.lon, status=PlaceStatus.CONFIRMED,
+                id=pid, name=nm, lat=sp.lat, lon=sp.lon, status=PlaceStatus.CONFIRMED,
                 duration_min=max(15, min(720, sp.minutes + 10)), source="photo", tags=["photo"],
                 notes=f"从照片还原：{sp.n} 张照片，{sp.start:%H:%M}–{sp.end:%H:%M}"))
             days[(sp.day - first).days].items.append(DayItem(place_id=pid, locked=True))
@@ -1563,7 +1605,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
-             f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+             f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个（自动起名 {named} 个）；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
     if tracked_n:
         lines.append(f"其中 {tracked_n} 张本来没有定位，是按拍摄时间在轨迹文件上补出的位置（取决于手机时间和轨迹时间是否一致、tz_hours 是否对）。")
     if guessed_n:

@@ -160,7 +160,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .pic{{position:absolute;right:70px;bottom:120px;width:300px;background:#fff;padding:14px 14px 44px;box-shadow:0 10px 26px rgba(0,0,0,.2);transform:rotate(3deg)}}.pic img{{width:100%;display:block}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
-{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}<div class="f">营业时间以现场为准</div>"""
+{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}"""
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
@@ -180,7 +180,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     by_place: dict[str, list[dict]] = {}
     if show_photos and photos and photo_dir:
         for ph in photos:
-            if not ph.get("place_id"):
+            if not ph.get("place_id") or ph.get("hide"):          # 用户在工作台里点了“不放进手册”的不导出
                 continue
             from . import photos as _phm
             if not _phm.export_to(Path(photo_dir), ph["file"], root / "photos" / ph["file"]):
@@ -309,6 +309,5 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     cap = [f"{trip.meta.name}｜{len(trip.plan.days)} 天行程手册"]
     for idx, d, vs, km, legs, pic in card_jobs:
         cap.append(f"第{idx + 1}天：" + "→".join(v.place.name for v in vs))
-    cap += ["", "营业时间以现场为准。"]
     (root / "caption.txt").write_text("\n".join(cap) + "\n", encoding="utf-8"); files.append("caption.txt")
     return {"folder": str(root), "files": files, "skipped": skipped}

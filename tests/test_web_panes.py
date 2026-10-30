@@ -50,3 +50,11 @@ def test_footprint_page_empty_then_filled(server):
     assert code == 200 and "1 趟" in r["message"] and "<circle" in r["html"]
     code, r = call(server, "/tok/api/fp_build", {"basemap": True})
     assert code == 200 and "没有加底图" in r["message"]
+
+
+def test_reveal_exports_rejects_outside(tmp_path, monkeypatch):
+    import pytest
+    from tripcore import web
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "x"))
+    with pytest.raises(web.HttpError):
+        web.reveal_exports({"path": "/etc"})
