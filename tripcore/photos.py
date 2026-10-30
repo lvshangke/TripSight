@@ -195,6 +195,28 @@ def export_to(folder: Path, fname: str, dst: Path) -> bool:
     return True
 
 
+def make_editable(folder: Path, fname: str) -> Path:
+    """给外部软件（预览等）改的文件：存进来的副本就是它本身；“只引用”的照片先转成一份去掉定位、缩小的副本再给，
+    这样改的是手册里的这一份，绝不会动用户的原文件。转成副本后这张照片不再是“只引用”。"""
+    cur = folder / fname
+    if cur.exists():
+        return cur
+    src = resolve(folder, fname)
+    if src is None:
+        raise PhotoError("原文件找不到了（被移动或删除了？），没法打开。")
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(src) as im:
+            data = _encode(ImageOps.exif_transpose(im).convert("RGB"), MAX_SIDE, 88)
+    except Exception:
+        raise PhotoError("这张照片打不开。")
+    cur.write_bytes(data)
+    refs = _refs(folder)
+    if refs.pop(fname, None) is not None:
+        (folder / REFS).write_text(json.dumps(refs, ensure_ascii=False, indent=1), encoding="utf-8")
+    return cur
+
+
 def thumb_uri(folder: Path, fname: str, side: int = 120, quality: int = 60) -> str:
     """工作台小缩略图（data URI）；读不出来返回空串。"""
     try:

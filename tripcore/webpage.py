@@ -200,6 +200,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .seg button.on{background:var(--acc);border-color:var(--acc)}
 .hbp .c{cursor:grab;transition:transform .15s,opacity .15s}.hbp .c.drag{opacity:.35}.hbp .c.over{transform:scale(1.06)}.hbp .c.over img{outline:2px dashed var(--acc)}.hbp .c.off img{opacity:.35;filter:grayscale(1)}
 .hbp .bt{justify-content:center;gap:4px}.hbp::after{content:"可以直接拖动照片调整顺序，第一张是封面";font-size:12px;color:var(--sub);align-self:center;margin-left:6px}
+#lb_act{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:99px;color:#fff;font-size:12px}#lb_act button{background:var(--paper);color:var(--ink);border:0}#lb_cap{bottom:62px}
 </style></head><body>
 <div id="app"><div id="side">
 <header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
@@ -280,7 +281,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div class="err" id="nt_err"></div>
 <div class="btns"><button type="button" id="nt_cancel">取消</button><button type="submit" class="pri" id="nt_ok">创建</button></div></form></div>
 <script>__JS__</script>
-<div id="lb"><img id="lb_img" alt=""><div id="lb_cap"></div><button id="lb_prev" title="上一张">‹</button><button id="lb_next" title="下一张">›</button><button id="lb_x" title="关闭">×</button></div><script>
+<div id="lb"><img id="lb_img" alt=""><div id="lb_cap"></div><button id="lb_prev" title="上一张">‹</button><button id="lb_next" title="下一张">›</button><div id="lb_act"><button data-e="preview" title="用“预览”打开，改完保存即可（只引用的照片会先转成一份去掉定位的副本，不动原图）">用预览修改</button><button data-e="finder" title="在访达里显示这张照片的文件">在访达中显示</button><span id="lb_msg"></span></div><button id="lb_x" title="关闭">×</button></div><script>
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
 let S = null, selDay = 0, edit = false, pending = null, drag = null, picks = [], calMonth = null;
@@ -684,8 +685,10 @@ async function lbShow() {
   $('lb_prev').style.display = $('lb_next').style.display = LB.list.length > 1 ? '' : 'none';
   try { const r = await api('photo_full', {id: p.id}); if (LB.list[LB.i] === p && r.uri) $('lb_img').src = r.uri; } catch (e) {}
 }
-function lbOpen(list, i) { LB = {list: list, i: i}; lbShow(); }
-function lbClose() { $('lb').classList.remove('on'); $('lb_img').src = ''; }
+function lbOpen(list, i) { LB = {list: list, i: i, edited: false}; lbShow(); }
+document.querySelectorAll('#lb_act button').forEach(b => b.onclick = async ev => { ev.stopPropagation(); const p = LB.list[LB.i]; if (!p || !p.id) return;
+  try { await api('photo_edit', {id: p.id, app: b.dataset.e}); LB.edited = b.dataset.e === 'preview'; $('lb_msg').textContent = LB.edited ? '已在“预览”打开；改完保存，关掉这里就会刷新' : '已在访达中显示'; } catch (e) { $('lb_msg').textContent = e.message; } });
+function lbClose() { $('lb').classList.remove('on'); $('lb_img').src = ''; $('lb_msg').textContent = ''; if (LB && LB.edited) { LB.edited = false; try { hbLoad(); } catch (e) {} } }
 $('lb_x').onclick = lbClose; $('lb_prev').onclick = () => { LB.i = (LB.i + LB.list.length - 1) % LB.list.length; lbShow(); }; $('lb_next').onclick = () => { LB.i = (LB.i + 1) % LB.list.length; lbShow(); };
 $('lb').onclick = e => { if (e.target === $('lb')) lbClose(); };
 document.addEventListener('keydown', e => { if (!$('lb').classList.contains('on')) return; if (e.key === 'Escape') { e.stopPropagation(); lbClose(); } else if (e.key === 'ArrowLeft') $('lb_prev').click(); else if (e.key === 'ArrowRight') $('lb_next').click(); }, true);

@@ -784,6 +784,30 @@ def hb_export(body: dict) -> dict[str, Any]:
     return {"message": "\n\n".join(out)}
 
 
+def photo_edit(body: dict) -> dict[str, Any]:
+    """用本机软件打开这张照片：app=preview（用“预览”修改，保存后手册里就是改后的）| finder（在访达里显示）。
+    只引用的照片，预览打开的是去掉定位的副本，不动原文件；finder 显示的是原文件所在位置。只在 macOS 上有效。"""
+    pid, app = str(body.get("id") or ""), str(body.get("app") or "")
+    if sys.platform != "darwin":
+        raise HttpError(400, "这个功能只在 Mac 上可用。")
+    row = next((x for x in _ph.load(ms._photo_index()) if x["id"] == pid), None)
+    if row is None or app not in ("preview", "finder"):
+        raise HttpError(404, "找不到这张照片。")
+    folder = ms._photo_dir()
+    try:
+        if app == "preview":
+            path = _ph.make_editable(folder, row["file"])
+            subprocess.Popen(["open", "-a", "Preview", str(path)])
+        else:
+            path = _ph.resolve(folder, row["file"])
+            if path is None:
+                raise HttpError(400, "原文件找不到了（被移动或删除了？）。")
+            subprocess.Popen(["open", "-R", str(path)])
+    except _ph.PhotoError as e:
+        raise HttpError(400, str(e))
+    return {"ok": True, "path": str(path)}
+
+
 def reveal_exports(body: dict) -> dict[str, Any]:
     """在访达（或系统文件管理器）里打开导出文件夹。path 可不填；填了必须在导出文件夹之内。"""
     root = ms.export_root()
@@ -959,7 +983,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
