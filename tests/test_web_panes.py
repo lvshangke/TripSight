@@ -69,3 +69,24 @@ def test_make_editable_converts_ref_to_copy(tmp_path):
     assert ph.is_ref(folder, row["file"])
     out = ph.make_editable(folder, row["file"])
     assert out.exists() and not ph.is_ref(folder, row["file"]) and src.exists()
+
+
+def test_hb_preview_basemap_and_thumbs(tmp_path, monkeypatch):
+    from datetime import datetime
+    from PIL import Image
+    from tests.test_phototrip import _jpg
+    from tripcore import web
+    d = tmp_path / "a"; d.mkdir()
+    for i in range(3):
+        _jpg(d / f"{i}.jpg", datetime(2026, 6, 19, 15, i), 28.85, 121.15)
+    r = web.hb_preview({"folder": str(d), "min_photos": 1})
+    assert r["basemap"] is None and r["stops"][0]["thumbs"]
+
+    class FakeClient:
+        def static_map(self, lat, lon, z, w, h):
+            b = __import__("io").BytesIO(); Image.new("RGB", (w, h), "green").save(b, "PNG"); return b.getvalue()
+    from tripcore import amap
+    monkeypatch.setattr(amap.AmapClient, "from_env", classmethod(lambda cls, log_path=None: FakeClient()))
+    monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "t.json"))
+    r = web.hb_preview({"folder": str(d), "min_photos": 1, "basemap": True})
+    assert r["basemap"].startswith("data:image") and len(r["xy"]) == len(r["stops"])

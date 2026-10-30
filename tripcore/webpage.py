@@ -201,9 +201,28 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .hbp .c{cursor:grab;transition:transform .15s,opacity .15s}.hbp .c.drag{opacity:.35}.hbp .c.over{transform:scale(1.06)}.hbp .c.over img{outline:2px dashed var(--acc)}.hbp .c.off img{opacity:.35;filter:grayscale(1)}
 .hbp .bt{justify-content:center;gap:4px}.hbp::after{content:"可以直接拖动照片调整顺序，第一张是封面";font-size:12px;color:var(--sub);align-self:center;margin-left:6px}
 #lb_act{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:99px;color:#fff;font-size:12px}#lb_act button{background:var(--paper);color:var(--ink);border:0}#lb_cap{bottom:62px}
+
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px}.seg button{white-space:nowrap;border:0;background:transparent;border-radius:99px;padding:5px 14px}.seg button.on{background:var(--acc);color:#fff}#modesw button{flex:1}
+#home,#rp{position:fixed;inset:0;z-index:3000;background:var(--bg);display:none}#home.on{display:flex;align-items:center;justify-content:center}#rp.on{display:flex;flex-direction:column}
+#home .hbox{text-align:center;max-width:720px;padding:20px}#home h2{font-family:var(--serif);font-size:30px;margin:0 0 6px}#home p{color:var(--sub);margin:0 0 26px}
+.hcards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}.hcard{width:300px;padding:28px 24px;border-radius:18px;background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow);text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .15s,box-shadow .15s}
+.hcard:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(80,60,30,.2);border-color:var(--acc)}.hcard b{font-size:20px;font-family:var(--serif)}.hcard span{color:var(--ink2);font-size:14px;line-height:1.6;font-weight:400}
+#rp .rtop{display:flex;align-items:center;gap:20px;padding:14px 28px;background:var(--paper);border-bottom:1px solid var(--line)}#rp .rtop b{font-family:var(--serif);font-size:18px}
+#rp .steps{flex:1;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}#rp .steps span{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;color:var(--sub);font-size:14px;transition:all .15s}
+#rp .steps span i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+#rp .steps span.on{background:var(--acc-soft2);color:var(--acc);font-weight:600}#rp .steps span.on i{background:var(--acc);color:#fff}#rp .steps span.done i{background:#7a9a5b;color:#fff}#rp .steps span.done{cursor:pointer;color:var(--ink2)}
+#rp_body{flex:1;overflow:auto;padding:26px max(28px,calc((100vw - 1040px)/2))}#rp .pane{display:block}#rp .hbtop{display:none}
+#rp .rfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;background:var(--paper);border-top:1px solid var(--line);gap:12px}
+#rp_body[data-s="1"] #hb_pvo,#rp_body[data-s="1"] #hb_merge,#rp_body[data-s="1"] #hb_list,#rp_body[data-s="1"] .hbexp,#rp_body[data-s="1"] #hb_pv,#rp_body[data-s="1"] #hb_go{display:none!important}
+#rp_body[data-s="2"] #hb_merge,#rp_body[data-s="2"] #hb_list,#rp_body[data-s="2"] .hbexp,#rp_body[data-s="2"] #hb_go{display:none!important}
+#rp_body[data-s="3"] #hb_import,#rp_body[data-s="3"] #hb_merge,#rp_body[data-s="3"] .hbexp{display:none!important}
+#rp_body[data-s="4"] #hb_import,#rp_body[data-s="4"] .hbexp,#rp_body[data-s="5"] #hb_import,#rp_body[data-s="5"] #hb_merge,#rp_body[data-s="5"] #hb_list{display:none!important}
+#rp_body[data-s="3"] .hbexp{display:none!important}
+.pvmap{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);max-width:760px;background:#eef3e8}.pvmap svg{display:block;width:100%;height:auto}.pvmap circle{cursor:pointer;transition:r .12s,fill .12s}.pvmap circle:hover{fill:#c4553a99}.pvmap circle.sel{stroke-width:4;fill:#c4553acc}
+.pvd{margin-top:12px;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-radius:12px;max-width:760px;min-height:48px}.pvd img{width:96px;height:72px;object-fit:cover;border-radius:6px;margin:6px 6px 0 0}
 </style></head><body>
 <div id="app"><div id="side">
-<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
+<header style="flex-wrap:wrap"><div class="seg" id="modesw" style="width:100%;display:flex"><button data-w="plan" class="on">计划行程</button><button data-w="restore">恢复行程</button></div><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
 <div id="tabs"></div>
@@ -217,6 +236,11 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="chips"><button data-t="我想把【景点名】加进行程，查一下位置给我确认；我确认后请直接排进某一天并更新路线。">加景点</button><button data-t="帮我在【区域】附近找几家酒店，给我对比；我选定后请直接设为住宿并更新路线。">找酒店</button><button data-t="帮我查【日期】从【出发地】到【目的地】的火车票/机票。">查车票机票</button><button data-t="帮我在第【几】天的景点附近找午餐，给我几家对比；我选定后请直接加进行程。">找午餐</button><button data-t="帮我在第【几】天的景点附近找晚餐，给我几家对比；我选定后请直接加进行程。">找晚餐</button><button data-t="查一下行程这几天的天气。">查天气</button></div>
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
+<div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
+<div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
+<button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
+<div id="rp"><div class="rtop"><b>恢复行程</b><div class="steps" id="rp_steps"></div><button id="rp_close">返回</button></div>
+<div id="rp_body" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></div>
 <div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="bill">花费</button><button data-t="vid">视频</button><button data-t="fp">足迹</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
@@ -233,7 +257,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="不在行程目录里存照片副本，省磁盘；导出时才从原文件缩小并去掉定位。原文件被移走或删除后图会缺失"><input type="checkbox" id="hb_link"> 只引用照片（不复制）</label>
 <input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置">
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
-<button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
+<label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b>
@@ -739,6 +763,45 @@ function photoRow(row, pid) {
   };
   wrap.appendChild(lab); row.querySelector('.sub').appendChild(wrap);
 }
+
+// ---- 恢复行程：整页流程 ----
+const RS = {step: 1, ok: false};
+const RS_NAMES = ['选来源', '预览调整', '恢复', '编辑', '导出'];
+function rsGo(n) {
+  RS.step = n; $('rp_body').dataset.s = n;
+  $('rp_steps').innerHTML = RS_NAMES.map((t, i) => '<span class="' + (i + 1 === n ? 'on' : i + 1 < n ? 'done' : '') + '" data-n="' + (i + 1) + '"><i>' + (i + 1 < n ? '✓' : i + 1) + '</i>' + t + '</span>').join('');
+  $('rp_steps').querySelectorAll('.done').forEach(x => x.onclick = () => { if (RS.step !== 3) rsGo(+x.dataset.n); });
+  $('rp_prev').style.visibility = n === 1 || n === 3 ? 'hidden' : '';
+  $('rp_next').style.display = n === 3 ? 'none' : '';
+  $('rp_next').textContent = n === 1 ? '下一步：预览' : n === 2 ? '恢复行程' : n === 4 ? '下一步：导出' : '导出在下面，完成后可返回';
+  $('rp_next').style.display = n === 5 || n === 3 ? 'none' : '';
+  $('rp_msg').textContent = n === 1 ? '填相册文件夹（或照片 App 相册），照片要带位置信息。' : n === 2 ? '先看看会得到几处；太碎就换“大景区”。' : n === 4 ? '改名字、调照片顺序、写几句话；选两处以上可合并。' : '';
+  if (n === 3) { $('hb_list').textContent = ''; }
+  $('rp_body').scrollTop = 0;
+}
+function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else if (RS.step === 1 && !on && err) $('rp_msg').textContent = err; $('rp_next').disabled = on; }
+function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
+async function rsOpen(step) {
+  moClose(); $('home').classList.remove('on'); HB.mode = 'restore';
+  $('rp_body').appendChild($('pane_hb')); $('pane_hb').classList.add('on'); $('rp').classList.add('on');
+  document.querySelectorAll('#modesw button').forEach(b => b.classList.toggle('on', b.dataset.w === 'restore'));
+  await hbLoad(); rsGo(step || (HB.data && HB.data.restored ? 4 : 1));
+}
+function rsClose() {
+  $('rp').classList.remove('on'); $('mo').querySelector('.box').appendChild($('pane_hb')); $('pane_hb').classList.remove('on'); HB.mode = 'restore';
+  document.querySelectorAll('#modesw button').forEach(b => b.classList.toggle('on', b.dataset.w === 'plan'));
+}
+$('rp_close').onclick = rsClose;
+$('rp_prev').onclick = () => rsGo(Math.max(1, RS.step - 1));
+$('rp_next').onclick = () => {
+  if (RS.step === 1) { $('rp_msg').textContent = ''; $('hb_pv').click(); }
+  else if (RS.step === 2) { rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
+  else if (RS.step === 4) rsGo(5);
+};
+document.querySelectorAll('#modesw button').forEach(b => b.onclick = () => { if (b.dataset.w === 'restore') rsOpen(); else rsClose(); });
+function homeMaybe() { try { if (sessionStorage.getItem('tsHome')) return; } catch (e) {} if (S && !S.days.some(d => d.items.length) && !S.unscheduled.length) $('home').classList.add('on'); }
+function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {} $('home').classList.remove('on'); }
+$('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); rsOpen(); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
 $('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', {folder: $('vd_path').value}); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
@@ -836,7 +899,7 @@ function hbWire(s) {
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { HB.mode = b.dataset.m; if (HB.data) hbRender(); });
 $('hb_go').onclick = async () => {
   $('hb_go').disabled = true; $('hb_list').textContent = '正在读取照片，几十秒内…';
-  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value, link_photos: $('hb_link').checked})); say(r.message.split('\n')[0]); await load(); await hbLoad(); } catch (e) { $('hb_list').textContent = e.message; }
+  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value, link_photos: $('hb_link').checked})); say(r.message.split('\n')[0]); await load(); await hbLoad(); if (window.rsDone) rsDone(true); } catch (e) { $('hb_list').textContent = e.message; if (window.rsDone) rsDone(false, e.message); }
   $('hb_go').disabled = false;
 };
 
@@ -847,16 +910,24 @@ $('hb_al').onclick = async () => {
   try { const r = await api('hb_albums', {}); $('hb_album').innerHTML = r.albums.map(a => '<option value="' + esc(a.name) + '">' + esc(a.name) + '（' + a.count + ' 张）</option>').join('') || '<option value="">没有相册</option>'; }
   catch (e) { $('hb_pvo').textContent = e.message; }
 };
+const bmOn = () => { try { return localStorage.getItem('tsRpBm') !== '0'; } catch (e) { return true; } };
+$('hb_pvbm').checked = bmOn(); $('hb_pvbm').onchange = () => { try { localStorage.setItem('tsRpBm', $('hb_pvbm').checked ? '1' : '0'); } catch (e) {} if ($('hb_pvo').innerHTML) $('hb_pv').click(); };
 $('hb_pv').onclick = async () => {
-  $('hb_pvo').textContent = '正在预览…';
+  $('hb_pvo').textContent = '正在预览…'; if (window.rsDone) rsPreviewing(true);
   try {
-    const r = await api('hb_preview', hbSrc({radius_m: +$('hb_r').value}));
-    const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180);
-    const W = 520, H = 200, dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 40) / dx, (H - 40) / dy);
-    const X = s => 20 + (s.lon - Math.min(...lo)) * k * sc, Y = s => H - 20 - (s.lat - Math.min(...la)) * sc;
-    const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:520px;background:#eef3e8;border-radius:6px">' + r.stops.map((s, i) => '<circle cx="' + X(s).toFixed(0) + '" cy="' + Y(s).toFixed(0) + '" r="' + (4 + Math.min(10, Math.sqrt(s.n))).toFixed(0) + '" fill="#c4553a55" stroke="#c4553a"><title>' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '</title></circle>').join('') + '</svg>';
-    $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。圆越大照片越多，觉得太碎就换“大景区”再预览。</div>' + svg;
-  } catch (e) { $('hb_pvo').textContent = e.message; }
+    const r = await api('hb_preview', hbSrc({radius_m: +$('hb_r').value, basemap: $('hb_pvbm').checked}));
+    const W = r.basemap ? r.bm_w : 760, H = r.basemap ? r.bm_h : 420; let pts;
+    if (r.basemap) pts = r.xy.map(a => ({x: a[0], y: a[1]}));
+    else { const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180), dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 80) / dx, (H - 80) / dy);
+      pts = r.stops.map(s => ({x: 40 + (s.lon - Math.min(...lo)) * k * sc, y: H - 40 - (s.lat - Math.min(...la)) * sc})); }
+    const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
+      r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5"><title>' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '</title></circle>').join('') + '</svg></div>';
+    $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。圆越大照片越多，点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
+      '<div class="pvd" id="hb_pvd"><span class="tlnote">点地图上的圆圈，这里会显示那处的时间和照片。</span></div>';
+    $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
+      $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
+    if (window.rsDone) rsPreviewing(false, r);
+  } catch (e) { $('hb_pvo').textContent = e.message; if (window.rsDone) rsPreviewing(false, null, e.message); }
 };
 $('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
 $('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r = await api('hb_regions', {}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };
@@ -907,7 +978,7 @@ $('bl_go').onclick = async () => {
   try { const r = await api('bills_import', {path: $('bl_path').value}); $('bl_msg').textContent = r.message; await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; }
 };
 $('tl_q').oninput = () => { if (toolsData) renderTools(); };
-load();
+load().then(homeMaybe);
 </script></body></html>
 """
 

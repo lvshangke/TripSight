@@ -866,9 +866,42 @@ def hb_preview(body: dict) -> dict[str, Any]:
     stops = _pt.cluster(photos, radius_m=radius)
     keep = [x for x in stops if x.n >= mn]
     guessed = _pt.assign_untagged(stops, untagged)
-    return {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
-            "untagged": len(untagged), "guessed": guessed, "stats": st,
-            "stops": [{"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M")} for x in keep]}
+    root = Path("/") if album else folder
+    rows = []
+    for x in keep[:80]:
+        names = sorted(x.files)[:3] if x.files else []
+        rows.append({"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"),
+                     "thumbs": [u for u in (_ph.thumb_uri(root, f, 120, 60) for f in names) if u]})
+    rows += [{"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
+    out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
+           "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": ""}
+    if body.get("basemap") and rows:
+        out.update(_preview_basemap(rows))
+    return out
+
+
+def _preview_basemap(rows: list[dict]) -> dict[str, Any]:
+    """预览地图的底图：只向高德发这张图的中心点、缩放级别和尺寸（不发照片、不发每个点）。只有国内 + 有 AMAP_KEY 才有。"""
+    from .amap import AmapClient
+    from .basemap import Basemap, Projection, choose_view
+    from .coords import out_of_china, wgs84_to_gcj02
+    if any(out_of_china(r["lat"], r["lon"]) for r in rows):
+        return {"basemap_note": "境外照片不支持高德底图，显示无底图的散点图"}
+    client = AmapClient.from_env(log_path=ms._root_dir() / "amap_calls.log")
+    if client is None:
+        return {"basemap_note": "没有 AMAP_KEY（在你自己的配置里设置），显示无底图的散点图"}
+    pts = [wgs84_to_gcj02(r["lat"], r["lon"]) for r in rows]
+    W, H = 760, 420
+    if len(pts) == 1:
+        pts = [pts[0], (pts[0][0] + 0.002, pts[0][1] + 0.002)]
+    view = choose_view(pts, W, H, 50)
+    bm = Basemap(client, ms._root_dir() / "share" / "basemap-cache")
+    uri = bm.fetch(view)
+    if not uri:
+        return {"basemap_note": "底图取不到（" + "；".join(bm.failures) + "），显示无底图的散点图"}
+    proj = Projection(view)
+    xy = [proj.xy(*wgs84_to_gcj02(r["lat"], r["lon"])) for r in rows]
+    return {"basemap": uri, "bm_w": W, "bm_h": H, "xy": [[round(a, 1), round(b, 1)] for a, b in xy]}
 
 
 def bills_state() -> dict[str, Any]:
