@@ -11,7 +11,7 @@ TEMPLATE = r"""<!doctype html>
 <style>__CSS__</style>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
-#app{display:flex;height:100%}
+#app{display:flex;height:calc(100% - 48px);margin-top:48px}
 #side{width:var(--sw,400px);flex:none;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--bg)}
 #scroll{flex:1;overflow:auto}
 #map{flex:1;min-width:0;height:100%}
@@ -203,15 +203,15 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #lb_act{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:99px;color:#fff;font-size:12px}#lb_act button{background:var(--paper);color:var(--ink);border:0}#lb_cap{bottom:62px}
 
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px}.seg button{white-space:nowrap;border:0;background:transparent;border-radius:99px;padding:5px 14px}.seg button.on{background:var(--acc);color:#fff}#modesw button{flex:1}
-#home,#rp{position:fixed;inset:0;z-index:3000;background:var(--bg);display:none}#home.on{display:flex;align-items:center;justify-content:center}#rp.on{display:flex;flex-direction:column}
+
 #home .hbox{text-align:center;max-width:720px;padding:20px}#home h2{font-family:var(--serif);font-size:30px;margin:0 0 6px}#home p{color:var(--sub);margin:0 0 26px}
 .hcards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}.hcard{width:300px;padding:28px 24px;border-radius:18px;background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow);text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .15s,box-shadow .15s}
 .hcard:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(80,60,30,.2);border-color:var(--acc)}.hcard b{font-size:20px;font-family:var(--serif)}.hcard span{color:var(--ink2);font-size:14px;line-height:1.6;font-weight:400}
-#rp .rtop{display:flex;align-items:center;gap:20px;padding:14px 28px;background:var(--paper);border-bottom:1px solid var(--line)}#rp .rtop b{font-family:var(--serif);font-size:18px}
+#rp .rtop{display:flex;align-items:center;gap:20px;padding:10px 28px;background:var(--paper);border-bottom:1px solid var(--line)}#rp .rtop b{font-family:var(--serif);font-size:18px}
 #rp .steps{flex:1;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}#rp .steps span{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;color:var(--sub);font-size:14px;transition:all .15s}
 #rp .steps span i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
 #rp .steps span.on{background:var(--acc-soft2);color:var(--acc);font-weight:600}#rp .steps span.on i{background:var(--acc);color:#fff}#rp .steps span.done i{background:#7a9a5b;color:#fff}#rp .steps span.done{cursor:pointer;color:var(--ink2)}
-#rp_body{flex:1;overflow:auto;padding:26px max(28px,calc((100vw - 1040px)/2))}#rp .pane{display:block}#rp .hbtop{display:none}
+#rp .hbtop{display:none}
 #rp .rfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;background:var(--paper);border-top:1px solid var(--line);gap:12px}
 #rp_body[data-s="1"] #hb_pvo,#rp_body[data-s="1"] #hb_merge,#rp_body[data-s="1"] #hb_list,#rp_body[data-s="1"] .hbexp,#rp_body[data-s="1"] #hb_pv,#rp_body[data-s="1"] #hb_go{display:none!important}
 #rp_body[data-s="2"] #hb_merge,#rp_body[data-s="2"] #hb_list,#rp_body[data-s="2"] .hbexp,#rp_body[data-s="2"] #hb_go{display:none!important}
@@ -222,9 +222,16 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .pvd{margin-top:12px;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-radius:12px;max-width:760px;min-height:48px}.pvd img{width:96px;height:72px;object-fit:cover;border-radius:6px;margin:6px 6px 0 0}
 .hbexp #hb_pvw{width:100%;margin:6px 0 14px}.pvt{display:flex;gap:8px;align-items:center;margin-bottom:8px}.pvt button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .pvf{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}#hb_pvf{width:100%;height:520px;border:0;display:block}#hb_pvc{display:none;height:520px;overflow:hidden;position:relative;background:#e9e4d8}#hb_pvcf{width:1080px;height:1440px;border:0;transform-origin:0 0;transform:scale(.36);position:absolute;left:50%;margin-left:-194px;top:0}
+
+#topnav{position:fixed;top:0;left:0;right:0;height:48px;z-index:3500;display:flex;align-items:center;gap:6px;padding:0 18px;background:var(--paper);border-bottom:1px solid var(--line)}
+#topnav b{font-family:var(--serif);font-size:17px;margin-right:18px;color:var(--acc);letter-spacing:.05em}#topnav button{border:0;background:transparent;border-radius:99px;padding:7px 16px;font-size:14px;color:var(--ink2);transition:all .15s}#topnav button:hover{background:var(--acc-soft)}#topnav button.on{background:var(--acc);color:#fff}
+#home,.pg{position:fixed;left:0;right:0;top:48px;bottom:0;z-index:3000;background:var(--bg);display:none}.pg.on{display:flex;flex-direction:column}#home.on{display:flex;align-items:center;justify-content:center}
+.pgbody{flex:1;overflow:auto;padding:26px max(28px,calc((100vw - 1040px)/2))}.pg .pane{display:block!important;padding:0!important}
+#mo .hbtop .seg{display:none}
 </style></head><body>
+<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button></nav>
 <div id="app"><div id="side">
-<header style="flex-wrap:wrap"><div class="seg" id="modesw" style="width:100%;display:flex"><button data-w="plan" class="on">计划行程</button><button data-w="restore">恢复行程</button></div><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
+<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
 <div id="tabs"></div>
@@ -241,9 +248,10 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
 <div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
 <button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
-<div id="rp"><div class="rtop"><b>恢复行程</b><div class="steps" id="rp_steps"></div><button id="rp_close">返回</button></div>
-<div id="rp_body" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></div>
-<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="bill">花费</button><button data-t="vid">视频</button><button data-t="fp">足迹</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
+<div class="pg" id="rp"><div class="rtop"><div class="steps" id="rp_steps"></div></div>
+<div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></div>
+<div class="pg" id="pg_bill"><div class="pgbody" id="pgb_bill"></div></div><div class="pg" id="pg_fp"><div class="pgbody" id="pgb_fp"></div></div><div class="pg" id="pg_vid"><div class="pgbody" id="pgb_vid"></div></div>
+<div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
@@ -685,7 +693,7 @@ function moShow(tab) {
   moTab = tab;
   document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
-  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad().then(hbPvSoon); else if (tab === 'bill') blLoad(); else if (tab === 'vid') {} else if (tab === 'fp') fpLoad(false); else toolsLoad();
+  if (tab === 'share') shareRefresh(); else if (tab === 'hb') { HB.mode = 'plan'; hbLoad().then(hbPvSoon); } else if (tab === 'bill') blLoad(); else if (tab === 'vid') {} else if (tab === 'fp') fpLoad(false); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 let shareSeq = 0;
@@ -794,27 +802,31 @@ function rsGo(n) {
 }
 function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else if (RS.step === 1 && !on && err) $('rp_msg').textContent = err; $('rp_next').disabled = on; }
 function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
-async function rsOpen(step) {
-  moClose(); $('home').classList.remove('on'); HB.mode = 'restore';
-  $('rp_body').appendChild($('pane_hb')); $('pane_hb').classList.add('on'); $('rp').classList.add('on');
-  document.querySelectorAll('#modesw button').forEach(b => b.classList.toggle('on', b.dataset.w === 'restore'));
-  await hbLoad(); rsGo(step || (HB.data && HB.data.restored ? 4 : 1));
+const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
+function pgShow(name, step) {
+  moClose(); $('home').classList.remove('on');
+  document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
+  ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
+  document.querySelectorAll('#topnav button').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
+  HB.mode = name === 'restore' ? 'restore' : 'plan';
+  if (name === 'plan') { setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 50); return; }
+  const m = PG_MAP[name], pn = $('pane_' + m[1]);
+  $(m[0]).appendChild(pn); pn.classList.add('on');
+  $(name === 'restore' ? 'rp' : 'pg_' + name).classList.add('on');
+  if (name === 'restore') return hbLoad().then(() => rsGo(step || (HB.data && HB.data.restored ? 4 : 1)));
+  if (name === 'bill') blLoad(); else if (name === 'fp') fpLoad(false);
 }
-function rsClose() {
-  $('rp').classList.remove('on'); $('mo').querySelector('.box').appendChild($('pane_hb')); $('pane_hb').classList.remove('on'); HB.mode = 'restore';
-  document.querySelectorAll('#modesw button').forEach(b => b.classList.toggle('on', b.dataset.w === 'plan'));
-}
-$('rp_close').onclick = rsClose;
+const rsOpen = step => pgShow('restore', step);
 $('rp_prev').onclick = () => rsGo(Math.max(1, RS.step - 1));
 $('rp_next').onclick = () => {
   if (RS.step === 1) { $('rp_msg').textContent = ''; $('hb_pv').click(); }
   else if (RS.step === 2) { rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
   else if (RS.step === 4) rsGo(5);
 };
-document.querySelectorAll('#modesw button').forEach(b => b.onclick = () => { if (b.dataset.w === 'restore') rsOpen(); else rsClose(); });
+document.querySelectorAll('#topnav button').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
 function homeMaybe() { try { if (sessionStorage.getItem('tsHome')) return; } catch (e) {} if (S && !S.days.some(d => d.items.length) && !S.unscheduled.length) $('home').classList.add('on'); }
 function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {} $('home').classList.remove('on'); }
-$('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); rsOpen(); };
+$('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
 $('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', {folder: $('vd_path').value}); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
