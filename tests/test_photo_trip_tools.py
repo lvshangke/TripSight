@@ -222,3 +222,11 @@ def test_style_preview_inlines_photos_and_writes_nothing(tmp_path, monkeypatch):
         assert "data:image/jpeg" in r["page"] and "photos/" not in r["page"] and "营业时间" not in r["page"]
         assert r["card"].startswith("<!doctype html>")
     assert not (tmp_path / "out").exists()
+
+
+def test_card_photos_count_one_to_five(tmp_path, monkeypatch):
+    from tripcore import web
+    s.import_photo_trip(str(_album(tmp_path)))
+    for n in (1, 3, 5):
+        card = web.hb_style_preview({"style": "手账", "card_photos": n})["card"]
+        assert card.count('class="ph ') == n and f'class="col n{n}"' in card

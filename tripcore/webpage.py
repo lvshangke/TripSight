@@ -266,7 +266,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
-<label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
+<label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
 <label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
@@ -770,11 +770,11 @@ function photoRow(row, pid) {
 let pvSeq = 0, pvTimer = null;
 async function hbStylePreview() {
   const my = ++pvSeq; $('hb_pvn').textContent = '正在生成预览…';
-  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
+  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
   catch (e) { if (my === pvSeq) $('hb_pvn').textContent = e.message; }
 }
 const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '5' || $('mo').classList.contains('on')) pvTimer = setTimeout(hbStylePreview, 250); };
-$('hb_style').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
+$('hb_style').onchange = hbPvSoon; $('hb_cp').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
 document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; });
 
 // ---- 恢复行程：整页流程 ----
@@ -952,7 +952,7 @@ $('hb_open').onclick = async () => { try { const r = await api('reveal_exports',
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
   $('hb_exp').disabled = false;
 };
 

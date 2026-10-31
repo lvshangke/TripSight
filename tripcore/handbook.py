@@ -150,14 +150,19 @@ t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.ad
 
 def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None) -> str:
     items = "".join(f'<div class="r"><b>{i + 1}</b><i>{_hm(v.arrive)}</i><span>{e(v.place.name)}</span></div>' for i, v in enumerate(vs))
-    pic_html = f'<div class="pic"><img src="{pic}"></div>' if pic else ""
+    pics = [x for x in (pic if isinstance(pic, list) else ([pic] if pic else []))][:5]
+    n = len(pics)
+    pic_html = f'<div class="col n{n}">' + "".join(f'<div class="ph p{i}"><img src="{q}"></div>' for i, q in enumerate(pics)) + "</div>" if n else ""
     date = f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else ""
     return f"""<!doctype html><meta charset="utf-8"><style>{CSS}{theme_css(style)}
 body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-size:30px;letter-spacing:.3em;color:var(--acc)}}
 .t{{font-size:84px;font-weight:700;margin:14px 0 4px}}.s{{font-size:30px;color:var(--sub)}}.route{{margin:30px 0;height:330px}}
 .r{{display:flex;align-items:center;gap:18px;font-size:42px;margin:14px 0}}.r b{{width:56px;height:56px;border-radius:50%;border:3px solid var(--acc);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:28px}}
 .r span{{flex:1;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}.r i{{font-style:normal;color:var(--sub);font-size:32px;width:90px}}
-.pic{{position:absolute;right:70px;bottom:120px;width:300px;background:#fff;padding:14px 14px 44px;box-shadow:0 10px 26px rgba(0,0,0,.2);transform:rotate(3deg)}}.pic img{{width:100%;display:block}}
+.col{{position:absolute;right:56px;bottom:56px;width:430px;display:grid;gap:14px;grid-template-columns:1fr}}.ph{{background:#fff;padding:12px 12px 36px;box-shadow:0 10px 26px rgba(0,0,0,.2)}}.ph img{{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}}
+.col.n1 .ph{{transform:rotate(3deg)}}.col.n2 .ph:nth-child(1){{transform:rotate(-2deg)}}.col.n2 .ph:nth-child(2){{transform:rotate(2.5deg)}}
+.col.n2{{width:370px}}.col.n3,.col.n4,.col.n5{{grid-template-columns:1fr 1fr;width:420px}}.col.n3 .ph img,.col.n4 .ph img,.col.n5 .ph img{{aspect-ratio:3/2}}.col.n3 .ph:first-child,.col.n5 .ph:first-child{{grid-column:1/3}}.col.n3 .ph,.col.n4 .ph,.col.n5 .ph{{padding:8px 8px 22px}}
+.col.n3 .ph:nth-child(1){{transform:rotate(-1.5deg)}}.col.n3 .ph:nth-child(2){{transform:rotate(2deg)}}.col.n3 .ph:nth-child(3){{transform:rotate(-2deg)}}.col.n4 .ph:nth-child(odd),.col.n5 .ph:nth-child(odd){{transform:rotate(-1.5deg)}}.col.n4 .ph:nth-child(even),.col.n5 .ph:nth-child(even){{transform:rotate(2deg)}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
 {_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}"""
@@ -165,7 +170,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -254,7 +259,13 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 parts.append(f'<div class="leg">{e(lg.note or lg.mode)} · {lg.distance_km} km · {lg.minutes} 分钟' + ("（估算）" if lg.detail_level == "estimate" else "") + "</div>")
         parts.append("</section>")
         days_html.append("".join(parts))
-        card_jobs.append((day.index, d, vs, km, st.legs, first_pic))
+        pool = [list(by_place.get(v.place.id, [])) for v in vs]
+        picked: list[str] = []
+        for r in range(MAX_PHOTOS):                       # 轮流从每一站取，最多 card_photos 张，让一天的卡片尽量覆盖不同地方
+            for lst in pool:
+                if r < len(lst) and len(picked) < max(1, min(int(card_photos), 5)):
+                    picked.append(f"../photos/{lst[r]['file']}")
+        card_jobs.append((day.index, d, vs, km, st.legs, picked))
 
     sp_html = ""
     if spending and spending.get("count"):

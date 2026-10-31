@@ -775,7 +775,7 @@ def hb_export(body: dict) -> dict[str, Any]:
     out: list[str] = []
     try:
         if fm & {"html", "cards", "pdf"}:
-            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), thumb_pins=bool(body.get("thumb_pins")), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
+            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), thumb_pins=bool(body.get("thumb_pins")), card_photos=max(1, min(int(body.get("card_photos") or 3), 5)), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
                                        show_spending=bool(body.get("spending")), spending_categories=[str(c) for c in (body.get("spending_cats") or [])] or None))
         if "obsidian" in fm:
             out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))
@@ -824,7 +824,7 @@ def hb_style_preview(body: dict) -> dict[str, Any]:
     try:
         with tempfile.TemporaryDirectory() as td:
             res = build_handbook(trip, Path(td), photos=items, photo_dir=ms._photo_dir(), show_photos=show, cards=False, stories=ms._load_json_file(ms._stories_path()),
-                                 style=style, regions=ms._chapter_labels(), card_preview=cards)
+                                 style=style, regions=ms._chapter_labels(), card_preview=cards, card_photos=max(1, min(int(body.get("card_photos") or 3), 5)))
             root = Path(res["folder"])
 
             def inline(m):
