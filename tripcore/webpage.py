@@ -228,10 +228,17 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #home,.pg{position:fixed;left:0;right:0;top:48px;bottom:0;z-index:3000;background:var(--bg);display:none}.pg.on{display:flex;flex-direction:column}#home.on{display:flex;align-items:center;justify-content:center}
 .pgbody{flex:1;overflow:auto;padding:26px max(28px,calc((100vw - 1040px)/2))}.pg .pane{display:block!important;padding:0!important}
 #mo .hbtop .seg{display:none}
+
+#topnav .nsp{flex:1}.tripsel{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:6px}#topnav select{max-width:240px;border-radius:99px;padding:5px 12px;background:var(--bg)}
+#toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:5000;background:#33302b;color:#fffdf8;padding:10px 20px;border-radius:99px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:all .25s;max-width:80vw}#toast.on{opacity:1;transform:translate(-50%,0)}#toast.err{background:#a63d2a}
+@keyframes pgin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.pg.on .pgbody,.pg.on .rtop{animation:pgin .25s ease-out}#rp_body>.pane>*{animation:pgin .3s ease-out}
+.hbs,.tcard,.hbimp,.hbexp,.bls .k,.day{transition:box-shadow .15s,transform .15s,border-color .15s}.hbs:hover,.tcard:hover{box-shadow:0 8px 22px rgba(80,60,30,.14);border-color:var(--line2)}.hbp .c:hover img{filter:brightness(1.05)}
+#rp .steps span.done:hover{background:var(--acc-soft)}#ptip{position:fixed;z-index:5000;background:#33302b;color:#fff;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}#ptip.on{opacity:1}
 </style></head><body>
-<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button></nav>
+<div id="toast"></div><div id="ptip"></div>
+<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label></nav>
 <div id="app"><div id="side">
-<header><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
+<header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
 <div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
 <div id="tabs"></div>
@@ -324,7 +331,9 @@ const pin = (txt, color) => L.divIcon({className:'', html:'<div class="pin" styl
 const emo = e => L.divIcon({className:'', html:'<div class="emo">'+e+'</div>', iconSize:[26,26], iconAnchor:[13,13]});
 const popup = (name, lines) => '<b>'+esc(name)+'</b>'+(lines.length?'<br>':'')+lines.map(esc).join('<br>');
 
-function say(t, err) { const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; }
+let toastT = null;
+function toast(t, err) { const e = $('toast'); if (!t) return; e.textContent = t.length > 90 ? t.slice(0, 90) + '…' : t; e.className = 'on' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => e.className = '', err ? 5000 : 3200); }
+function say(t, err) { const m = $('msg'); m.textContent = t || ''; m.className = err ? 'err' : ''; if (t) toast(t, err); }
 async function api(path, body) {
   const r = await fetch('api/' + path, body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   const j = await r.json().catch(() => ({error: '服务没有响应'}));
@@ -387,7 +396,7 @@ $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
   if (want === '__new__') { await loadTrips(); ntOpen(); return; }
   if (pending && !confirm('有一个还没确认的修改预览，切换行程会放弃它。继续吗？')) { await loadTrips(); return; }
-  try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); }
+  try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); }
   catch (e) { say(e.message, true); await loadTrips(); }
 };
 function renderAll() { renderDates(); renderTabs(); renderList(); }
@@ -785,6 +794,8 @@ const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '
 $('hb_style').onchange = hbPvSoon; $('hb_cp').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
 document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; });
 
+document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (!t) return; const r = t.getBoundingClientRect(), p = $('ptip'); p.textContent = t.dataset.tip; p.style.left = Math.max(8, r.left + r.width / 2 - p.offsetWidth / 2) + 'px'; p.style.top = (r.top - 34) + 'px'; p.className = 'on'; });
+document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('[data-tip]')) $('ptip').className = ''; });
 // ---- 恢复行程：整页流程 ----
 const RS = {step: 1, ok: false};
 const RS_NAMES = ['选来源', '预览调整', '恢复', '编辑', '导出'];
@@ -802,9 +813,10 @@ function rsGo(n) {
 }
 function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else if (RS.step === 1 && !on && err) $('rp_msg').textContent = err; $('rp_next').disabled = on; }
 function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
+var PGCUR = 'plan';
 const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
 function pgShow(name, step) {
-  moClose(); $('home').classList.remove('on');
+  PGCUR = name; moClose(); $('home').classList.remove('on');
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
@@ -879,7 +891,7 @@ function hbCard(s, restore) {
 }
 function hbWire(s) {
   const box = $('hb_' + s.id), m = box.querySelector('.hbm');
-  const note = (t, err) => { m.textContent = t; m.style.color = err ? '#b91c1c' : '#555'; };
+  const note = (t, err) => { m.textContent = t; m.style.color = err ? '#b91c1c' : '#555'; if (t) toast(t, err); };
   const sel = box.querySelector('.sel'); if (sel) sel.onchange = () => { sel.checked ? HB.sel.add(s.id) : HB.sel.delete(s.id); };
   const lbList = s.photos.map(p => ({id: p.id, thumb: p.thumb, caption: ''}));
   let dragId = null;
@@ -946,7 +958,7 @@ $('hb_pv').onclick = async () => {
     else { const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180), dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 80) / dx, (H - 80) / dy);
       pts = r.stops.map(s => ({x: 40 + (s.lon - Math.min(...lo)) * k * sc, y: H - 40 - (s.lat - Math.min(...la)) * sc})); }
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
-      r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5"><title>' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '</title></circle>').join('') + '</svg></div>';
+      r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。圆越大照片越多，点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点地图上的圆圈，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
@@ -964,7 +976,7 @@ $('hb_open').onclick = async () => { try { const r = await api('reveal_exports',
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; } catch (e) { $('hb_out').textContent = e.message; }
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ~/Documents/TripSight/ 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
   $('hb_exp').disabled = false;
 };
 
