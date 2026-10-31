@@ -165,7 +165,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -222,8 +222,8 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         for i, v in enumerate(vs):
             p = v.place
             rgtag = f'<span class="rg">{e(rg[p.id])}</span> · ' if rg.get(p.id) else ''
-            hours = f"营业：{e(p.opening_hours)}" if p.opening_hours else "营业时间未核实"
-            body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{rgtag}{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟 · {hours}</div>'
+            hours_sep = f" · 营业：{e(p.opening_hours)}" if p.opening_hours else ""
+            body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{rgtag}{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟{hours_sep}</div>'
             views, tabs = "", []
             pics = by_place.get(p.id, [])[:MAX_PHOTOS]
             if pics:
@@ -265,12 +265,16 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     order_ids = [v.place.id for day in trip.plan.days for v in day_visits(trip, day)[0]]
     chs = order_of_appearance(order_ids, rg)
     chap_html = '<div class="m">' + ' → '.join(e(c) for c in chs) + '</div>' if len(chs) > 1 else ''
+    foot = '<div class="foot">营业时间来自地图服务，出发前请再核实。</div>' if any(p.opening_hours for p in trip.places) else ""
     title = e(trip.meta.name)
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
             f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
-            f'{"".join(days_html)}{sp_html}<div class="foot">营业时间来自地图服务，出发前请再核实。</div></div>{JS}</html>')
+            f'{"".join(days_html)}{sp_html}{foot}</div>{JS}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 
+    if card_preview is not None and card_jobs:                  # 只要第一天卡片的 HTML 给预览用，不渲染图
+        idx, d, vs, km, legs, pic = card_jobs[0]
+        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None))
     if cards:
         from . import share as _share
         try:

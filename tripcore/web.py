@@ -808,6 +808,43 @@ def photo_edit(body: dict) -> dict[str, Any]:
     return {"ok": True, "path": str(path)}
 
 
+def hb_style_preview(body: dict) -> dict[str, Any]:
+    """导出前预览：按选的风格在临时文件夹里生成手册，返回内嵌了缩小照片的网页和第一天卡片的网页；不写进导出文件夹、不联网（不含高德底图）。"""
+    import base64, re, tempfile
+    from .handbook import THEMES, build_handbook
+    style = str(body.get("style") or "手账")
+    if style not in THEMES:
+        raise HttpError(400, "没有这个风格。")
+    trip = ms._load()
+    if trip.plan is None or not trip.plan.days:
+        raise HttpError(400, "还没有排好的行程，没有可预览的内容。")
+    show = bool(body.get("photos", True))
+    items = _ph.load(ms._photo_index()) if show else []
+    cards: list[str] = []
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            res = build_handbook(trip, Path(td), photos=items, photo_dir=ms._photo_dir(), show_photos=show, cards=False, stories=ms._load_json_file(ms._stories_path()),
+                                 style=style, regions=ms._chapter_labels(), card_preview=cards)
+            root = Path(res["folder"])
+
+            def inline(m):
+                f = root / "photos" / m.group(1)
+                try:
+                    from PIL import Image
+                    import io
+                    with Image.open(f) as im:
+                        im.thumbnail((640, 640)); b = io.BytesIO(); im.convert("RGB").save(b, "JPEG", quality=70)
+                    return 'src="data:image/jpeg;base64,' + base64.b64encode(b.getvalue()).decode() + '"'
+                except Exception:
+                    return 'src=""'
+            pat = re.compile(r'src="(?:\.\./)?photos/([^"]+)"')
+            page = pat.sub(inline, (root / "index.html").read_text(encoding="utf-8"))
+            card = pat.sub(inline, cards[0]) if cards else ""
+    except (OSError, ValueError) as e:
+        raise HttpError(400, str(e))
+    return {"page": page, "card": card}
+
+
 def reveal_exports(body: dict) -> dict[str, Any]:
     """在访达（或系统文件管理器）里打开导出文件夹。path 可不填；填了必须在导出文件夹之内。"""
     root = ms.export_root()
@@ -1016,7 +1053,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1094,7 +1131,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

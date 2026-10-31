@@ -211,3 +211,14 @@ def test_obsidian_uses_relative_markdown_images_and_skips_hidden(tmp_path, monke
     md = "\n".join(f.read_text(encoding="utf-8") for f in root.glob("*.md"))
     assert "](attachments/photos/" in md and "![[" not in md
     assert len(list((root / "attachments" / "photos").glob("*.jpg"))) == len(items) - 1
+
+
+def test_style_preview_inlines_photos_and_writes_nothing(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    for st in ("手账", "杂志"):
+        r = web.hb_style_preview({"style": st})
+        assert "data:image/jpeg" in r["page"] and "photos/" not in r["page"] and "营业时间" not in r["page"]
+        assert r["card"].startswith("<!doctype html>")
+    assert not (tmp_path / "out").exists()

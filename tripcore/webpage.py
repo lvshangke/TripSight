@@ -220,6 +220,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #rp_body[data-s="3"] .hbexp{display:none!important}
 .pvmap{position:relative;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);max-width:760px;background:#eef3e8}.pvmap svg{display:block;width:100%;height:auto}.pvmap circle{cursor:pointer;transition:r .12s,fill .12s}.pvmap circle:hover{fill:#c4553a99}.pvmap circle.sel{stroke-width:4;fill:#c4553acc}
 .pvd{margin-top:12px;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-radius:12px;max-width:760px;min-height:48px}.pvd img{width:96px;height:72px;object-fit:cover;border-radius:6px;margin:6px 6px 0 0}
+.hbexp #hb_pvw{width:100%;margin:6px 0 14px}.pvt{display:flex;gap:8px;align-items:center;margin-bottom:8px}.pvt button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.pvf{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}#hb_pvf{width:100%;height:520px;border:0;display:block}#hb_pvc{display:none;height:520px;overflow:hidden;position:relative;background:#e9e4d8}#hb_pvcf{width:1080px;height:1440px;border:0;transform-origin:0 0;transform:scale(.36);position:absolute;left:50%;margin-left:-194px;top:0}
 </style></head><body>
 <div id="app"><div id="side">
 <header style="flex-wrap:wrap"><div class="seg" id="modesw" style="width:100%;display:flex"><button data-w="plan" class="on">计划行程</button><button data-w="restore">恢复行程</button></div><select id="trip" title="切换行程"></select><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
@@ -260,8 +262,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
-<div class="hbexp"><b>确定最终版并导出</b>
-<label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<div class="hbexp"><b>确定最终版并导出</b> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
@@ -683,7 +685,7 @@ function moShow(tab) {
   moTab = tab;
   document.querySelectorAll('#mo .tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
   document.querySelectorAll('#mo .pane').forEach(p => p.classList.toggle('on', p.id === 'pane_' + tab));
-  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad(); else if (tab === 'bill') blLoad(); else if (tab === 'vid') {} else if (tab === 'fp') fpLoad(false); else toolsLoad();
+  if (tab === 'share') shareRefresh(); else if (tab === 'hb') hbLoad().then(hbPvSoon); else if (tab === 'bill') blLoad(); else if (tab === 'vid') {} else if (tab === 'fp') fpLoad(false); else toolsLoad();
 }
 const shareOpts = () => ({lodging: $('sh_l').checked, costs: $('sh_c').checked, photos: $('sh_p').checked, theme: $('sh_t').value, basemap: $('sh_b').checked});
 let shareSeq = 0;
@@ -764,6 +766,17 @@ function photoRow(row, pid) {
   wrap.appendChild(lab); row.querySelector('.sub').appendChild(wrap);
 }
 
+// ---- 导出前预览 ----
+let pvSeq = 0, pvTimer = null;
+async function hbStylePreview() {
+  const my = ++pvSeq; $('hb_pvn').textContent = '正在生成预览…';
+  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
+  catch (e) { if (my === pvSeq) $('hb_pvn').textContent = e.message; }
+}
+const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '5' || $('mo').classList.contains('on')) pvTimer = setTimeout(hbStylePreview, 250); };
+$('hb_style').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
+document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; });
+
 // ---- 恢复行程：整页流程 ----
 const RS = {step: 1, ok: false};
 const RS_NAMES = ['选来源', '预览调整', '恢复', '编辑', '导出'];
@@ -777,7 +790,7 @@ function rsGo(n) {
   $('rp_next').style.display = n === 5 || n === 3 ? 'none' : '';
   $('rp_msg').textContent = n === 1 ? '填相册文件夹（或照片 App 相册），照片要带位置信息。' : n === 2 ? '先看看会得到几处；太碎就换“大景区”。' : n === 4 ? '改名字、调照片顺序、写几句话；选两处以上可合并。' : '';
   if (n === 3) { $('hb_list').textContent = ''; }
-  $('rp_body').scrollTop = 0;
+  $('rp_body').scrollTop = 0; if (n === 5) hbStylePreview();
 }
 function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else if (RS.step === 1 && !on && err) $('rp_msg').textContent = err; $('rp_next').disabled = on; }
 function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
