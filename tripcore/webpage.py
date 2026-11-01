@@ -237,9 +237,10 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .msgbox{display:none;width:100%;padding:10px 14px;border-radius:10px;background:var(--acc-soft);border:1px solid var(--acc-soft2);color:var(--ink);white-space:pre-wrap;font-size:13px;line-height:1.6}.msgbox.on{display:block}.msgbox.err{background:#fdecea;border-color:#f3c0b8;color:#8a2a1c}.pk{font-size:12px;padding:5px 10px;white-space:nowrap}
 .rep{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.rh{font-weight:600;margin-bottom:8px;font-family:var(--serif)}.rep .why{margin:8px 0;padding:10px 12px;background:#fdecea;border:1px solid #f3c0b8;border-radius:8px;color:#8a2a1c;font-size:13px;line-height:1.6}
 .bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:12px 0}.bcard{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.brow{display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0}.brow span{width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brow .bt{flex:1;background:var(--bg);border-radius:4px}.brow b{min-width:44px;text-align:right}.brow i{font-style:normal;color:var(--sub);min-width:34px;text-align:right}
+.nbtn{font-size:13px!important;padding:5px 12px!important;border:1px solid var(--line)!important}#bin{position:absolute;right:16px;top:50px;width:340px;max-height:60vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px;display:none}#bin.on{display:block}#bin .br{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dotted var(--line);font-size:13px}#bin .br span{flex:1}
 </style></head><body>
 <div id="toast"></div><div id="ptip"></div>
-<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label></nav>
+<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
 <div id="app"><div id="side">
 <header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
@@ -353,6 +354,19 @@ async function load() {
   syncChat();
 }
 let TRIPS_R = null;
+$('trip_del').onclick = async () => {
+  const r = TRIPS_R; if (!r || r.single) return toast('单文件模式不能删除行程。', true);
+  const cur = r.trips.find(t => t.slug === r.current); if (!cur) return;
+  if (!confirm('删除「' + cur.name + '」？\n它会被移到回收区，文件不会真正删掉，之后可以在“回收区”里恢复。')) return;
+  try { const x = await api('trip_delete', {slug: cur.slug}); toast(x.message); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); } catch (e) { toast(e.message, true); }
+};
+$('trip_bin').onclick = e => { e.stopPropagation(); const b = $('bin'); if (b.classList.contains('on')) return b.classList.remove('on'); binRender(); b.classList.add('on'); };
+document.addEventListener('click', e => { if (!e.target.closest('#bin')) $('bin').classList.remove('on'); });
+function binRender() {
+  const a = (TRIPS_R && TRIPS_R.archived) || [];
+  $('bin').innerHTML = '<div class="rh">回收区</div>' + (a.length ? a.map(t => '<div class="br"><span>' + (t.kind === 'restore' ? '📷 ' : '') + esc(t.name) + '</span><button data-s="' + esc(t.slug) + '">恢复</button></div>').join('') : '<div class="tlnote">这里还没有删除过的行程。</div>');
+  $('bin').querySelectorAll('button').forEach(b => b.onclick = async () => { try { const x = await api('trip_restore', {slug: b.dataset.s}); toast(x.message); await loadTrips(); binRender(); } catch (er) { toast(er.message, true); } });
+}
 const needKind = () => PGCUR === 'plan' ? 'plan' : (PGCUR === 'bill' ? '' : 'restore');
 async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; fillTripSel(); } catch (e) {} }
 function fillTripSel() {
@@ -1048,7 +1062,7 @@ $('bl_go').onclick = async () => {
   $('bl_go').disabled = false;
 };
 document.querySelectorAll('button[data-pick]').forEach(b => b.onclick = async () => {
-  try { const r = await api('pick_path', {kind: b.dataset.pick, prompt: b.dataset.pick === 'folder' ? '请选择文件夹' : '请选择文件'}); if (r.path) { $(b.dataset.to).value = r.path; $(b.dataset.to).dispatchEvent(new Event('change')); } }
+  try { const r = await api('pick_path', {kind: b.dataset.pick, prompt: b.dataset.pick === 'folder' ? '请选择文件夹' : '请选择文件'}); if (r.path) { $(b.dataset.to).value = r.path; $(b.dataset.to).dispatchEvent(new Event('change')); if (b.dataset.to === 'vd_path') $('vd_scan').click(); } }
   catch (e) { toast(e.message, true); }
 });
 $('tl_q').oninput = () => { if (toolsData) renderTools(); };

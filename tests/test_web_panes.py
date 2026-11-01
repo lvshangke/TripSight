@@ -103,3 +103,23 @@ def test_pick_path_mac_only_and_cancel(monkeypatch):
     assert web.pick_path({"kind": "folder"}) == {"path": ""}
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "/Users/x/账单.csv\n", ""))
     assert web.pick_path({"kind": "file"}) == {"path": "/Users/x/账单.csv"}
+
+
+def test_trip_delete_moves_to_archive_and_restore(tmp_path, monkeypatch):
+    import pytest
+    from tripcore import web, workspace as ws
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from tripcore import mcp_server as s
+    if s._single_file_mode():
+        pytest.skip("single file mode")
+    s.new_trip(name="甲", num_days=1)
+    s.new_trip(name="乙", num_days=1)
+    root = s._root_dir()
+    cur = ws.active_slug(root)
+    out = web.trip_delete({"slug": cur})
+    assert "回收区" in out["message"] and ws.active_slug(root) != cur
+    assert [x["slug"] for x in ws.list_trips(root, archived=True)] == [cur]
+    assert web.trip_restore({"slug": cur})["slug"]
+    with pytest.raises(web.HttpError):
+        web.trip_delete({"slug": "nope"})

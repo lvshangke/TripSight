@@ -393,7 +393,37 @@ def trips() -> dict[str, Any]:
     root = ms._root_dir()
     ws.migrate_legacy(root)
     return {"single": False, "current": ws.active_slug(root),
+            "archived": [{k: it[k] for k in ("slug", "name", "num_days", "kind")} for it in ws.list_trips(root, archived=True)],
             "trips": [{k: it[k] for k in ("slug", "name", "num_days", "places", "kind")} for it in ws.list_trips(root)]}
+
+
+def trip_delete(body: dict) -> dict[str, Any]:
+    """“删除”行程：移到 trips/_archive/（回收区），文件不会真正删掉，可以在回收区里恢复。删的是当前行程时先切到另一个同类行程。"""
+    if ms._single_file_mode():
+        raise HttpError(400, "当前是单文件模式，不能删除行程。")
+    root = ms._root_dir()
+    slug = str(body.get("slug") or "")
+    items = ws.list_trips(root)
+    me = next((x for x in items if x["slug"] == slug), None)
+    if me is None:
+        raise HttpError(404, "找不到这个行程。")
+    others = [x for x in items if x["slug"] != slug]
+    if not others:
+        raise HttpError(400, "这是唯一的行程，不能删除：先新建一个再删。")
+    if slug == ws.active_slug(root):
+        nxt = next((x for x in reversed(others) if x["kind"] == me["kind"]), others[-1])
+        ws.set_active(root, nxt["slug"])
+    ws.archive(root, slug)
+    return {"message": f"已删除「{me['name']}」（移到了回收区，文件没有真正删除，可以恢复）。"}
+
+
+def trip_restore(body: dict) -> dict[str, Any]:
+    root = ms._root_dir()
+    try:
+        dest = ws.unarchive(root, str(body.get("slug") or ""))
+    except KeyError:
+        raise HttpError(404, "回收区里没有这个行程。")
+    return {"message": "已恢复行程。", "slug": dest.name}
 
 
 def switch(body: dict) -> dict[str, Any]:
@@ -1068,7 +1098,7 @@ def fp_build(body: dict) -> dict[str, Any]:
 
 
 ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state, "fp_state": lambda: fp_build({})}
-ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
+ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
                "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}

@@ -121,3 +121,14 @@ def archive(root: Path, slug: str) -> Path:
         dest, n = dest_base / f"{slug}-{n}", n + 1
     shutil.move(str(src), str(dest))
     return dest
+
+
+def unarchive(root: Path, slug: str) -> Path:
+    """把 trips/_archive/ 里的行程移回 trips/。"""
+    src = trips_dir(root) / ARCHIVE / slug
+    if not src.is_dir():
+        raise KeyError(slug)
+    base = slug.rsplit("-", 1)[0] if (trips_dir(root) / slug).exists() else slug
+    dest = trips_dir(root) / unique_slug(root, base)
+    shutil.move(str(src), str(dest))
+    return dest
