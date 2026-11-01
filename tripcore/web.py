@@ -771,6 +771,18 @@ def hb_merge(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
 
 
+def restore_context(msg: str) -> str:
+    """用户在“恢复行程”页里和助手说话时，把页面状态直接写进给 agent 的消息里（不靠 agent 一定有 restore_status 这个工具，旧版本的 agent 也能看到）。"""
+    try:
+        status = ms.restore_status()
+    except Exception:
+        status = "（读不到页面状态）"
+    return ("【TripSight 页面：恢复行程】\n页面状态：\n" + status + "\n"
+            "说明：“恢复行程”是把用户拍过的照片（文件夹或 Mac 照片 App 相册）还原成走过的路线，不是从已有行程里挑一个。"
+            "当前行程是空的恢复行程、用户又没给来源时，直接问他：照片在哪个文件夹（给完整路径）或哪个相册，或请他在页面左侧“选来源”里选；"
+            "有了来源先预览再恢复，用 import_photo_trip（folder 或 album），先和用户确认。不要列出已有的计划行程让用户选。\n\n用户说：" + msg)
+
+
 def activity(body: dict) -> dict[str, Any]:
     """助手（任何 agent）最近调用了哪些工具：since 之后有变化的。页面轮询用，只读。"""
     from . import activity as _ac
@@ -1329,7 +1341,7 @@ def make_handler(token: str, state: dict):
             if key:
                 headers["Authorization"] = "Bearer " + key
             cfile, sid = _chat_file(), _session_id()          # 先定下是哪个行程：回复中途即使切换了行程，也记在原来那个里
-            agent_msg = ("【TripSight 页面：恢复行程】先调用 restore_status 看页面上选了什么、预览到什么；之后再回答。\n" + msg) if body.get("ctx") == "restore" else msg
+            agent_msg = restore_context(msg) if body.get("ctx") == "restore" else msg
             payload = json.dumps({"messages": [{"role": "user", "content": agent_msg}], "session_id": sid, "stream": True})
             try:
                 conn = http.client.HTTPConnection(host, port, timeout=130)

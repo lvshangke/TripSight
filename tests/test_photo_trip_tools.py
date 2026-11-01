@@ -368,3 +368,11 @@ def test_album_videos_are_read_by_path_without_copying(tmp_path, monkeypatch):
     assert seen == [f1, f2] and "2 段视频" in out and "另有 1 个读不了" in out
     with pytest.raises(s.ToolError):
         s.scan_videos()
+
+
+def test_restore_context_inlines_page_state_for_agents_without_the_tool(tmp_path):
+    from tripcore import web
+    s.new_restore_trip("旧手机")
+    out = web.restore_context("帮我恢复下行程")
+    assert out.startswith("【TripSight 页面：恢复行程】") and "旧手机" in out and "照片恢复的行程" in out
+    assert "不要列出已有的计划行程" in out and out.endswith("用户说：帮我恢复下行程")
