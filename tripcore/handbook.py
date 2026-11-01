@@ -105,6 +105,21 @@ THEMES = {      # 只换配色、字体和相框角度，都是浅色底
     "海边": {"bg": "#eaf3f9", "paper": "#ffffff", "ink": "#1f3b52", "sub": "#6b8aa3", "acc": "#1f7fbf", "line": "#cfe0ee", "tape": "#bfdcf0", "rot": "-1.5deg", "font": '"PingFang SC","Noto Sans SC",sans-serif'},
 }
 
+EDIT_JS = """<style>[data-ed]{outline:none;cursor:text;border-radius:4px}[data-ed]:hover{background:rgba(196,85,58,.1)}[data-ed]:focus{background:rgba(196,85,58,.16);box-shadow:0 0 0 2px rgba(196,85,58,.4)}[data-ed]:empty:before{content:"点这里写几句…";color:#aaa;font-style:normal}
+.rzh{position:absolute;right:-8px;bottom:-8px;width:18px;height:18px;border-radius:50%;background:#c4553a;border:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:3;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.ed-tip{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;background:rgba(40,40,40,.85);color:#fff;font:13px sans-serif;padding:6px 12px;border-radius:14px;z-index:9}</style>
+<div class="ed-tip">可编辑预览：点标题/文字直接改，拖照片右下角的红点调大小</div>
+<script>(function(){const send=m=>parent.postMessage(Object.assign({tripsight:1},m),'*');
+document.querySelectorAll('[data-ed]').forEach(el=>{el.contentEditable='true';el.spellcheck=false;let v=el.textContent;
+el.addEventListener('focus',()=>{v=el.textContent});
+el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur()}});
+el.addEventListener('blur',()=>{const t=el.textContent.trim();if(t!==v.trim()){const a=el.dataset.ed.split(':');send({k:a[0],id:a[1],text:t})}})});
+document.querySelectorAll('[data-rz]').forEach(box=>{const h=document.createElement('span');h.className='rzh';h.title='拖动调整大小';box.appendChild(h);
+h.addEventListener('pointerdown',e=>{e.preventDefault();h.setPointerCapture(e.pointerId);const w0=box.getBoundingClientRect().width,base=parseFloat(box.dataset.rz)||100,x0=e.clientX;let now=0;
+const mv=ev=>{now=Math.max(40,Math.min(160,Math.round(base*(w0+(ev.clientX-x0))/w0)));box.style.setProperty('--s',now/100)};
+const up=()=>{h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);if(now){box.dataset.rz=now;send({k:'scale',id:box.dataset.pid,scale:now})}};
+h.addEventListener('pointermove',mv);h.addEventListener('pointerup',up)})});})();</script>"""
+
 
 def theme_css(name: str) -> str:
     t = THEMES.get(name)
@@ -126,14 +141,14 @@ CSS = """
 .day{margin-top:36px}.dh{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px;flex-wrap:wrap}
 .dh h2{font-size:26px}.dh span{color:var(--sub);font-size:14px}.wx{color:var(--sub);font-size:14px;margin-top:6px}
 .route{width:100%;margin:14px 0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
-.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.m-walk{stroke-dasharray:1 7!important}.m-transit{stroke-dasharray:none!important}.m-drive{stroke-dasharray:14 7!important}.est{opacity:.5}.pinr{fill:none;stroke:#fff;stroke-width:3}.pinb{fill:var(--acc)}.pinn{font-size:10px;fill:#fff;text-anchor:middle;font-family:sans-serif;font-weight:700}.lg{stroke-width:3}.lgbg{fill:#fff;opacity:.85}.lt{font-size:12px;fill:#33302b;font-family:sans-serif}.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 14px;margin:18px 6px 6px}.gal figure{margin:0;background:#fff;padding:7px 7px 22px;box-shadow:0 5px 14px rgba(0,0,0,.16);transform:rotate(var(--gr,1.5deg))}.gal figure:nth-child(2n){--gr:-1.8deg}.gal figure:nth-child(3n){--gr:.8deg}.gal img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;cursor:zoom-in}
+.line{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:7 6;stroke-linecap:round}.dot{fill:var(--paper);stroke:var(--acc);stroke-width:2.5}.bl{stroke-width:3.5;stroke:#d9381e}.m-walk{stroke-dasharray:1 7!important}.m-transit{stroke-dasharray:none!important}.m-drive{stroke-dasharray:14 7!important}.est{opacity:.5}.pinr{fill:none;stroke:#fff;stroke-width:3}.pinb{fill:var(--acc)}.pinn{font-size:10px;fill:#fff;text-anchor:middle;font-family:sans-serif;font-weight:700}.lg{stroke-width:3}.lgbg{fill:#fff;opacity:.85}.lt{font-size:12px;fill:#33302b;font-family:sans-serif}.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 14px;margin:18px 6px 6px}.gal figure{position:relative;width:calc(100% * var(--s,1));max-width:100%;justify-self:center;margin:0;background:#fff;padding:7px 7px 22px;box-shadow:0 5px 14px rgba(0,0,0,.16);transform:rotate(var(--gr,1.5deg))}.gal figure:nth-child(2n){--gr:-1.8deg}.gal figure:nth-child(3n){--gr:.8deg}.gal img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;cursor:zoom-in}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:96vw;max-height:94vh}
 @media print{.lb{display:none}.stop{break-inside:avoid}.day{break-before:page}}
 .dn{font:700 12px sans-serif;text-anchor:middle;fill:var(--acc)}
 .stop{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 2px 0 var(--line)}
 .stop h3{font-size:20px}.stop h3 b{color:var(--acc);margin-right:6px}.meta{color:var(--sub);font-size:14px;margin-top:2px}
 .leg{color:var(--sub);font-size:13px;border-left:3px dotted var(--line);margin:0 0 0 18px;padding:2px 0 2px 14px}
-.polaroid{position:relative;width:min(300px,78%);margin:14px auto 4px;background:#fff;padding:10px 10px 38px;box-shadow:0 6px 18px rgba(0,0,0,.18);transform:rotate(var(--rot,-2deg))}
+.polaroid{position:relative;width:calc(min(300px,78%) * var(--s,1));max-width:100%;margin:14px auto 4px;background:#fff;padding:10px 10px 38px;box-shadow:0 6px 18px rgba(0,0,0,.18);transform:rotate(var(--rot,-2deg))}
 .polaroid:before{content:"";position:absolute;top:-12px;left:36%;width:80px;height:22px;background:var(--tape);opacity:.8;transform:rotate(3deg)}
 .polaroid img,.polaroid video{width:100%;display:block}.cap{position:absolute;left:0;right:0;bottom:9px;text-align:center;font-size:14px;color:var(--sub)}
 .tabs{display:flex;gap:8px;justify-content:center;margin:6px 0 0}.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:99px;padding:3px 12px;cursor:pointer}
@@ -148,7 +163,21 @@ JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previ
 t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';const m=document.createElement('img');m.src=i.src;o.appendChild(m);o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None) -> str:
+def _scale_attrs(ph: dict, edit: bool) -> str:
+    """照片的显示比例（--s，1=默认大小）和预览里拖动调整用的标记；导出的文件里只有 style。"""
+    sc = ph.get("scale")
+    a = f' style="--s:{sc / 100:g}"' if sc else ""
+    if edit:
+        a += f' data-rz="{sc or 100}" data-pid="{e(str(ph.get("id", "")))}"'
+    return a
+
+
+def _fig(ph: dict, name: str, edit: bool) -> str:
+    cap = e(ph.get("caption") or name)
+    return f'<figure{_scale_attrs(ph, edit)}><img src="photos/{ph["file"]}" alt="{cap}" loading="lazy"></figure>'
+
+
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None, title="") -> str:
     n_st = len(vs)
     many = n_st > 12                                   # 站点太多：照片拼贴让位，名字分两列排，字号随数量缩小，保证每一站都写得下
     rows_h = min(96, 640 // max(1, (n_st + 1) // 2 if many else n_st))
@@ -169,13 +198,13 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .col.n2{{width:370px}}.col.n3,.col.n4,.col.n5{{grid-template-columns:1fr 1fr;width:420px}}.col.n3 .ph img,.col.n4 .ph img,.col.n5 .ph img{{aspect-ratio:3/2}}.col.n3 .ph:first-child,.col.n5 .ph:first-child{{grid-column:1/3}}.col.n3 .ph,.col.n4 .ph,.col.n5 .ph{{padding:8px 8px 22px}}
 .col.n3 .ph:nth-child(1){{transform:rotate(-1.5deg)}}.col.n3 .ph:nth-child(2){{transform:rotate(2deg)}}.col.n3 .ph:nth-child(3){{transform:rotate(-2deg)}}.col.n4 .ph:nth-child(odd),.col.n5 .ph:nth-child(odd){{transform:rotate(-1.5deg)}}.col.n4 .ph:nth-child(even),.col.n5 .ph:nth-child(even){{transform:rotate(2deg)}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
-<div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t">第 {idx + 1} 天</div><div class="s">{date}{len(vs)} 站 · {km} km</div>
+<div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t" style="font-size:{max(46, min(84, 840 // max(1, len(title)))) if title else 84}px">{e(title) if title else f"第 {idx + 1} 天"}</div><div class="s">{f"第 {idx + 1} 天 · " if title else ""}{date}{len(vs)} 站 · {km} km</div>
 {_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}"""
 
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -197,7 +226,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 skipped.append(f"照片缺失（原文件被移动或删除了？）：{ph['file']}")
                 continue
             files.append(f"photos/{ph['file']}")
-            by_place.setdefault(ph["place_id"], []).append({"file": ph["file"], "caption": ph.get("caption", "")})
+            by_place.setdefault(ph["place_id"], []).append({"file": ph["file"], "caption": ph.get("caption", ""), "id": ph.get("id", ""), "scale": ph.get("scale")})
     pin_of: dict[str, str] = {}
     if thumb_pins and photo_dir:                          # 路线图上用每个点的第一张照片当图钉（96 像素小图，内嵌，现场从原文件生成）
         from . import photos as _phm
@@ -214,6 +243,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         shutil.copy2(vp, dst); files.append(f"media/{dst.name}"); vids[pid] = f"media/{dst.name}"
 
     days_html, card_jobs, km_all, stops_all = [], [], 0.0, 0
+    dt = {str(k): v for k, v in (day_titles or {}).items() if v}
     rg = regions or {}
     for day in trip.plan.days:
         vs, _ = day_visits(trip, day)
@@ -223,7 +253,9 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         d = trip.day_date(day.index)
         km = round(sum(lg.distance_km for lg in st.legs), 1)
         km_all += km; stops_all += len(vs)
-        head = f'<section class="day"><div class="dh"><h2>第 {day.index + 1} 天</h2><span>' + (f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else "") + f"{len(vs)} 站 · {km} km</span></div>"
+        dtitle = dt.get(str(day.index + 1), "")
+        ed_t = f' data-ed="title:{day.index + 1}"' if edit else ""
+        head = f'<section class="day"><div class="dh"><h2{ed_t}>{e(dtitle) if dtitle else f"第 {day.index + 1} 天"}</h2><span>' + (f"第 {day.index + 1} 天 · " if dtitle else "") + (f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else "") + f"{len(vs)} 站 · {km} km</span></div>"
         wx = (trip.weather or {}).get(d.isoformat()) if d else None
         if wx is not None and getattr(wx, "day_weather", ""):
             head += f'<div class="wx">天气预报：{e(wx.day_weather)} {round(wx.day_temp)}°C（预报，非实况）</div>'
@@ -243,19 +275,22 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 views += f'<video data-k="video" {"style=display:none " if tabs else ""}src="{vids[p.id]}" controls loop playsinline preload="none"></video>'; tabs.append(("video", "视频"))
             if views:
                 cap = by_place.get(p.id, [{}])[0].get("caption", "") or p.name
-                body += f'<div class="polaroid"><div>{views}</div><div class="cap">{e(cap)}</div></div>'
+                pol = _scale_attrs(pics[0], edit) if pics else ""
+                body += f'<div class="polaroid"{pol}><div>{views}</div><div class="cap">{e(cap)}</div></div>'
                 if len(tabs) > 1:
                     body += '<div class="tabs">' + "".join(f'<button data-k="{k}" class="{"on" if j == 0 else ""}">{nm}</button>' for j, (k, nm) in enumerate(tabs)) + "</div>"
                 else:
                     body += '<div class="tabs" style="display:none"></div>'
             if len(pics) > 1:
-                body += '<div class="gal">' + "".join(f'<figure><img src="photos/{ph["file"]}" alt="{e(ph.get("caption") or p.name)}" loading="lazy"></figure>' for ph in pics[1:]) + "</div>"
+                body += '<div class="gal">' + "".join(_fig(ph, p.name, edit) for ph in pics[1:]) + "</div>"
             sty = (stories or {}).get(p.id) or {}
             if sty.get("facts"):
                 body += '<ul class="facts">' + "".join(
                     f'<li>{e(f["text"])} <small>来源：' + (f'<a href="{e(f["source"])}" rel="noreferrer">{e(f["source"])}</a>' if f["source"].startswith("http") else e(f["source"])) + "</small></li>"
                     for f in sty["facts"]) + "</ul>"
-            if sty.get("impression"):
+            if edit:
+                body += f'<p class="imp">“<span data-ed="imp:{e(p.id)}">{e(sty.get("impression", ""))}</span>”<small>{"我写的" if sty.get("by") == "user" else "AI 根据照片的描写，仅供参考，可修改"}</small></p>'
+            elif sty.get("impression"):
                 body += f'<p class="imp">“{e(sty["impression"])}”<small>{"我写的" if sty.get("by") == "user" else "AI 根据照片的描写，仅供参考，可修改"}</small></p>'
             body += "</div>"
             parts.append(body)
@@ -285,12 +320,12 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     title = e(trip.meta.name)
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
             f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
-            f'{"".join(days_html)}{sp_html}{foot}</div>{JS}</html>')
+            f'{"".join(days_html)}{sp_html}{foot}</div>{JS}{EDIT_JS if edit else ""}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 
     if card_preview is not None and card_jobs:                  # 只要第一天卡片的 HTML 给预览用，不渲染图
         idx, d, vs, km, legs, pic = card_jobs[0]
-        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None))
+        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), "")))
     if cards:
         from . import share as _share
         try:
@@ -300,7 +335,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None), encoding="utf-8")
+                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), "")), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()

@@ -45,7 +45,7 @@ def test_parameter_assignments_exist():
 
 
 def test_each_skill_is_short_and_routable():
-    assert {d.name for d in TRIP_SKILLS} >= {"trip-planner", "trip-routes", "trip-hours-weather", "trip-food", "trip-sources", "trip-export", "trip-review"}
+    assert {d.name for d in TRIP_SKILLS} >= {"trip-planner", "trip-routes", "trip-hours-weather", "trip-food", "trip-sources", "trip-export", "trip-review", "trip-restore"}
     for d in TRIP_SKILLS:
         txt = (d / "SKILL.md").read_text(encoding="utf-8")
         assert len(txt.splitlines()) <= 200, f"{d.name} 超过 200 行，请拆分或精简"

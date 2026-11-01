@@ -1451,7 +1451,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
         spend = _bl.summarize(led, spending_categories or None)
     try:
         res = build_handbook(trip, export_root(), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins, card_photos=card_photos)
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins, card_photos=card_photos, day_titles=_day_titles())
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     if basemap:
@@ -1783,6 +1783,52 @@ def autoname_stops() -> str:
     if found:
         return f"重新起名 {len(todo)} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。"
     return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名（没配高德 key 或查询失败），先写成“区县 · 时间”或日期时间，可以手动改。配好 AMAP_KEY 后再点一次。"
+
+
+def _day_titles_path() -> Path:
+    return trip_path().with_name("day_titles.json")
+
+
+def _day_titles() -> dict[str, str]:
+    return {str(k): str(v) for k, v in _load_json_file(_day_titles_path()).items() if isinstance(v, str) and v.strip()}
+
+
+def set_day_title(day: int, title: str = "") -> str:
+    """给第 day 天（从 1 起）设置手册网页、小红书卡片、PDF 上的标题（最多 20 字），默认是“第 N 天”。title 留空 = 恢复默认。
+    标题只是文字风格：可以有点意思、有点诗意，但不能写进没有依据的事实（地名、数字、天气都要来自行程）。起好后给用户看，用户满意再保存。"""
+    trip = _load()
+    if not trip.plan or not (1 <= int(day) <= len(trip.plan.days)):
+        raise ToolError(f"第 {day} 天不存在。")
+    title = (title or "").strip()
+    if len(title) > 20:
+        raise ToolError("标题最多 20 个字。")
+    bad = title and _guard_text(title)
+    if bad:
+        raise ToolError("标题" + "；".join(bad))
+    data = _day_titles()
+    if title:
+        data[str(int(day))] = title
+    else:
+        data.pop(str(int(day)), None)
+    _day_titles_path().write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return f"第 {day} 天的标题" + (f"改为「{title}」。" if title else "已恢复为“第 N 天”。")
+
+
+def suggest_day_titles() -> dict:
+    """只读：返回每天的日期、地点名（按顺序）、时间段和现有标题，供你给每天起一个有意思的标题（3 个候选让用户选，或直接问用户想要什么感觉）。
+    起标题只用这里返回的地点和时间，不要编造；用户选定后逐天 set_day_title。不涉及照片内容。"""
+    from .handbook import day_visits  # noqa: F401
+    trip = _load()
+    if not trip.plan:
+        raise ToolError("还没有排好的行程。")
+    titles = _day_titles()
+    out = []
+    for day in trip.plan.days:
+        vs, _ = day_visits(trip, day)
+        d = trip.day_date(day.index)
+        out.append({"day": day.index + 1, "date": d.isoformat() if d else "", "title": titles.get(str(day.index + 1), ""),
+                    "stops": [{"name": v.place.name, "from": f"{v.arrive // 60:02d}:{v.arrive % 60:02d}", "to": f"{v.leave // 60:02d}:{v.leave % 60:02d}"} for v in vs]})
+    return {"days": out, "note": "标题≤20 字，只做修辞；每天给 3 个候选。选定后用 set_day_title 保存。"}
 
 
 def _regions_path() -> Path:
@@ -3369,7 +3415,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]
@@ -3379,14 +3425,16 @@ _PROFILES = {
     "core": ["行程基础", "景点与住宿", "排程与检查", "路线与交通"],
     "plan": ["行程基础", "景点与住宿", "排程与检查", "路线与交通", "餐食", "攻略与导入", "偏好"],
     "review": ["行程基础", "分享与导出", "复盘与游记"],
+    "restore": ["行程基础", "恢复与手册"],
 }
+DEFAULT_TOOLS = "core,restore"      # 没设 TRIPCORE_TOOLS 时只暴露规划核心 + 恢复行程/手册；要全部写 full
 
 
 def _selected_tools(spec: Optional[str] = None) -> list:
     """环境变量 TRIPCORE_TOOLS 可以只暴露一部分工具来省上下文：写档位名（core / plan / review）或目录里的类别名，逗号分隔；
     不设或写 full 就是全部。open_workbench 总是保留，这样没暴露的功能仍可在工作台里用。"""
     from .tools_catalog import CATALOG, CATEGORIES
-    spec = (os.environ.get("TRIPCORE_TOOLS", "") if spec is None else spec).strip()
+    spec = (os.environ.get("TRIPCORE_TOOLS", DEFAULT_TOOLS) if spec is None else spec).strip()
     if not spec or spec.lower() == "full":
         return list(TOOLS)
     want: set[str] = set()

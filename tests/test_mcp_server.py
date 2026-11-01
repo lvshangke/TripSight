@@ -105,10 +105,11 @@ def test_exact_dates_set_num_days():
     assert s._load().meta.num_days == 4
 
 
-def test_server_registers_all_tools():
+def test_server_registers_all_tools(monkeypatch):
+    monkeypatch.setenv("TRIPCORE_TOOLS", "full")
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 77
+    assert len(names) == 81
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -1200,3 +1201,11 @@ def test_tools_env_selects_groups(monkeypatch):
     monkeypatch.setenv("TRIPCORE_TOOLS", "core")
     import asyncio
     assert len(asyncio.run(ms.build_server().list_tools())) == len(core)
+
+
+def test_default_tools_are_light_and_include_restore(monkeypatch):
+    monkeypatch.delenv("TRIPCORE_TOOLS", raising=False)
+    names = {t.name for t in asyncio.run(s.build_server().list_tools())}
+    assert {"add_place", "import_photo_trip", "merge_stops", "set_day_title", "suggest_day_titles", "delete_stop", "export_handbook", "open_workbench"} <= names
+    assert "import_bills" not in names and "export_rough_cut" not in names
+    assert len(names) < 50

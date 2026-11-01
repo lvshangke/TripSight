@@ -273,3 +273,34 @@ def test_export_dir_setting_roundtrip(tmp_path, monkeypatch):
     r = web.export_dir({"path": str(target)})
     assert r["custom"] and Path(r["path"]) == target.resolve() and s.export_root() == target.resolve()
     assert web.export_dir({"path": ""})["custom"] is False
+
+
+def test_day_titles_show_in_page_card_and_edit_hooks(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    assert s.suggest_day_titles()["days"][0]["stops"]
+    with pytest.raises(s.ToolError):
+        s.set_day_title(9, "x")
+    with pytest.raises(s.ToolError):
+        s.set_day_title(1, "字" * 21)
+    s.set_day_title(1, "从港口走到日落")
+    r = web.hb_style_preview({"style": "手账", "edit": True})
+    assert "从港口走到日落" in r["page"] and "从港口走到日落" in r["card"] and "第 1 天 · " in r["page"]
+    assert 'data-ed="title:1"' in r["page"] and 'data-ed="imp:' in r["page"] and "data-rz=" in r["page"]
+    plain = web.hb_style_preview({"style": "手账"})["page"]
+    assert "data-ed" not in plain and "data-rz" not in plain
+    assert "已恢复" in web.hb_day_title({"day": 1, "title": "第 1 天"})["message"] and not s._day_titles()
+
+
+def test_photo_scale_saved_and_applied_to_export(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    first = s._ph.load(s._photo_index())[1]
+    assert web.hb_photo_scale({"id": first["id"], "scale": 500})["scale"] == 160
+    web.hb_photo_scale({"id": first["id"], "scale": 60})
+    page = web.hb_style_preview({"style": "手账"})["page"]
+    assert "--s:0.6" in page or "--s:1.6" in page
+    web.hb_photo_scale({"id": first["id"], "scale": 100})
+    assert "scale" not in [x for x in s._ph.load(s._photo_index()) if x["id"] == first["id"]][0]

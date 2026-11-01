@@ -136,7 +136,7 @@ button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
 .warn{background:#fff8ed;border:1px solid #f1e3cd;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:13px;color:#8a4b00}
 .hbtop{display:flex;align-items:center;gap:12px;margin-bottom:8px}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .hbimp{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}#hb_folder{flex:1;min-width:260px}
-.hbs{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0;background:var(--paper)}.hbs .dels{margin-left:auto;color:#b91c1c;border-color:#e7b4ae;background:#fff}.hbs .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hbs .h input.nm{flex:1;min-width:140px;font:inherit;font-weight:700;padding:3px 6px;border:1px solid var(--line2);border-radius:6px}
+.hbs{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0;background:var(--paper)}.dayt{display:flex;gap:8px;align-items:center;margin:14px 0 4px}.dayt b{color:var(--acc)}.dayt input{flex:1;max-width:420px}.hbs .dels{margin-left:auto;color:#b91c1c;border-color:#e7b4ae;background:#fff}.hbs .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hbs .h input.nm{flex:1;min-width:140px;font:inherit;font-weight:700;padding:3px 6px;border:1px solid var(--line2);border-radius:6px}
 .hbs .dy{font-size:12px;background:var(--acc-soft);color:#2347a5;border-radius:99px;padding:1px 8px}.hbs .tm{font-size:12px;color:var(--sub)}
 .hbp{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hbp .c{width:96px}.hbp img{width:96px;height:72px;object-fit:cover;border-radius:6px;display:block;cursor:zoom-in}.hbp .c.cover img{outline:2px solid #c4553a}
 .hbp .bt{display:flex;justify-content:space-between;margin-top:2px}.hbp .bt{align-items:center}.hbp .bt button,.hbp .bt span{padding:0 5px;font-size:12px;white-space:nowrap;line-height:20px}.hbp .add{width:96px;height:72px;border:1px dashed #999;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--acc);cursor:pointer;font-size:12px}
@@ -282,7 +282,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
-<div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。</div></div>
+<div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
@@ -813,7 +813,7 @@ function photoRow(row, pid) {
 let pvSeq = 0, pvTimer = null;
 async function hbStylePreview() {
   const my = ++pvSeq; $('hb_pvn').textContent = '正在生成预览…';
-  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
+  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, edit: true}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
   catch (e) { if (my === pvSeq) $('hb_pvn').textContent = e.message; }
 }
 const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '5' || $('mo').classList.contains('on')) pvTimer = setTimeout(hbStylePreview, 250); };
@@ -897,7 +897,9 @@ function hbRender() {
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
   if (!rows.length) { $('hb_list').innerHTML = '<div class="tlnote">' + (restore ? '还没有恢复过的行程：在上面填相册文件夹，点“读取照片”。' : '这个行程还没有排好的景点。') + '</div>'; return; }
-  $('hb_list').innerHTML = rows.map(s => hbCard(s, restore)).join('');
+  let lastDay = 0;
+  $('hb_list').innerHTML = rows.map(s => { let h = ''; if (s.day !== lastDay) { lastDay = s.day; h = '<div class="dayt"><b>第 ' + s.day + ' 天</b><input class="dti" data-day="' + s.day + '" maxlength="20" placeholder="给这一天起个标题（可不填，默认“第 ' + s.day + ' 天”）" value="' + esc((d.day_titles || {})[s.day] || '') + '"></div>'; } return h + hbCard(s, restore); }).join('');
+  document.querySelectorAll('.dti').forEach(i => i.onchange = async () => { try { const r = await api('hb_day_title', {day: +i.dataset.day, title: i.value}); toast(r.message); hbPvSoon(); } catch (e) { toast(e.message, true); } });
   rows.forEach(s => hbWire(s));
   $('hb_exp').disabled = false;
 }
@@ -998,6 +1000,15 @@ $('hb_pv').onclick = async () => {
   } catch (e) { $('hb_pvo').textContent = e.message; if (window.rsDone) rsPreviewing(false, null, e.message); }
 };
 $('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
+window.addEventListener('message', async ev => {
+  const m = ev.data; if (!m || !m.tripsight || ev.source !== $('hb_pvf').contentWindow) return;
+  try {
+    if (m.k === 'title') { const r = await api('hb_day_title', {day: +m.id, title: m.text}); toast(r.message); }
+    else if (m.k === 'imp') { const t = m.text.replace(/^[“"]|[”"]$/g, ''); await api('hb_edit', {place_id: m.id, impression: t}); toast(t ? '已保存“我的话”' : '已清除这段话'); }
+    else if (m.k === 'scale') { await api('hb_photo_scale', {id: m.id, scale: m.scale}); toast('照片大小已保存（' + m.scale + '%）'); }
+    hbLoad();
+  } catch (e) { toast(e.message, true); hbPvSoon(); }
+});
 $('hb_an').onclick = async () => { if (!confirm('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。')) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }

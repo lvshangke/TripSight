@@ -35,7 +35,7 @@ def test_tool_errors_become_run_errors(tmp_path):
 
 
 def test_cli_run_and_tools(capsys):
-    assert cli.main(["tools", "分享与导出"]) == 0
+    assert cli.main(["tools", "恢复与手册"]) == 0
     assert "export_handbook" in capsys.readouterr().out
     assert cli.main(["run", "new_trip", '{"name": "甲", "num_days": 1}']) == 0
     assert cli.main(["run", "show_trip"]) == 0
