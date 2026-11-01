@@ -1015,11 +1015,24 @@ def hb_preview(body: dict) -> dict[str, Any]:
         rows.append({"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"),
                      "thumbs": [u for u in (_ph.thumb_uri(root, f, 120, 60) for f in names) if u]})
     rows += [{"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
+    _save_draft(folder, album, radius, mn, len(stops), len(keep), len(photos), keep)
     out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
            "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": ""}
     if body.get("basemap") and rows:
         out.update(_preview_basemap(rows))
     return out
+
+
+def _save_draft(folder: Path, album: str, radius: int, min_photos: int, total: int, kept: int, photos: int, keep: list) -> None:
+    """页面上“预览”的结果存成草稿，agent 用 restore_status 读到（预览不新建行程，所以 agent 不然什么也看不到）。"""
+    try:
+        days = sorted({x.day.isoformat() for x in keep})
+        rec = {"at": time.time(), "folder": "" if album else str(folder), "album": album, "radius_m": radius, "min_photos": min_photos,
+               "clusters": total, "kept": kept, "photos": photos, "days": days,
+               "stops": [{"day": x.day.isoformat(), "from": x.start.strftime("%H:%M"), "to": x.end.strftime("%H:%M"), "n": x.n} for x in keep[:60]]}
+        (ms._root_dir() / "restore_draft.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _preview_basemap(rows: list[dict]) -> dict[str, Any]:
@@ -1286,7 +1299,8 @@ def make_handler(token: str, state: dict):
             if key:
                 headers["Authorization"] = "Bearer " + key
             cfile, sid = _chat_file(), _session_id()          # 先定下是哪个行程：回复中途即使切换了行程，也记在原来那个里
-            payload = json.dumps({"messages": [{"role": "user", "content": msg}], "session_id": sid, "stream": True})
+            agent_msg = ("【TripSight 页面：恢复行程】先调用 restore_status 看页面上选了什么、预览到什么；之后再回答。\n" + msg) if body.get("ctx") == "restore" else msg
+            payload = json.dumps({"messages": [{"role": "user", "content": agent_msg}], "session_id": sid, "stream": True})
             try:
                 conn = http.client.HTTPConnection(host, port, timeout=130)
                 conn.request("POST", "/v1/chat/completions", payload.encode("utf-8"), headers)

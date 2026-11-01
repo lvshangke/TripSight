@@ -218,7 +218,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #rp_body.pgbody{padding:8px 20px 18px}#rp .rfoot{padding:12px 20px;border-top:1px solid var(--line);background:var(--paper)}#rp .rfoot .tlnote{flex:1;text-align:center;font-size:12px;line-height:1.35}
 #rp_main{flex:1;position:relative;min-width:0;padding:14px}
 #rmap{position:absolute;inset:14px;border-radius:20px;overflow:hidden;box-shadow:0 10px 34px rgba(80,60,30,.16);background:#ede5d4;border:1px solid var(--line)}
-#rmap_empty{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;pointer-events:none;z-index:500}#rmap_empty.hide{display:none}
+#rmap_chip{position:absolute;left:30px;top:30px;z-index:1100;background:rgba(255,253,248,.95);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:13px;box-shadow:0 4px 14px rgba(60,45,20,.15);max-width:calc(100% - 140px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#rmap_chip.pv{background:#fff4ec;border-color:#e7b4ae;color:var(--acc)}#rmap_empty{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;pointer-events:none;z-index:500}#rmap_empty.hide{display:none}
 #rp_act{position:absolute;left:30px;bottom:30px;width:min(390px,calc(100% - 60px));z-index:1100;background:rgba(255,253,248,.95);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 28px rgba(60,45,20,.2);padding:10px 14px}
 #rp_act .ah{display:flex;align-items:center;gap:8px;font-size:13px}#rp_act .ah .tlnote{flex:1}#rp_act .ah button{border:0;background:transparent;padding:0 4px;cursor:pointer;color:var(--sub)}
 #rp_act .dot{width:9px;height:9px;border-radius:50%;background:#b8b0a0}#rp_act .dot.run{background:var(--acc);animation:pulse 1s infinite}#rp_act .dot.ok{background:#7a9a5b}
@@ -288,7 +288,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
 <div class="pg" id="rp"><aside id="rp_side"><div class="rtop"><div class="steps" id="rp_steps"></div></div>
 <div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></aside>
-<section id="rp_main"><div id="rmap"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
+<section id="rp_main"><div id="rmap"></div><div id="rmap_chip"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
 <div id="rp_act"><div class="ah"><span class="dot" id="act_dot"></span><b id="act_title">助手</b><span class="tlnote" id="act_sub">空闲</span><button id="act_fold" title="收起/展开">▾</button></div><div id="act_list"></div></div>
 <button id="rp_ctog" title="显示/隐藏助手对话">💬</button></section>
 <aside id="rp_chat"></aside></div>
@@ -726,7 +726,7 @@ async function send() {
   const text = $('ctext').value.trim(); if (!text || busy) return;
   busy = true; $('csend').disabled = true; $('trip').disabled = true; const rev0 = S ? S.revision : null, trip0 = S ? S.trip : null; $('ctext').value = ''; bubble('u', text); const out = bubble('a', '…'); let got = '', done = false;
   try {
-    const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text})});
+    const r = await fetch('api/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: text, ctx: PGCUR === 'restore' ? 'restore' : ''})});
     if (!r.ok) { const j = await r.json().catch(() => ({})); out.className = 'm e'; out.textContent = j.error || ('出错了 ' + r.status); if (r.status >= 500) chatMark(false); }
     else {
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
@@ -921,6 +921,7 @@ function rmapSelect(m) { if (RSEL) RSEL.setIcon(rpin(RSEL._p.n)); RSEL = m; m.se
 function rmapFromHb() {
   if (!HB.data || HB.mode !== 'restore') return;
   const pts = HB.data.stops.filter(x => x.restored && x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: x.day, id: x.id, tip: x.name}));
+  $('rmap_chip').className = ''; $('rmap_chip').textContent = '当前行程：' + HB.data.name + '（' + pts.length + ' 处）';
   rmapDraw(pts, p => { const el = $('hb_' + p.id); if (el && RS.step === 4) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); } });
 }
 // ---- 助手运行过程（轮询 activity）
@@ -1106,6 +1107,7 @@ $('hb_pv').onclick = async () => {
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
       $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
+    $('rmap_chip').className = 'pv'; $('rmap_chip').textContent = '预览：' + r.kept + ' 处，还没有恢复成行程（现有行程不受影响）';
     { const days = [...new Set(r.stops.map(x => x.day))].sort();
       rmapDraw(r.stops.filter(x => x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: days.indexOf(x.day) + 1, tip: x.day + ' ' + x.start + '–' + x.end + ' · ' + x.n + ' 张', _s: x})), p => { const s = p._s;
         $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); }); }

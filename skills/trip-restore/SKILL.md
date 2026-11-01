@@ -11,6 +11,7 @@ description: 恢复行程与手册：用户想把拍过的照片（文件夹或 
 - 照片只在本机读；给模型看图（`view_stop`）只在用户同意时做，人像和路人照片提醒用户。
 
 ## 流程（用户说“帮我把这些照片恢复成行程”）
+0. 先 `restore_status`：用户可能已在 TripSight 页面选好文件夹并预览过（预览不新建行程，所以 `show_trip` 看不到）。有预览就复述“预览到 N 处”，用其中的 folder/album 和 radius_m，确认后再 `import_photo_trip`；消息以“【TripSight 页面：恢复行程】”开头时同样先调它。
 1. 问清来源：文件夹路径，或 Mac 相册（先 `list_photo_albums`，用户选）。景点大小：普通 300 米，大景区 1500 米（`radius_m`）。用户没给路径就问，不要自己去找。
 2. `import_photo_trip`（文件夹用 `folder`，相册用 `album`；省磁盘可 `link_photos=true`；有 GPX/KML 轨迹给 `track`）。结果摘要如实转述：读到几张、聚成几个点、没定位的几张。
 3. **起名**：有高德 key 时已自动起名；名字还是“停留点”或“区县 · 时间”的，先问用户，同意后 `autoname_stops`。仍不准的，对每个点 `view_stop` 看缩略图和候选地名，**给用户 2~3 个候选让他选**，再 `update_place` 改名；不确定就写“区县 · 时间”，别猜。

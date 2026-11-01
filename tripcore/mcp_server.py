@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import os
 import secrets
 from datetime import date
@@ -1658,6 +1659,29 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         row = [f"{pid} {sp.start:%H:%M}–{sp.end:%H:%M} {sp.n}张" for pid, sp in zip(ids, keep) if (sp.day - first).days == d]
         lines.append(f"第{d + 1}天 {first.fromordinal(first.toordinal() + d).isoformat()}：" + ("；".join(row) if row else "（这天没有保留的停留点）"))
     lines.append("下一步：对每个点用 view_stop 看缩略图和候选地名，向用户确认后用 update_place 改名；介绍和描写用 save_stop_story 写；最后 export_handbook。")
+    return "\n".join(lines)
+
+
+def restore_status() -> str:
+    """恢复行程页面的状态：用户在 TripSight 页面里选了哪个文件夹/相册、预览出几处（预览不新建行程，所以只靠 show_trip 看不到）、当前行程是哪个。
+    用户在页面里和你对话（消息以【TripSight 页面：恢复行程】开头）或说“就用我刚选的/预览的那个”时先调用它；
+    要正式恢复时用里面的 folder/album 和 radius_m 调 import_photo_trip，并先和用户确认。"""
+    import datetime as _dt
+    lines = []
+    try:
+        t = _load()
+        kind = "照片恢复的行程" if _photo_trip_path().exists() else "计划行程"
+        lines.append(f"当前行程：「{t.meta.name}」（{kind}，{len(t.places)} 个景点）。")
+    except ToolError:
+        lines.append("还没有当前行程。")
+    d = _load_json_file(_root_dir() / "restore_draft.json")
+    if d.get("at"):
+        ago = int((time.time() - d["at"]) // 60)
+        src = f"相册「{d['album']}」" if d.get("album") else f"文件夹 {d.get('folder')}"
+        lines.append(f"页面上的预览（{ago} 分钟前，还没恢复成行程，不会改动当前行程）：{src}，按 {d.get('radius_m')} 米聚类，读到 {d.get('photos')} 张带位置的照片，聚成 {d.get('clusters')} 处，保留 {d.get('kept')} 处，涉及 {'、'.join(d.get('days') or [])}。")
+        lines.append("如果用户说恢复这个：先确认，再 import_photo_trip(folder 或 album, radius_m)。预览里的点只是候选，没有名字。")
+    else:
+        lines.append("页面上还没有做过预览。")
     return "\n".join(lines)
 
 
@@ -3420,7 +3444,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

@@ -322,3 +322,13 @@ def test_activity_log_records_tool_calls_and_hides_secrets(tmp_path):
     assert ev[0]["state"] == "ok" and ev[0]["label"] and ev[-1]["state"] == "err"
     assert "SECRET" not in json.dumps(ev, ensure_ascii=False)
     assert web.activity({"since": ev[-1]["ts"]})["events"] == []
+
+
+def test_restore_status_sees_preview_draft_before_any_trip_is_created(tmp_path):
+    from tripcore import web
+    s.new_trip(name="旧计划", num_days=1)
+    assert "还没有做过预览" in s.restore_status() and "旧计划" in s.restore_status()
+    web.hb_preview({"folder": str(_album(tmp_path)), "radius_m": 300})
+    out = s.restore_status()
+    assert "旧计划" in out and "预览" in out and "聚成" in out and str(tmp_path) in out
+    assert s._load().meta.name == "旧计划"            # 预览没有新建行程
