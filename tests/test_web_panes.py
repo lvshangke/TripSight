@@ -90,3 +90,16 @@ def test_hb_preview_basemap_and_thumbs(tmp_path, monkeypatch):
     monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "t.json"))
     r = web.hb_preview({"folder": str(d), "min_photos": 1, "basemap": True})
     assert r["basemap"].startswith("data:image") and len(r["xy"]) == len(r["stops"])
+
+
+def test_pick_path_mac_only_and_cancel(monkeypatch):
+    import pytest, subprocess, sys
+    from tripcore import web
+    monkeypatch.setattr(sys, "platform", "linux")
+    with pytest.raises(web.HttpError):
+        web.pick_path({"kind": "file"})
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, "", "execution error: User canceled. (-128)"))
+    assert web.pick_path({"kind": "folder"}) == {"path": ""}
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "/Users/x/账单.csv\n", ""))
+    assert web.pick_path({"kind": "file"}) == {"path": "/Users/x/账单.csv"}

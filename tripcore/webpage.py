@@ -234,6 +234,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 @keyframes pgin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.pg.on .pgbody,.pg.on .rtop{animation:pgin .25s ease-out}#rp_body>.pane>*{animation:pgin .3s ease-out}
 .hbs,.tcard,.hbimp,.hbexp,.bls .k,.day{transition:box-shadow .15s,transform .15s,border-color .15s}.hbs:hover,.tcard:hover{box-shadow:0 8px 22px rgba(80,60,30,.14);border-color:var(--line2)}.hbp .c:hover img{filter:brightness(1.05)}
 #rp .steps span.done:hover{background:var(--acc-soft)}#ptip{position:fixed;z-index:5000;background:#33302b;color:#fff;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}#ptip.on{opacity:1}
+.msgbox{display:none;width:100%;padding:10px 14px;border-radius:10px;background:var(--acc-soft);border:1px solid var(--acc-soft2);color:var(--ink);white-space:pre-wrap;font-size:13px;line-height:1.6}.msgbox.on{display:block}.msgbox.err{background:#fdecea;border-color:#f3c0b8;color:#8a2a1c}.pk{font-size:12px;padding:5px 10px;white-space:nowrap}
 </style></head><body>
 <div id="toast"></div><div id="ptip"></div>
 <nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label></nav>
@@ -270,9 +271,9 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div class="hbtop"><div class="seg"><button data-m="restore" class="on">恢复行程</button><button data-m="plan">计划行程</button></div>
 <span class="tlnote" id="hb_hint"></span></div>
 <div id="hb_import" class="hbimp"><b>从相册文件夹恢复</b>
-<label>来源 <select id="hb_src"><option value="folder">文件夹</option><option value="album">照片 App 相册（Mac）</option></select></label><select id="hb_album" style="display:none"><option value="">先点“读取相册列表”</option></select><button id="hb_al" style="display:none">读取相册列表</button><input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）">
+<label>来源 <select id="hb_src"><option value="folder">文件夹</option><option value="album">照片 App 相册（Mac）</option></select></label><select id="hb_album" style="display:none"><option value="">先点“读取相册列表”</option></select><button id="hb_al" style="display:none">读取相册列表</button><input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）"><button class="pk" data-pick="folder" data-to="hb_folder">选文件夹</button>
 <label title="不在行程目录里存照片副本，省磁盘；导出时才从原文件缩小并去掉定位。原文件被移走或删除后图会缺失"><input type="checkbox" id="hb_link"> 只引用照片（不复制）</label>
-<input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置">
+<input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置"><button class="pk" data-pick="file" data-to="hb_track">选文件</button><button class="pk" data-pick="folder" data-to="hb_track">选文件夹</button>
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
@@ -284,8 +285,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
 <label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">
-<div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button id="bl_go" class="pri">导入</button>
-<div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="tlnote" style="width:100%;white-space:pre-wrap"></div></div>
+<div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="file" data-to="bl_path">选文件</button><button class="pk" data-pick="folder" data-to="bl_path">选文件夹</button><button id="bl_go" class="pri">导入</button>
+<div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="msgbox"></div></div>
 <details class="hbimp" id="bl_auto"><summary><b>自动导入</b> <span class="tlnote" id="bl_watchn"></span></summary>
 <div style="width:100%"><div class="tlnote">盯着这些文件夹（每行一个），里面新出现的微信/支付宝账单和 Apple Pay 记录会自动记进账本。推荐：iPhone 把账单存进 iCloud 云盘的“TripSight账单”文件夹。只读，不会移动或删除里面的文件。</div>
 <textarea id="bl_watch" rows="3" style="width:100%;box-sizing:border-box;font:inherit" placeholder="例如 ~/Library/Mobile Documents/com~apple~CloudDocs/TripSight账单"></textarea>
@@ -293,12 +294,12 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_vid">
-<div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button id="vd_scan">整理归类</button>
+<div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_path">选文件夹</button><button id="vd_scan">整理归类</button>
 <div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
 <pre id="vd_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
 <div class="hbimp"><b>粗剪</b><label>目标时长（秒，0 = 不限）<input id="vd_t" type="number" value="60" min="0" style="width:70px"></label><label>每段最长（秒）<input id="vd_m" type="number" value="8" min="2" max="30" style="width:60px"></label>
 <label><input type="checkbox" id="vd_c" checked> 每天前加“第N天”和路线卡片</label>
-<input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button id="vd_cut" class="pri">生成粗剪</button>
+<input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_jy">选文件夹</button><button id="vd_cut" class="pri">生成粗剪</button>
 <div class="tlnote" style="width:100%">输出到 ~/Documents/TripSight/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
 <pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
 <div class="pane" id="pane_fp">
@@ -941,7 +942,7 @@ $('hb_go').onclick = async () => {
 };
 
 const hbSrc = o => Object.assign(o, $('hb_src').value === 'album' ? {album: $('hb_album').value} : {folder: $('hb_folder').value});
-function hbSrcUi() { const a = $('hb_src').value === 'album'; $('hb_folder').style.display = a ? 'none' : ''; $('hb_album').style.display = a ? '' : 'none'; $('hb_al').style.display = a ? '' : 'none'; }
+function hbSrcUi() { const a = $('hb_src').value === 'album'; $('hb_folder').style.display = a ? 'none' : ''; document.querySelectorAll('[data-to=hb_folder]').forEach(x => x.style.display = a ? 'none' : ''); $('hb_album').style.display = a ? '' : 'none'; $('hb_al').style.display = a ? '' : 'none'; }
 $('hb_src').onchange = hbSrcUi;
 $('hb_al').onclick = async () => {
   try { const r = await api('hb_albums', {}); $('hb_album').innerHTML = r.albums.map(a => '<option value="' + esc(a.name) + '">' + esc(a.name) + '（' + a.count + ' 张）</option>').join('') || '<option value="">没有相册</option>'; }
@@ -1002,7 +1003,7 @@ function blRender() {
     '<td><select class="p"><option value="">—</option>' + opt(BL.places, r.place_id || '', x => [x.id, x.name]) + '</select></td>' +
     '<td><input type="checkbox" class="x"' + (r.excluded ? ' checked' : '') + '></td></tr>').join('') + '</table>';
   $('bl_list').querySelectorAll('tr[data-id]').forEach(tr => {
-    const id = tr.dataset.id, send = async o => { try { await api('bills_edit', Object.assign({id: id}, o)); await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; } };
+    const id = tr.dataset.id, send = async o => { try { await api('bills_edit', Object.assign({id: id}, o)); await blLoad(); } catch (e) { blSay(e.message, true); } };
     tr.querySelector('.c').onchange = e => send({category: e.target.value, remember: true});
     tr.querySelector('.p').onchange = e => send({place_id: e.target.value});
     tr.querySelector('.x').onchange = e => send({excluded: e.target.checked});
@@ -1010,10 +1011,16 @@ function blRender() {
 }
 $('bl_wsave').onclick = async () => { try { const r = await api('bills_watch', {folders: $('bl_watch').value.split('\n')}); $('bl_wmsg').textContent = r.message; await blLoad(); } catch (e) { $('bl_wmsg').textContent = e.message; } };
 $('bl_scan').onclick = async () => { $('bl_wmsg').textContent = '正在扫描…'; try { const r = await api('bills_scan', {}); $('bl_wmsg').textContent = r.message; await blLoad(); } catch (e) { $('bl_wmsg').textContent = e.message; } };
+function blSay(t, err) { const m = $('bl_msg'); m.textContent = t || ''; m.className = 'msgbox' + (t ? ' on' : '') + (err ? ' err' : ''); if (t) toast(t.split('\n')[0], err); }
 $('bl_go').onclick = async () => {
-  $('bl_msg').textContent = '正在导入…';
-  try { const r = await api('bills_import', {path: $('bl_path').value}); $('bl_msg').textContent = r.message; await blLoad(); } catch (e) { $('bl_msg').textContent = e.message; }
+  $('bl_go').disabled = true; blSay('正在导入…');
+  try { const r = await api('bills_import', {path: $('bl_path').value}); blSay(r.message || '导入完成，但没有返回内容。'); await blLoad(); } catch (e) { blSay(e && e.message ? e.message : '导入失败（没有返回原因）。', true); }
+  $('bl_go').disabled = false;
 };
+document.querySelectorAll('button[data-pick]').forEach(b => b.onclick = async () => {
+  try { const r = await api('pick_path', {kind: b.dataset.pick, prompt: b.dataset.pick === 'folder' ? '请选择文件夹' : '请选择文件'}); if (r.path) { $(b.dataset.to).value = r.path; $(b.dataset.to).dispatchEvent(new Event('change')); } }
+  catch (e) { toast(e.message, true); }
+});
 $('tl_q').oninput = () => { if (toolsData) renderTools(); };
 load().then(homeMaybe);
 </script></body></html>

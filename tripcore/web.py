@@ -951,6 +951,24 @@ def bills_state() -> dict[str, Any]:
             "shortcut": _bl.SHORTCUT_STEPS, "icloud": str(_bl.icloud_folder())}
 
 
+def pick_path(body: dict) -> dict[str, Any]:
+    """弹出 Mac 自带的“选择文件/文件夹”窗口（工作台服务就跑在用户自己的 Mac 上），返回选中的完整路径；取消返回空串。
+    浏览器自己拿不到完整路径，所以由本机服务来弹窗。只返回路径，不读文件内容。"""
+    if sys.platform != "darwin":
+        raise HttpError(400, "选择窗口只在 Mac 上可用，请直接粘贴路径。")
+    what = "folder" if body.get("kind") == "folder" else "file"
+    prompt = re.sub(r'["\\]', "", str(body.get("prompt") or "请选择"))[:60]
+    try:
+        r = subprocess.run(["osascript", "-e", f'POSIX path of (choose {what} with prompt "{prompt}")'], capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired):
+        raise HttpError(400, "没能打开选择窗口，请直接粘贴路径。")
+    if r.returncode != 0:
+        if "-128" in r.stderr:                         # 用户点了取消
+            return {"path": ""}
+        raise HttpError(400, "没能打开选择窗口，请直接粘贴路径。")
+    return {"path": r.stdout.strip()}
+
+
 def bills_import(body: dict) -> dict[str, Any]:
     try:
         return {"message": ms.import_bills(str(body.get("path") or ""))}
@@ -1053,7 +1071,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1131,7 +1149,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""
