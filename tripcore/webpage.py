@@ -249,6 +249,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #mo .hbtop .seg{display:none}
 
 #topnav .nsp{flex:1}.tripsel{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:6px}#topnav select{max-width:240px;border-radius:99px;padding:5px 12px;background:var(--bg)}
+#askmask{position:fixed;inset:0;z-index:6000;background:rgba(40,32,20,.38);display:flex;align-items:center;justify-content:center}.askbox{width:min(420px,90vw);background:var(--paper);border-radius:16px;padding:22px 24px;box-shadow:0 18px 50px rgba(0,0,0,.3)}.askmsg{white-space:pre-line;font-size:15px;line-height:1.6;color:var(--ink)}.askbt{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 #toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:5000;background:#33302b;color:#fffdf8;padding:10px 20px;border-radius:99px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:all .25s;max-width:80vw}#toast.on{opacity:1;transform:translate(-50%,0)}#toast.err{background:#a63d2a}
 @keyframes pgin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.pg.on .pgbody,.pg.on .rtop{animation:pgin .25s ease-out}#rp_body>.pane>*{animation:pgin .3s ease-out}
 #rp_body input:not([type=checkbox]):not([type=file]),#rp_body select{font:inherit;font-size:14px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box;color:inherit}
@@ -383,11 +384,24 @@ async function load() {
   renderAll();
   syncChat();
 }
+// 页内确认框：不用浏览器自带的 confirm（内置浏览器/WebView 里它可能被屏蔽，点了没反应）
+function ask(msg, okText) {
+  return new Promise(res => {
+    const w = document.createElement('div'); w.id = 'askmask';
+    w.innerHTML = '<div class="askbox"><div class="askmsg"></div><div class="askbt"><button class="ano">取消</button><button class="ayes pri"></button></div></div>';
+    w.querySelector('.askmsg').textContent = msg; w.querySelector('.ayes').textContent = okText || '确定';
+    const done = v => { w.remove(); document.removeEventListener('keydown', kd, true); res(v); };
+    const kd = e => { if (e.key === 'Escape') { e.preventDefault(); done(false); } else if (e.key === 'Enter') { e.preventDefault(); done(true); } };
+    w.querySelector('.ano').onclick = () => done(false); w.querySelector('.ayes').onclick = () => done(true);
+    w.onclick = e => { if (e.target === w) done(false); };
+    document.addEventListener('keydown', kd, true); document.body.appendChild(w); w.querySelector('.ayes').focus();
+  });
+}
 let TRIPS_R = null;
 $('trip_del').onclick = async () => {
   const r = TRIPS_R; if (!r || r.single) return toast('单文件模式不能删除行程。', true);
   const cur = r.trips.find(t => t.slug === r.current); if (!cur) return;
-  if (!confirm('删除「' + cur.name + '」？\n它会被移到回收区，文件不会真正删掉，之后可以在“回收区”里恢复。')) return;
+  if (!(await ask('删除「' + cur.name + '」？\n它会被移到回收区，文件不会真正删掉，之后可以在“回收区”里恢复。'))) return;
   try { const x = await api('trip_delete', {slug: cur.slug}); toast(x.message); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); } catch (e) { toast(e.message, true); }
 };
 $('trip_bin').onclick = e => { e.stopPropagation(); const b = $('bin'); if (b.classList.contains('on')) return b.classList.remove('on'); binRender(); b.classList.add('on'); };
@@ -451,7 +465,7 @@ $('ntf').onsubmit = async e => {
 $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
   if (want === '__new__') { await loadTrips(); ntOpen(); return; }
-  if (pending && !confirm('有一个还没确认的修改预览，切换行程会放弃它。继续吗？')) { await loadTrips(); return; }
+  if (pending && !(await ask('有一个还没确认的修改预览，切换行程会放弃它。继续吗？'))) { await loadTrips(); return; }
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); }
   catch (e) { say(e.message, true); await loadTrips(); }
 };
@@ -936,7 +950,7 @@ async function pgShow(name, step) {
   chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop();
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
-  document.querySelectorAll('#topnav button').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
+  document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
   HB.mode = name === 'restore' ? 'restore' : 'plan';
   if (name === 'plan') { setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 50); return; }
   const m = PG_MAP[name], pn = $('pane_' + m[1]);
@@ -952,7 +966,7 @@ $('rp_next').onclick = () => {
   else if (RS.step === 2) { rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
   else if (RS.step === 4) rsGo(5);
 };
-document.querySelectorAll('#topnav button').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
+document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
 function homeMaybe() { try { if (sessionStorage.getItem('tsHome')) return; } catch (e) {} if (S && !S.days.some(d => d.items.length) && !S.unscheduled.length) $('home').classList.add('on'); }
 function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {} $('home').classList.remove('on'); }
 $('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
@@ -1024,7 +1038,7 @@ function hbWire(s) {
     c.querySelector('img').onclick = () => lbOpen(lbList, i);
     c.querySelectorAll('button').forEach(b => b.onclick = async () => {
       try {
-        if (b.dataset.a === 'del') { if (!confirm('从「' + s.name + '」删掉第 ' + (i + 1) + ' 张照片？\n只删手册里的这一份，你的原图不动。')) return; await api('photo_remove', {id: c.dataset.p}); toast('已从「' + s.name + '」删除第 ' + (i + 1) + ' 张照片'); }
+        if (b.dataset.a === 'del') { if (!(await ask('从「' + s.name + '」删掉第 ' + (i + 1) + ' 张照片？\n只删手册里的这一份，你的原图不动。'))) return; await api('photo_remove', {id: c.dataset.p}); toast('已从「' + s.name + '」删除第 ' + (i + 1) + ' 张照片'); }
         else await api('hb_photo_move', {id: c.dataset.p, to: b.dataset.a});
         await hbLoad();
       } catch (e) { note(e.message, true); }
@@ -1032,7 +1046,7 @@ function hbWire(s) {
   });
   const ds = box.querySelector('.dels');
   if (ds) ds.onclick = async () => {
-    if (!confirm('删除地点「' + s.name + '」（第 ' + s.day + ' 天）？\n它的 ' + s.photos.length + ' 张照片副本和文字都会一起去掉；你相册里的原照片不动。')) return;
+    if (!(await ask('删除地点「' + s.name + '」（第 ' + s.day + ' 天）？\n它的 ' + s.photos.length + ' 张照片副本和文字都会一起去掉；你相册里的原照片不动。'))) return;
     try { const r = await api('hb_stop_delete', {place_id: s.id}); HB.sel.delete(s.id); toast(r.message); await load(); await hbLoad(); hbPvSoon && hbPvSoon(); } catch (e) { note(e.message, true); }
   };
   const inp = box.querySelector('.add input');
@@ -1103,7 +1117,7 @@ window.addEventListener('message', async ev => {
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
-$('hb_an').onclick = async () => { if (!confirm('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。')) return;
+$('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
 $('hb_dirpick').onclick = async () => { try { const r = await api('pick_path', {kind: 'folder', prompt: '请选择导出文件夹'}); if (r.path) { const d = await dirLoad({path: r.path}); if (d) toast('导出文件夹已改为 ' + d.path); } } catch (e) { toast(e.message, true); } };

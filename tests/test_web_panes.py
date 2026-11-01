@@ -123,3 +123,10 @@ def test_trip_delete_moves_to_archive_and_restore(tmp_path, monkeypatch):
     assert web.trip_restore({"slug": cur})["slug"]
     with pytest.raises(web.HttpError):
         web.trip_delete({"slug": "nope"})
+
+
+def test_page_uses_inpage_dialog_and_nav_handler_skips_action_buttons():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert "confirm(" not in h.replace("function ask", "")       # 内置浏览器里原生 confirm 可能不弹，要用页内确认框
+    assert "#topnav button[data-pg]" in h and "document.querySelectorAll('#topnav button').forEach(b => b.onclick" not in h
