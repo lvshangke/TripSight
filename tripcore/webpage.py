@@ -412,19 +412,23 @@ function binRender() {
   $('bin').querySelectorAll('button').forEach(b => b.onclick = async () => { try { const x = await api('trip_restore', {slug: b.dataset.s}); toast(x.message); await loadTrips(); binRender(); } catch (er) { toast(er.message, true); } });
 }
 const needKind = () => PGCUR === 'plan' ? 'plan' : (PGCUR === 'bill' ? '' : 'restore');
-async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; fillTripSel(); } catch (e) {} }
+const lastKey = k => 'tsLast_' + k;
+function rememberTrip(r) { try { const c = r.trips.find(t => t.slug === r.current); if (c) localStorage.setItem(lastKey(c.kind), c.slug); } catch (e) {} }
+function lastTrip(r, k) { let v = ''; try { v = localStorage.getItem(lastKey(k)) || ''; } catch (e) {} return r.trips.find(t => t.kind === k && t.slug === v) || r.trips.filter(t => t.kind === k).slice(-1)[0]; }
+async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; rememberTrip(TRIPS_R); fillTripSel(); } catch (e) {} }
 function fillTripSel() {
   const r = TRIPS_R; if (!r) return; const sel = $('trip'), k = needKind(); sel.innerHTML = '';
   const list = r.trips.filter(t => !k || r.single || t.kind === k);
   list.forEach(t => { const o = document.createElement('option'); o.value = t.slug; o.textContent = (t.kind === 'restore' ? '📷 ' : '') + t.name + (t.num_days ? '（' + t.num_days + '天）' : ''); o.selected = t.slug === r.current || r.single; sel.appendChild(o); });
   if (!list.length) { const o = document.createElement('option'); o.value = ''; o.disabled = true; o.selected = true; o.textContent = k === 'restore' ? '（还没有恢复过的行程）' : '（还没有计划行程）'; sel.appendChild(o); }
   if (!r.single && k !== 'restore') { const o = document.createElement('option'); o.value = '__new__'; o.textContent = '＋ 新建行程…'; sel.appendChild(o); }
+  if (!r.single && k === 'restore') { const o = document.createElement('option'); o.value = '__newrestore__'; o.textContent = '＋ 恢复新的行程…'; sel.appendChild(o); }
   sel.disabled = r.single; sel.title = r.single ? '单文件模式不能切换或新建' : (k === 'restore' ? '这里只列恢复过的行程' : '切换行程 / 新建行程');
 }
 async function ensureKind(name) {
   const k = name === 'plan' ? 'plan' : (name === 'bill' ? '' : 'restore'), r = TRIPS_R; if (!k || !r || r.single) return;
   const cur = r.trips.find(t => t.slug === r.current); if (cur && cur.kind === k) return;
-  const pick = r.trips.filter(t => t.kind === k).slice(-1)[0]; if (!pick) return;
+  const pick = lastTrip(r, k); if (!pick) return;
   try { await api('switch', {slug: pick.slug}); await load(); } catch (e) {}
 }
 let curTrip = null, apPicked = null;
@@ -465,6 +469,7 @@ $('ntf').onsubmit = async e => {
 $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
   if (want === '__new__') { await loadTrips(); ntOpen(); return; }
+  if (want === '__newrestore__') { await loadTrips(); $('hb_folder').value = ''; HB.sel.clear(); rsGo(1); $('rp_msg').textContent = '选新的照片文件夹或相册，读取后会新建一个恢复行程，现有的行程都还在。'; return; }
   if (pending && !(await ask('有一个还没确认的修改预览，切换行程会放弃它。继续吗？'))) { await loadTrips(); return; }
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); }
   catch (e) { say(e.message, true); await loadTrips(); }
