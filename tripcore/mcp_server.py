@@ -1544,6 +1544,9 @@ def _load_json_file(p: Path) -> dict:
         return {}
 
 
+_NAME_ERR: list[str] = []      # 最近一次起名遇到的第一个错误原因（给用户看，不是猜）
+
+
 def _stop_names(keep: list) -> tuple[list[str], int]:
     """给每个停留点起名：高德反查（景区/小区/最近地标/街道）；没有 key 或查不到就写“区县 · 时间”，不猜。
     同名的点加上时间区分。返回 (名字列表, 查到真实名字的个数)。只发每个点的坐标，不发照片。"""
@@ -1552,15 +1555,22 @@ def _stop_names(keep: list) -> tuple[list[str], int]:
         client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
     except Exception:
         client = None
+    _NAME_ERR.clear()
+    if client is None:
+        _NAME_ERR.append("tripcore 这个进程里读不到 AMAP_KEY（key 要配在 agent 里 tripcore 那一项的 env；改完要重启 agent）")
     names: list[str] = []
     found = 0
+    fails = 0
     for sp in keep:
         w = None
-        if client is not None:
+        if client is not None and fails < 3:               # 连着 3 次报错（key 不对、额度用完）就别再一个个试了
             try:
                 w = client.where(sp.lat, sp.lon)
-            except Exception:
-                w = None
+                fails = 0
+            except Exception as ex:
+                fails += 1
+                if not _NAME_ERR:
+                    _NAME_ERR.append(str(ex))
         nm = (w or {}).get("name", "")
         if nm:
             found += 1
@@ -1681,6 +1691,8 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
              f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个（自动起名 {named} 个）；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if auto_name and not named and _NAME_ERR:
+        lines.append(f"景点没有查到真实地名，原因：{_NAME_ERR[0]}。先写成“区县 · 时间”；原因解决后可用 autoname_stops 重新起名（不要改用别的服务反查）。")
     if tracked_n:
         lines.append(f"其中 {tracked_n} 张本来没有定位，是按拍摄时间在轨迹文件上补出的位置（取决于手机时间和轨迹时间是否一致、tz_hours 是否对）。")
     if guessed_n:
@@ -1891,7 +1903,7 @@ def autoname_stops() -> str:
     _save(commit(trip, mutate))
     if found:
         return f"重新起名 {len(todo)} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。"
-    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名（没配高德 key 或查询失败），先写成“区县 · 时间”或日期时间，可以手动改。配好 AMAP_KEY 后再点一次。"
+    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名" + (f"。原因：{_NAME_ERR[0]}" if _NAME_ERR else "（高德没有返回名字）") + "。先写成“区县 · 时间”或日期时间，可以手动改；原因解决后再点一次。具体每次请求在 amap_calls.log 里（不含 key）。"
 
 
 def _day_titles_path() -> Path:

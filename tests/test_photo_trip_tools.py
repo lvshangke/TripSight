@@ -396,3 +396,18 @@ def test_long_span_restores_and_date_filter_works(tmp_path):
     assert pv2["span_days"] == 1 and pv2["kept"] == 1
     with pytest.raises(s.ToolError):
         s.date_filter([], [], "2026-13-01", "")
+
+
+def test_autoname_reports_real_reason_and_stops_after_repeated_errors(tmp_path, monkeypatch):
+    s.import_photo_trip(str(_album(tmp_path)), auto_name=False)
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    assert "AMAP_KEY" in s.autoname_stops()
+    calls = []
+
+    class Bad:
+        def where(self, la, lo):
+            calls.append(1)
+            raise s.AmapError("高德返回错误：INVALID_USER_KEY")
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda c, log_path=None: Bad()))
+    out = s.autoname_stops()
+    assert "INVALID_USER_KEY" in out and len(calls) <= 3
