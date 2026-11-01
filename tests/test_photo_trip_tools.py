@@ -411,3 +411,16 @@ def test_autoname_reports_real_reason_and_stops_after_repeated_errors(tmp_path, 
     monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda c, log_path=None: Bad()))
     out = s.autoname_stops()
     assert "INVALID_USER_KEY" in out and len(calls) <= 3
+
+
+def test_restore_auto_mode_is_set_by_page_and_seen_by_agent(tmp_path):
+    from tripcore import web
+    s.new_restore_trip("旧手机")
+    assert "逐步确认" in s.restore_status() and web.restore_mode({})["auto"] is False
+    assert web.restore_mode({"auto": True})["auto"] is True
+    st = s.restore_status()
+    assert "自动执行" in st and "不要调用 export_handbook" in st and "包括删除" in st
+    assert "逐步确认" in web.restore_context("x") or "自动执行" in web.restore_context("x")
+    web.restore_mode({"auto": False})
+    assert "逐步确认" in s.restore_status()
+    assert not any(t.__name__ == "set_restore_auto" for t in s.TOOLS)

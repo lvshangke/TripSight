@@ -781,7 +781,14 @@ def restore_context(msg: str) -> str:
     return ("【TripSight 页面：恢复行程】\n页面状态：\n" + status + "\n"
             "说明：“恢复行程”是把用户拍过的照片（文件夹或 Mac 照片 App 相册）还原成走过的路线，不是从已有行程里挑一个。"
             "当前行程是空的恢复行程、用户又没给来源时，直接问他：照片在哪个文件夹（给完整路径）或哪个相册，或请他在页面左侧“选来源”里选；"
-            "照片跨几年也能一次恢复（用户只想恢复一段时才带 start_date/end_date）；有了来源先预览再恢复，用 import_photo_trip（folder 或 album），先和用户确认。不要列出已有的计划行程让用户选。\n\n用户说：" + msg)
+            "照片跨几年也能一次恢复（用户只想恢复一段时才带 start_date/end_date）；有了来源先预览再恢复，用 import_photo_trip（folder 或 album）；要不要先确认，看上面“执行模式”那一行。不要列出已有的计划行程让用户选。\n\n用户说：" + msg)
+
+
+def restore_mode(body: dict) -> dict[str, Any]:
+    """恢复页“自动执行”开关：带 auto 就设置，不带就只读。只由页面（用户）设置，助手没有改它的工具。"""
+    if "auto" in body:
+        ms.set_restore_auto(bool(body.get("auto")))
+    return {"auto": ms.restore_auto()}
 
 
 def activity(body: dict) -> dict[str, Any]:
@@ -1257,7 +1264,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "export_dir": export_dir, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1335,7 +1342,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path", "bills_range", "activity"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path", "bills_range", "activity", "restore_mode"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

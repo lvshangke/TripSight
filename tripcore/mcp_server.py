@@ -1754,6 +1754,24 @@ def new_restore_trip(name: str = "") -> str:
     return f"已新建恢复行程「{nm}」并切换到它。下一步选照片文件夹或相册。"
 
 
+def restore_auto() -> bool:
+    """用户在 TripSight 恢复页打开了“自动执行”吗（页面开关，存在数据目录里）。助手自己不能改。"""
+    return bool(_load_json_file(_root_dir() / "restore_mode.json").get("auto"))
+
+
+def set_restore_auto(on: bool) -> None:
+    (_root_dir() / "restore_mode.json").write_text(json.dumps({"auto": bool(on)}), encoding="utf-8")
+
+
+AUTO_FLOW = ("执行模式：【自动执行】用户在页面上打开了自动执行：不用每一步问确认，包括删除；按这个流程自己走完，每做完一步在对话里用一句话告诉用户。"
+             "流程：①有页面预览或用户给了来源（文件夹/相册）就 import_photo_trip（用预览的半径，没有就 300；来源不知道就问，不要猜）；"
+             "②tag_regions，再 autoname_stops（失败就把结果里的原因告诉用户，不要改用别的服务反查）；"
+             "③同一天里名字相同或明显同属一个景区的点 merge_stops，明显不是景点的零散点 delete_stop；"
+             "④suggest_day_titles 后给每天 set_day_title；⑤有图可看的点用 view_stop 看过再 save_stop_story（只写画面里看得到的）；"
+             "⑥最后不要调用 export_handbook：告诉用户手册预览已准备好，请他在页面第 5 步点“导出”。每一步的结果都以工具返回为准，不编造。")
+CONFIRM_FLOW = "执行模式：【逐步确认】改动前（导入、合并、删除、改名、导出）先和用户确认。"
+
+
 def restore_status() -> str:
     """恢复行程页面的状态：用户在 TripSight 页面里选了哪个文件夹/相册、预览出几处（预览不新建行程，所以只靠 show_trip 看不到）、当前行程是哪个。
     用户在页面里和你对话（消息以【TripSight 页面：恢复行程】开头）或说“就用我刚选的/预览的那个”时先调用它；
@@ -1774,6 +1792,7 @@ def restore_status() -> str:
         lines.append("如果用户说恢复这个：先确认，再 import_photo_trip(folder 或 album, radius_m)。预览里的点只是候选，没有名字。")
     else:
         lines.append("页面上还没有做过预览。")
+    lines.append(AUTO_FLOW if restore_auto() else CONFIRM_FLOW)
     return "\n".join(lines)
 
 

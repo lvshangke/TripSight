@@ -214,6 +214,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #rp .hbtop{display:none}
 #rp.on{flex-direction:row}#rp_side{position:relative}#rp_gate{display:none;position:absolute;inset:0;z-index:5;background:var(--paper);align-items:center;justify-content:center;text-align:center;padding:30px}#rp_gate.on{display:flex}#rp_gate b{font-size:18px}#rp_gate p{color:var(--sub);font-size:14px;line-height:1.6;margin:10px 0 18px}
 #nr{position:fixed;inset:0;background:#0006;z-index:3000;display:none;align-items:center;justify-content:center}#nr.on{display:flex}#nr form{background:var(--paper);border-radius:16px;padding:22px 24px;width:min(400px,92vw);box-shadow:var(--shadow);font-size:14px}#nr form input{width:100%;margin-top:4px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box}#nr .bt{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}#nr .err{color:#a63d2a;margin-top:6px;min-height:18px}#rp_side{width:430px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-right:1px solid var(--line);box-shadow:2px 0 18px rgba(80,60,30,.05);z-index:2}
+#rp_auto{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px}#rp_auto small{color:var(--sub);flex:1}#rp_auto.on b{color:var(--acc)}#rp .sw{position:relative;width:38px;height:22px;flex:none}#rp .sw input{opacity:0;position:absolute;inset:0;margin:0;cursor:pointer;z-index:1}#rp .sw span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.15s}#rp .sw span::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}#rp .sw input:checked+span{background:var(--acc)}#rp .sw input:checked+span::after{left:19px}
 #rp .rtop{display:block;padding:16px 20px 6px;background:transparent;border:0}#rp .steps{justify-content:flex-start;flex-wrap:nowrap;gap:4px}
 #rp .steps span{padding:4px 10px 4px 4px;font-size:13px;gap:6px}#rp .steps span:not(.on){font-size:0;gap:0;padding:4px}#rp .steps span:not(.on) i{font-size:12px}
 #rp_body.pgbody{padding:8px 20px 18px}#rp .rfoot{padding:12px 20px;border-top:1px solid var(--line);background:var(--paper)}#rp .rfoot .tlnote{flex:1;text-align:center;font-size:12px;line-height:1.35}
@@ -287,7 +288,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
 <div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
 <button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
-<div class="pg" id="rp"><aside id="rp_side"><div id="rp_gate"><div><b>先新建一个恢复行程</b><p>恢复的照片会读进这个行程里，不会改动你现有的行程。</p><button class="pri" id="rp_gate_btn">＋ 恢复新的行程</button></div></div><div class="rtop"><div class="steps" id="rp_steps"></div></div>
+<div class="pg" id="rp"><aside id="rp_side"><div id="rp_gate"><div><b>先新建一个恢复行程</b><p>恢复的照片会读进这个行程里，不会改动你现有的行程。</p><button class="pri" id="rp_gate_btn">＋ 恢复新的行程</button></div></div><div class="rtop"><div id="rp_auto"><label class="sw"><input type="checkbox" id="rp_autoc"><span></span></label><b>自动执行</b><small id="rp_autot">逐步确认：助手每做一步改动前先问你</small></div><div class="steps" id="rp_steps"></div></div>
 <div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></aside>
 <section id="rp_main"><div id="rmap"></div><div id="rmap_chip"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
 <div id="rp_act"><div class="ah"><span class="dot" id="act_dot"></span><b id="act_title">助手</b><span class="tlnote" id="act_sub">空闲</span><button id="act_fold" title="收起/展开">▾</button></div><div id="act_list"></div></div>
@@ -944,7 +945,7 @@ function rmapFromHb() {
   rmapDraw(pts, p => { const el = $('hb_' + p.id); if (el && RS.step === 4) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); } });
 }
 // ---- 助手运行过程（轮询 activity）
-let ACT = {since: 0, evs: new Map(), timer: null, refreshT: null};
+let ACT = {since: 0, evs: new Map(), timer: null, refreshT: null, boot: Date.now() / 1000};
 const ACT_CHANGES = new Set(['import_photo_trip', 'merge_stops', 'delete_stop', 'autoname_stops', 'update_place', 'tag_regions', 'save_stop_story', 'set_day_title', 'new_trip', 'switch_trip', 'undo', 'remove_place', 'add_place', 'add_photo', 'remove_photo']);
 function actRender() {
   const list = [...ACT.evs.values()].sort((a, b) => a.t0 - b.t0).slice(-14).reverse();
@@ -959,20 +960,40 @@ async function actPoll() {
   if (PGCUR !== 'restore' || document.hidden) return;
   try {
     const r = await api('activity', {since: ACT.since}); let changed = false;
-    r.events.forEach(e => { const old = ACT.evs.get(e.id); ACT.evs.set(e.id, e); ACT.since = Math.max(ACT.since, e.ts); if (e.state !== 'run' && (!old || old.state === 'run') && ACT_CHANGES.has(e.name) && e.state === 'ok') changed = true; });
+    r.events.forEach(e => { const old = ACT.evs.get(e.id); if (e.ts >= ACT.boot && (!old || old.state !== e.state)) actFollow(e); ACT.evs.set(e.id, e); ACT.since = Math.max(ACT.since, e.ts); if (e.state !== 'run' && (!old || old.state === 'run') && ACT_CHANGES.has(e.name) && e.state === 'ok') changed = true; });
     if (r.events.length) actRender();
     if (changed) { clearTimeout(ACT.refreshT); ACT.refreshT = setTimeout(async () => { try { await load(); await hbLoad(); } catch (e) {} }, 400); }
   } catch (e) {}
+}
+// 助手操作时，左侧跟着走：工具 → 第几步，并把来源、半径填进去
+const ACT_STEP = {list_photo_albums: 1, restore_status: 1, new_restore_trip: 1, import_photo_trip: 3, export_handbook: 5, export_notes: 5, export_calendar: 5, scan_videos: 5, export_rough_cut: 5,
+  view_stop: 4, autoname_stops: 4, tag_regions: 4, merge_stops: 4, delete_stop: 4, update_place: 4, save_stop_story: 4, set_day_title: 4, suggest_day_titles: 4};
+function actFollow(e) {
+  const n = ACT_STEP[e.name]; if (!n || PGCUR !== 'restore' || $('rp_gate').classList.contains('on')) return;
+  if (e.state === 'run') {
+    if (e.name === 'import_photo_trip' && e.args) {
+      const g = k => { const m = e.args.match(new RegExp(k + '=([^，]*)')); return m ? m[1] : ''; };
+      const al = g('album'), fo = g('folder'), rd = g('radius_m');
+      if (al) { $('hb_src').value = 'album'; hbSrcUi(); if (![...$('hb_album').options].some(o => o.value === al)) $('hb_album').innerHTML = '<option value="' + esc(al) + '">' + esc(al) + '</option>'; $('hb_album').value = al; }
+      else if (fo) { $('hb_src').value = 'folder'; hbSrcUi(); $('hb_folder').value = fo; }
+      if (rd && [...$('hb_r').options].some(o => o.value === rd)) $('hb_r').value = rd;
+    }
+    if (RS.step !== n && !(n === 4 && RS.step === 5)) rsGo(n);
+    $('rp_msg').textContent = '助手正在：' + (e.label || e.name);
+  } else if (e.state === 'ok' && e.name === 'import_photo_trip') { rsGo(4); }
 }
 function actStart() { if (ACT.timer) return; ACT.since = ACT.since || (Date.now() / 1000 - 600); actRender(); actPoll(); ACT.timer = setInterval(actPoll, 1500); }
 function actStop() { clearInterval(ACT.timer); ACT.timer = null; }
 $('act_fold').onclick = () => $('rp_act').classList.toggle('fold');
 $('rp_ctog').onclick = () => $('rp').classList.toggle('nochat');
+function autoUi(on) { $('rp_autoc').checked = on; $('rp_auto').classList.toggle('on', on); $('rp_autot').textContent = on ? '自动：助手会把整个流程走完（含删除），到导出前停下等你点' : '逐步确认：助手每做一步改动前先问你'; }
+async function autoLoad() { try { autoUi((await api('restore_mode', {})).auto); } catch (e) {} }
+$('rp_autoc').onchange = async () => { const on = $('rp_autoc').checked; autoUi(on); try { await api('restore_mode', {auto: on}); toast(on ? '已打开自动执行：助手会直接做完，导出前停下' : '已改回逐步确认'); } catch (e) { autoUi(!on); toast(e.message, true); } };
 window.addEventListener('resize', () => { if (PGCUR === 'restore' && RMAP) RMAP.invalidateSize(); });
 const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
 async function pgShow(name, step) {
   PGCUR = name; await ensureKind(name); fillTripSel(); moClose(); $('home').classList.remove('on');
-  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop(); rpGate();
+  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') { actStart(); autoLoad(); } else actStop(); rpGate();
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
