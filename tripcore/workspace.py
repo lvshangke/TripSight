@@ -87,6 +87,7 @@ def list_trips(root: Path, archived: bool = False) -> list[dict[str, Any]]:
         meta = data.get("meta") or {}
         out.append({"slug": d.name, "name": meta.get("name", d.name), "num_days": meta.get("num_days"),
                     "places": len(data.get("places") or []), "revision": data.get("revision", 0),
+                    "kind": "restore" if (d / "photo_trip.json").exists() else "plan",
                     "active": (not archived) and d.name == cur})
     return out
 

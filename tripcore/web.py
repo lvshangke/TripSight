@@ -389,11 +389,11 @@ def trips() -> dict[str, Any]:
     """行程下拉框用：所有行程和当前行程。单文件模式只有一个，不能切换。"""
     if ms._single_file_mode():
         t = ms._load()
-        return {"single": True, "current": None, "trips": [{"slug": "", "name": t.meta.name, "num_days": t.meta.num_days, "places": len(t.places)}]}
+        return {"single": True, "current": None, "trips": [{"slug": "", "name": t.meta.name, "num_days": t.meta.num_days, "places": len(t.places), "kind": "restore" if ms._photo_trip_path().exists() else "plan"}]}
     root = ms._root_dir()
     ws.migrate_legacy(root)
     return {"single": False, "current": ws.active_slug(root),
-            "trips": [{k: it[k] for k in ("slug", "name", "num_days", "places")} for it in ws.list_trips(root)]}
+            "trips": [{k: it[k] for k in ("slug", "name", "num_days", "places", "kind")} for it in ws.list_trips(root)]}
 
 
 def switch(body: dict) -> dict[str, Any]:
@@ -948,7 +948,7 @@ def bills_state() -> dict[str, Any]:
     return {"rows": led, "summary": _bl.summarize(led) if led else None, "categories": _bl.CATEGORIES + [_bl.TRANSFER],
             "places": [{"id": p.id, "name": p.name} for p in trip.places], "has_dates": trip.day_date(0) is not None,
             "rules": len(_bl.load_rules(ms._rules_path())), "watch": [str(x) for x in ms._watch_folders()],
-            "shortcut": _bl.SHORTCUT_STEPS, "icloud": str(_bl.icloud_folder())}
+            "report": ms._load_json_file(ms._bills_report_path()) or None, "shortcut": _bl.SHORTCUT_STEPS, "icloud": str(_bl.icloud_folder())}
 
 
 def pick_path(body: dict) -> dict[str, Any]:

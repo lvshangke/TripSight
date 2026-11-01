@@ -235,6 +235,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .hbs,.tcard,.hbimp,.hbexp,.bls .k,.day{transition:box-shadow .15s,transform .15s,border-color .15s}.hbs:hover,.tcard:hover{box-shadow:0 8px 22px rgba(80,60,30,.14);border-color:var(--line2)}.hbp .c:hover img{filter:brightness(1.05)}
 #rp .steps span.done:hover{background:var(--acc-soft)}#ptip{position:fixed;z-index:5000;background:#33302b;color:#fff;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}#ptip.on{opacity:1}
 .msgbox{display:none;width:100%;padding:10px 14px;border-radius:10px;background:var(--acc-soft);border:1px solid var(--acc-soft2);color:var(--ink);white-space:pre-wrap;font-size:13px;line-height:1.6}.msgbox.on{display:block}.msgbox.err{background:#fdecea;border-color:#f3c0b8;color:#8a2a1c}.pk{font-size:12px;padding:5px 10px;white-space:nowrap}
+.rep{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.rh{font-weight:600;margin-bottom:8px;font-family:var(--serif)}.rep .why{margin:8px 0;padding:10px 12px;background:#fdecea;border:1px solid #f3c0b8;border-radius:8px;color:#8a2a1c;font-size:13px;line-height:1.6}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:12px 0}.bcard{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.brow{display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0}.brow span{width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brow .bt{flex:1;background:var(--bg);border-radius:4px}.brow b{min-width:44px;text-align:right}.brow i{font-style:normal;color:var(--sub);min-width:34px;text-align:right}
 </style></head><body>
 <div id="toast"></div><div id="ptip"></div>
 <nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label></nav>
@@ -292,7 +294,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <textarea id="bl_watch" rows="3" style="width:100%;box-sizing:border-box;font:inherit" placeholder="例如 ~/Library/Mobile Documents/com~apple~CloudDocs/TripSight账单"></textarea>
 <button id="bl_wsave">保存</button> <button id="bl_scan" class="pri">立即扫描</button> <span class="tlnote" id="bl_wmsg"></span>
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
-<div id="bl_sum"></div><div id="bl_list"></div></div>
+<div id="bl_rep"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_vid">
 <div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_path">选文件夹</button><button id="vd_scan">整理归类</button>
 <div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
@@ -306,7 +308,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
 <div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程，和复盘里标了“去了”的景点；纯计划不算。公里数是直线距离累加，只是下限。城市来自“标城市”，没标的不猜。</div></div>
 <pre id="fp_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
-<div class="ph" style="height:480px"><iframe id="fp_frame" sandbox title="足迹地图" style="width:100%;height:100%;border:0;background:#fff"></iframe></div></div>
+<div class="ph" style="height:480px"><iframe id="fp_frame" sandbox="allow-scripts" title="足迹地图" style="width:100%;height:100%;border:0;background:#fff"></iframe></div></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
@@ -350,13 +352,22 @@ async function load() {
   renderAll();
   syncChat();
 }
-async function loadTrips() {
-  try {
-    const r = await api('trips'), sel = $('trip'); sel.innerHTML = '';
-    r.trips.forEach(t => { const o = document.createElement('option'); o.value = t.slug; o.textContent = t.name + (t.num_days ? '（' + t.num_days + '天）' : ''); o.selected = t.slug === r.current || r.single; sel.appendChild(o); });
-    if (!r.single) { const o = document.createElement('option'); o.value = '__new__'; o.textContent = '＋ 新建行程…'; sel.appendChild(o); }
-    sel.disabled = r.single; sel.title = r.single ? '单文件模式不能切换或新建' : '切换行程 / 新建行程'; curTrip = r.current;
-  } catch (e) {}
+let TRIPS_R = null;
+const needKind = () => PGCUR === 'plan' ? 'plan' : (PGCUR === 'bill' ? '' : 'restore');
+async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; fillTripSel(); } catch (e) {} }
+function fillTripSel() {
+  const r = TRIPS_R; if (!r) return; const sel = $('trip'), k = needKind(); sel.innerHTML = '';
+  const list = r.trips.filter(t => !k || r.single || t.kind === k);
+  list.forEach(t => { const o = document.createElement('option'); o.value = t.slug; o.textContent = (t.kind === 'restore' ? '📷 ' : '') + t.name + (t.num_days ? '（' + t.num_days + '天）' : ''); o.selected = t.slug === r.current || r.single; sel.appendChild(o); });
+  if (!list.length) { const o = document.createElement('option'); o.value = ''; o.disabled = true; o.selected = true; o.textContent = k === 'restore' ? '（还没有恢复过的行程）' : '（还没有计划行程）'; sel.appendChild(o); }
+  if (!r.single && k !== 'restore') { const o = document.createElement('option'); o.value = '__new__'; o.textContent = '＋ 新建行程…'; sel.appendChild(o); }
+  sel.disabled = r.single; sel.title = r.single ? '单文件模式不能切换或新建' : (k === 'restore' ? '这里只列恢复过的行程' : '切换行程 / 新建行程');
+}
+async function ensureKind(name) {
+  const k = name === 'plan' ? 'plan' : (name === 'bill' ? '' : 'restore'), r = TRIPS_R; if (!k || !r || r.single) return;
+  const cur = r.trips.find(t => t.slug === r.current); if (cur && cur.kind === k) return;
+  const pick = r.trips.filter(t => t.kind === k).slice(-1)[0]; if (!pick) return;
+  try { await api('switch', {slug: pick.slug}); await load(); } catch (e) {}
 }
 let curTrip = null, apPicked = null;
 function apOpen() { $('ap_q').value = ''; $('ap_list').innerHTML = ''; $('ap_warn').textContent = ''; $('ap_err').textContent = ''; $('ap_dur').value = 90; apPicked = null; $('ap_ok').disabled = true; $('ap').classList.add('on'); $('ap_q').focus(); }
@@ -816,8 +827,8 @@ function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else
 function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
 var PGCUR = 'plan';
 const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
-function pgShow(name, step) {
-  PGCUR = name; moClose(); $('home').classList.remove('on');
+async function pgShow(name, step) {
+  PGCUR = name; await ensureKind(name); fillTripSel(); moClose(); $('home').classList.remove('on');
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
@@ -988,13 +999,32 @@ async function blLoad() {
   $('bl_steps').innerHTML = BL.shortcut.map(x => '<li>' + esc(x) + '</li>').join('');
   blRender();
 }
+function blReport() {
+  const r = BL.report; if (!r) { $('bl_rep').innerHTML = ''; return; }
+  const f = r.files || [], first = f.map(x => x.first).filter(Boolean).sort()[0], last = f.map(x => x.last).filter(Boolean).sort().slice(-1)[0];
+  let why = '';
+  if (r.added === 0 && r.outside > 0 && !r.duplicate) why = '<b>没有一笔记进账本：</b>账单里的消费日期是 ' + esc(first || '?') + '～' + esc(last || '?') + '，而这个行程的日期是 ' + esc(r.trip_start) + '～' + esc(r.trip_end) + '，两段时间没有重合。检查是不是导了别的月份的账单，或者行程日期设得不对（恢复行程的日期来自照片拍摄时间）。';
+  else if (r.added === 0 && r.duplicate > 0) why = '这些消费之前已经导入过了，没有新增。';
+  $('bl_rep').innerHTML = '<div class="rep"><div class="rh">上次导入 · ' + esc(r.at || '') + '</div><div class="bls"><div class="k"><span class="tlnote">新记</span><b>' + r.added + '</b>笔</div><div class="k"><span class="tlnote">行程期间之外</span><b>' + r.outside + '</b>笔</div><div class="k"><span class="tlnote">重复</span><b>' + r.duplicate + '</b>笔</div>' +
+    '<div class="k"><span class="tlnote">账单覆盖</span><b style="font-size:14px">' + esc(first || '—') + '～' + esc(last || '—') + '</b></div><div class="k"><span class="tlnote">行程期间</span><b style="font-size:14px">' + esc(r.trip_start) + '～' + esc(r.trip_end) + '</b></div></div>' +
+    (why ? '<div class="why">' + why + '</div>' : '') + f.map(x => '<div class="tlnote">' + esc(x.name) + '：' + esc(x.source) + '账单，读到 ' + x.rows + ' 笔</div>').join('') + '</div>';
+}
 function blRender() {
+  blReport();
   const s = BL.summary;
-  if (!BL.rows.length) { $('bl_sum').innerHTML = ''; $('bl_list').innerHTML = '<div class="tlnote">' + (BL.has_dates ? '还没有导入账单。' : '这个行程还没有设具体日期，没法筛出旅行期间的消费：先在助手里设置日期。') + '</div>'; return; }
-  const max = Math.max(...Object.values(s.by_category), 1);
+  if (!BL.rows.length) { $('bl_sum').innerHTML = ''; $('bl_list').innerHTML = '<div class="tlnote">' + (BL.has_dates ? (BL.report ? '账本里还没有这个行程期间的消费，分析需要先有消费记录。' : '还没有导入账单。选一个微信/支付宝账单文件，点“导入”。') : '这个行程还没有设具体日期，没法筛出旅行期间的消费：先在助手里设置日期。') + '</div>'; return; }
+  const max = Math.max(...Object.values(s.by_category), 1), days = Object.keys(s.by_day), maxd = Math.max(...Object.values(s.by_day), 1);
+  const byPlace = {}; BL.rows.filter(r => !r.excluded && r.place_id).forEach(r => { byPlace[r.place_id] = (byPlace[r.place_id] || 0) + r.amount; });
+  const pname = id => (BL.places.find(p => p.id === id) || {}).name || id;
+  const top = BL.rows.filter(r => !r.excluded).sort((a, b) => b.amount - a.amount).slice(0, 5);
   $('bl_sum').innerHTML = '<div class="bls"><div class="k"><span class="tlnote">合计</span><b>' + s.total + ' 元</b>' + s.count + ' 笔</div>' +
-    Object.entries(s.by_category).sort((a, b) => b[1] - a[1]).map(([k, v]) => '<div class="k" style="min-width:90px"><span class="tlnote">' + esc(k) + '</span><b>' + v + '</b><div class="blbar" style="width:' + Math.round(v / max * 100) + '%"></div></div>').join('') + '</div>' +
-    '<div class="tlnote">按天：' + Object.entries(s.by_day).map(([k, v]) => esc(k.slice(5)) + ' ' + v).join('　') + (s.excluded_count ? '　｜　不计入：' + s.excluded_count + ' 笔（转账/群收款，共 ' + s.excluded_total + ' 元）' : '') + '</div>' +
+    '<div class="k"><span class="tlnote">日均</span><b>' + (s.total / Math.max(days.length, 1)).toFixed(0) + ' 元</b>' + days.length + ' 天有消费</div>' +
+    '<div class="k"><span class="tlnote">单笔平均</span><b>' + (s.total / Math.max(s.count, 1)).toFixed(0) + ' 元</b></div>' +
+    (s.excluded_count ? '<div class="k"><span class="tlnote">不计入</span><b>' + s.excluded_count + ' 笔</b>转账/群收款 ' + s.excluded_total + ' 元</div>' : '') + '</div>' +
+    '<div class="bgrid"><div class="bcard"><div class="rh">按类别</div>' + Object.entries(s.by_category).sort((a, b) => b[1] - a[1]).map(([k, v]) => '<div class="brow"><span>' + esc(k) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / max * 100) + '%"></div></div><b>' + v + '</b><i>' + Math.round(v / s.total * 100) + '%</i></div>').join('') + '</div>' +
+    '<div class="bcard"><div class="rh">按天</div>' + Object.entries(s.by_day).map(([k, v]) => '<div class="brow"><span>' + esc(k.slice(5)) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / maxd * 100) + '%"></div></div><b>' + v + '</b></div>').join('') + '</div>' +
+    '<div class="bcard"><div class="rh">花在哪些地方</div>' + (Object.keys(byPlace).length ? Object.entries(byPlace).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => '<div class="brow"><span>' + esc(pname(k)) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / Math.max(...Object.values(byPlace)) * 100) + '%"></div></div><b>' + Math.round(v) + '</b></div>').join('') : '<div class="tlnote">还没有消费对应到景点；在下面的明细里给消费选“对应景点”。</div>') + '</div>' +
+    '<div class="bcard"><div class="rh">最大的 5 笔</div>' + top.map(r => '<div class="brow"><span>' + esc(r.merchant) + '</span><b>' + r.amount + '</b><i>' + esc(r.date.slice(5)) + '</i></div>').join('') + '</div></div>' +
     '<div class="tlnote">改某一笔的类别时，同一商户的其他消费会一起改，以后导入也沿用（已记住 ' + BL.rules + ' 家）。</div>';
   const opt = (list, cur, fn) => list.map(x => '<option value="' + esc(fn(x)[0]) + '"' + (fn(x)[0] === cur ? ' selected' : '') + '>' + esc(fn(x)[1]) + '</option>').join('');
   $('bl_list').innerHTML = '<table class="bltab"><tr><th>时间</th><th>商户</th><th>金额</th><th>类别</th><th>对应景点</th><th>不计入</th></tr>' + BL.rows.map(r =>

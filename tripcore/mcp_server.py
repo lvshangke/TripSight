@@ -1320,7 +1320,7 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
 
 def footprint(basemap: bool = False) -> str:
     """足迹统计与地图：把去过的行程合起来——几趟、几天、到过几个城市、大约走了多少公里，并生成一张所有去过的地方的地图页（~/.tripcore/足迹.html）。
-    只算“去过”的：从照片还原的行程，以及复盘里标了“去了”的景点；纯计划不算。公里数是每天按先后顺序的直线距离累加，只是下限；
+    只算“去过”的：用“恢复行程”从照片还原的行程；计划行程和复盘不算。公里数是每天按先后顺序的直线距离累加，只是下限；
     城市来自 tag_regions，没标过的行程不会猜。默认只读本机文件、不联网。
     basemap=true 给地图加高德街道底图（仅国内、需要用户自己的 AMAP_KEY）：会联网，只把“地图中心点、缩放级别、图片大小”发给高德，
     不发地名；但中心点大致反映去过的范围，用之前告诉用户并等他同意。"""
@@ -1755,6 +1755,10 @@ def _trip_range(trip: Trip) -> tuple[Any, Any]:
     return a, b
 
 
+def _bills_report_path() -> Path:
+    return trip_path().with_name("bills_report.json")
+
+
 def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], list[str]]:
     from . import bills as _bl
     a, b = _trip_range(trip)
@@ -1763,6 +1767,7 @@ def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], l
     rules = _bl.load_rules(_rules_path())
     tot = {"added": 0, "outside": 0, "duplicate": 0}
     notes: list[str] = []
+    rep_files: list[dict[str, Any]] = []
     for f in files:
         try:
             if f.suffix.lower() == ".txt":
@@ -1777,8 +1782,17 @@ def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], l
         for k in tot:
             tot[k] += r[k]
         label = {"wechat": "微信", "alipay": "支付宝", "applepay": "Apple Pay"}.get(txns[0].source, "") if txns else ""
-        notes.append(f"{f.name}：{label}账单，读到 {st['rows']} 笔")
+        dts = sorted(x.when.date().isoformat() for x in txns)
+        notes.append(f"{f.name}：{label}账单，读到 {st['rows']} 笔" + (f"，消费日期 {dts[0]}～{dts[-1]}" if dts else ""))
+        rep_files.append({"name": f.name, "source": label, "rows": st["rows"], "first": dts[0] if dts else "", "last": dts[-1] if dts else "",
+                          "added": r["added"], "outside": r["outside"], "duplicate": r["duplicate"]})
     _bl.save(_ledger_path(), ledger)
+    try:                                                                  # 记下这次导入的情况，工作台“花费”页一直显示，不会因为没记进账本就什么都看不到
+        from datetime import datetime as _dt
+        _bills_report_path().write_text(json.dumps({"at": _dt.now().strftime("%Y-%m-%d %H:%M"), "trip_start": a.isoformat(), "trip_end": b.isoformat(),
+                                                    "files": rep_files, "notes": notes, **tot}, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
     return tot, notes
 
 

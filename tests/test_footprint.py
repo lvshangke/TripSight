@@ -30,11 +30,10 @@ def test_footprint_counts_only_gone_trips(tmp_path):
     assert "<circle" in html and "<polyline" in html
 
 
-def test_review_visited_counts_and_untagged_note(tmp_path):
-    d = _trip("甲行", [("A", 30.0, 120.0), ("B", 30.1, 120.1)])
+def test_review_visited_no_longer_counts_only_restored_trips():
+    _trip("甲行", [("A", 30.0, 120.0), ("B", 30.1, 120.1)])
     s.record_review("A", "去了")
-    out = s.footprint()
-    assert "1 个地方" in out and "还没有城市信息" in out
+    assert "还没有可统计" in s.footprint()
 
 
 def test_basemap_option_without_key_or_abroad(monkeypatch):
@@ -60,3 +59,23 @@ def test_html_embeds_basemap_when_available():
             return "data:image/jpeg;base64,AAAA"
     assert "<image href=\"data:image/jpeg" in fp.build_html([f], BM())
     assert "<image" not in fp.build_html([f], None)
+
+
+def test_basemap_view_uses_gcj02_not_raw_wgs84():
+    from tripcore.coords import wgs84_to_gcj02
+    f = fp.TripFoot("a", "甲", 1, "", True, [(0, 28.70, 121.40, "x"), (0, 28.72, 121.42, "y")])
+    seen = {}
+
+    class BM:
+        def fetch(self, v):
+            seen["v"] = v
+            return "data:image/jpeg;base64,AAAA"
+    fp.build_html([f], BM())
+    gla, glo = wgs84_to_gcj02(28.71, 121.41)
+    assert abs(seen["v"].lat - gla) < 0.003 and abs(seen["v"].lat - 28.71) > 0.0005 or abs(seen["v"].lon - glo) < 0.003
+
+
+def test_nearby_points_merge_into_one_numbered_pin():
+    f = fp.TripFoot("a", "甲", 1, "", True, [(0, 28.7, 121.4, "x"), (0, 28.70001, 121.40001, "y"), (0, 28.8, 121.5, "z")])
+    html = fp.build_html([f])
+    assert html.count('class="t t0 pin"') == 2 and ">2</text>" in html
