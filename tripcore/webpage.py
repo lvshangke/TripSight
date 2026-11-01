@@ -235,7 +235,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .hbs,.tcard,.hbimp,.hbexp,.bls .k,.day{transition:box-shadow .15s,transform .15s,border-color .15s}.hbs:hover,.tcard:hover{box-shadow:0 8px 22px rgba(80,60,30,.14);border-color:var(--line2)}.hbp .c:hover img{filter:brightness(1.05)}
 #rp .steps span.done:hover{background:var(--acc-soft)}#ptip{position:fixed;z-index:5000;background:#33302b;color:#fff;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}#ptip.on{opacity:1}
 .msgbox{display:none;width:100%;padding:10px 14px;border-radius:10px;background:var(--acc-soft);border:1px solid var(--acc-soft2);color:var(--ink);white-space:pre-wrap;font-size:13px;line-height:1.6}.msgbox.on{display:block}.msgbox.err{background:#fdecea;border-color:#f3c0b8;color:#8a2a1c}.pk{font-size:12px;padding:5px 10px;white-space:nowrap}
-.rep{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.rh{font-weight:600;margin-bottom:8px;font-family:var(--serif)}.rep .why{margin:8px 0;padding:10px 12px;background:#fdecea;border:1px solid #f3c0b8;border-radius:8px;color:#8a2a1c;font-size:13px;line-height:1.6}
+.seg input[type=date]{margin:0 4px}#bl_mode{margin:12px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.rep{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.rh{font-weight:600;margin-bottom:8px;font-family:var(--serif)}.rep .why{margin:8px 0;padding:10px 12px;background:#fdecea;border:1px solid #f3c0b8;border-radius:8px;color:#8a2a1c;font-size:13px;line-height:1.6}
 .bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:12px 0}.bcard{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.brow{display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0}.brow span{width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brow .bt{flex:1;background:var(--bg);border-radius:4px}.brow b{min-width:44px;text-align:right}.brow i{font-style:normal;color:var(--sub);min-width:34px;text-align:right}
 .nbtn{font-size:13px!important;padding:5px 12px!important;border:1px solid var(--line)!important}#bin{position:absolute;right:16px;top:50px;width:340px;max-height:60vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px;display:none}#bin.on{display:block}#bin .br{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dotted var(--line);font-size:13px}#bin .br span{flex:1}
 </style></head><body>
@@ -295,7 +295,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <textarea id="bl_watch" rows="3" style="width:100%;box-sizing:border-box;font:inherit" placeholder="例如 ~/Library/Mobile Documents/com~apple~CloudDocs/TripSight账单"></textarea>
 <button id="bl_wsave">保存</button> <button id="bl_scan" class="pri">立即扫描</button> <span class="tlnote" id="bl_wmsg"></span>
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
-<div id="bl_rep"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
+<div id="bl_rep"></div><div id="bl_mode"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_vid">
 <div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_path">选文件夹</button><button id="vd_scan">整理归类</button>
 <div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
@@ -1017,36 +1017,49 @@ function blReport() {
   const r = BL.report; if (!r) { $('bl_rep').innerHTML = ''; return; }
   const f = r.files || [], first = f.map(x => x.first).filter(Boolean).sort()[0], last = f.map(x => x.last).filter(Boolean).sort().slice(-1)[0];
   let why = '';
-  if (r.added === 0 && r.outside > 0 && !r.duplicate) why = '<b>没有一笔记进账本：</b>账单里的消费日期是 ' + esc(first || '?') + '～' + esc(last || '?') + '，而这个行程的日期是 ' + esc(r.trip_start) + '～' + esc(r.trip_end) + '，两段时间没有重合。检查是不是导了别的月份的账单，或者行程日期设得不对（恢复行程的日期来自照片拍摄时间）。';
+  if (!r.trip_start) why = '这个行程还没有具体日期，所以没有记进行程账本。下面选“全部账单”或“自选日期”就能看统计。';
+  else if (r.added === 0 && r.outside > 0 && !r.duplicate) why = '<b>没有一笔记进账本：</b>账单里的消费日期是 ' + esc(first || '?') + '～' + esc(last || '?') + '，而这个行程的日期是 ' + esc(r.trip_start) + '～' + esc(r.trip_end) + '，两段时间没有重合。检查是不是导了别的月份的账单，或者行程日期设得不对（恢复行程的日期来自照片拍摄时间）。想单独看这段账单的花销，点下面的“全部账单”。';
   else if (r.added === 0 && r.duplicate > 0) why = '这些消费之前已经导入过了，没有新增。';
   $('bl_rep').innerHTML = '<div class="rep"><div class="rh">上次导入 · ' + esc(r.at || '') + '</div><div class="bls"><div class="k"><span class="tlnote">新记</span><b>' + r.added + '</b>笔</div><div class="k"><span class="tlnote">行程期间之外</span><b>' + r.outside + '</b>笔</div><div class="k"><span class="tlnote">重复</span><b>' + r.duplicate + '</b>笔</div>' +
-    '<div class="k"><span class="tlnote">账单覆盖</span><b style="font-size:14px">' + esc(first || '—') + '～' + esc(last || '—') + '</b></div><div class="k"><span class="tlnote">行程期间</span><b style="font-size:14px">' + esc(r.trip_start) + '～' + esc(r.trip_end) + '</b></div></div>' +
+    '<div class="k"><span class="tlnote">账单覆盖</span><b style="font-size:14px">' + esc(first || '—') + '～' + esc(last || '—') + '</b></div><div class="k"><span class="tlnote">行程期间</span><b style="font-size:14px">' + (r.trip_start ? esc(r.trip_start) + '～' + esc(r.trip_end) : '未设日期') + '</b></div></div>' +
     (why ? '<div class="why">' + why + '</div>' : '') + f.map(x => '<div class="tlnote">' + esc(x.name) + '：' + esc(x.source) + '账单，读到 ' + x.rows + ' 笔</div>').join('') + '</div>';
 }
-function blRender() {
-  blReport();
-  const s = BL.summary;
-  if (!BL.rows.length) { $('bl_sum').innerHTML = ''; $('bl_list').innerHTML = '<div class="tlnote">' + (BL.has_dates ? (BL.report ? '账本里还没有这个行程期间的消费，分析需要先有消费记录。' : '还没有导入账单。选一个微信/支付宝账单文件，点“导入”。') : '这个行程还没有设具体日期，没法筛出旅行期间的消费：先在助手里设置日期。') + '</div>'; return; }
+let BL_MODE = 'trip', BL_RANGE = {start: '', end: ''};
+async function blView() { const r = await api('bills_range', BL_MODE === 'all' ? {} : BL_RANGE); BL.view = r; return r; }
+function blModeUi() {
+  const pl = BL.pool || {count: 0}, ms = [['trip', '行程期间'], ['all', '全部账单' + (pl.count ? '（' + pl.first.slice(5) + '～' + pl.last.slice(5) + '）' : '')], ['custom', '自选日期']];
+  $('bl_mode').innerHTML = '<div class="seg">' + ms.map(m => '<button data-m="' + m[0] + '"' + (BL_MODE === m[0] ? ' class="on"' : '') + '>' + esc(m[1]) + '</button>').join('') + '</div>' +
+    (BL_MODE === 'custom' ? ' <input type="date" id="bl_a" value="' + BL_RANGE.start + '"> ～ <input type="date" id="bl_b" value="' + BL_RANGE.end + '">' : '') +
+    (BL_MODE !== 'trip' && !pl.count ? ' <span class="tlnote">还没有账单：先导入一个微信/支付宝账单。</span>' : '') +
+    (BL_MODE === 'trip' ? ' <span class="tlnote">只统计这个行程日期内的消费，可以改类别、对应到景点。</span>' : ' <span class="tlnote">不受行程日期限制，看账单里所有消费。</span>');
+  $('bl_mode').querySelectorAll('button').forEach(b => b.onclick = () => { BL_MODE = b.dataset.m; if (BL_MODE === 'custom' && !BL_RANGE.start && pl.count) { BL_RANGE = {start: pl.first, end: pl.last}; } blRender(); });
+  if ($('bl_a')) { $('bl_a').onchange = () => { BL_RANGE.start = $('bl_a').value; blRender(); }; $('bl_b').onchange = () => { BL_RANGE.end = $('bl_b').value; blRender(); }; }
+}
+async function blRender() {
+  blReport(); blModeUi();
+  const ro = BL_MODE !== 'trip', V = ro ? await blView() : BL, s = V.summary;
+  if (!V.rows.length) { $('bl_sum').innerHTML = ''; $('bl_list').innerHTML = '<div class="tlnote">' + (ro ? '这段日期里没有消费记录。换一段日期，或选“全部账单”。' : BL.has_dates ? (BL.report ? '账本里还没有这个行程期间的消费，分析需要先有消费记录。' : '还没有导入账单。选一个微信/支付宝账单文件，点“导入”。') : '这个行程还没有设具体日期，没法筛出旅行期间的消费：先在助手里设置日期。') + '</div>'; return; }
   const max = Math.max(...Object.values(s.by_category), 1), days = Object.keys(s.by_day), maxd = Math.max(...Object.values(s.by_day), 1);
-  const byPlace = {}; BL.rows.filter(r => !r.excluded && r.place_id).forEach(r => { byPlace[r.place_id] = (byPlace[r.place_id] || 0) + r.amount; });
-  const pname = id => (BL.places.find(p => p.id === id) || {}).name || id;
-  const top = BL.rows.filter(r => !r.excluded).sort((a, b) => b.amount - a.amount).slice(0, 5);
+  const byPlace = {}; V.rows.filter(r => !r.excluded && r.place_id).forEach(r => { byPlace[r.place_id] = (byPlace[r.place_id] || 0) + r.amount; });
+  const pname = id => (V.places.find(p => p.id === id) || {}).name || id;
+  const top = V.rows.filter(r => !r.excluded).sort((a, b) => b.amount - a.amount).slice(0, 5);
   $('bl_sum').innerHTML = '<div class="bls"><div class="k"><span class="tlnote">合计</span><b>' + s.total + ' 元</b>' + s.count + ' 笔</div>' +
     '<div class="k"><span class="tlnote">日均</span><b>' + (s.total / Math.max(days.length, 1)).toFixed(0) + ' 元</b>' + days.length + ' 天有消费</div>' +
     '<div class="k"><span class="tlnote">单笔平均</span><b>' + (s.total / Math.max(s.count, 1)).toFixed(0) + ' 元</b></div>' +
     (s.excluded_count ? '<div class="k"><span class="tlnote">不计入</span><b>' + s.excluded_count + ' 笔</b>转账/群收款 ' + s.excluded_total + ' 元</div>' : '') + '</div>' +
     '<div class="bgrid"><div class="bcard"><div class="rh">按类别</div>' + Object.entries(s.by_category).sort((a, b) => b[1] - a[1]).map(([k, v]) => '<div class="brow"><span>' + esc(k) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / max * 100) + '%"></div></div><b>' + v + '</b><i>' + Math.round(v / s.total * 100) + '%</i></div>').join('') + '</div>' +
     '<div class="bcard"><div class="rh">按天</div>' + Object.entries(s.by_day).map(([k, v]) => '<div class="brow"><span>' + esc(k.slice(5)) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / maxd * 100) + '%"></div></div><b>' + v + '</b></div>').join('') + '</div>' +
-    '<div class="bcard"><div class="rh">花在哪些地方</div>' + (Object.keys(byPlace).length ? Object.entries(byPlace).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => '<div class="brow"><span>' + esc(pname(k)) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / Math.max(...Object.values(byPlace)) * 100) + '%"></div></div><b>' + Math.round(v) + '</b></div>').join('') : '<div class="tlnote">还没有消费对应到景点；在下面的明细里给消费选“对应景点”。</div>') + '</div>' +
+    (ro ? '' : '<div class="bcard"><div class="rh">花在哪些地方</div>' + (Object.keys(byPlace).length ? Object.entries(byPlace).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => '<div class="brow"><span>' + esc(pname(k)) + '</span><div class="bt"><div class="blbar" style="width:' + Math.round(v / Math.max(...Object.values(byPlace)) * 100) + '%"></div></div><b>' + Math.round(v) + '</b></div>').join('') : '<div class="tlnote">还没有消费对应到景点；在下面的明细里给消费选“对应景点”。</div>') + '</div>') +
     '<div class="bcard"><div class="rh">最大的 5 笔</div>' + top.map(r => '<div class="brow"><span>' + esc(r.merchant) + '</span><b>' + r.amount + '</b><i>' + esc(r.date.slice(5)) + '</i></div>').join('') + '</div></div>' +
-    '<div class="tlnote">改某一笔的类别时，同一商户的其他消费会一起改，以后导入也沿用（已记住 ' + BL.rules + ' 家）。</div>';
+    (ro ? '<div class="tlnote">这是账单里这段日期的全部消费，只用来看统计；要改类别，请在“行程期间”里改。</div>' : '<div class="tlnote">改某一笔的类别时，同一商户的其他消费会一起改，以后导入也沿用（已记住 ' + BL.rules + ' 家）。</div>');
   const opt = (list, cur, fn) => list.map(x => '<option value="' + esc(fn(x)[0]) + '"' + (fn(x)[0] === cur ? ' selected' : '') + '>' + esc(fn(x)[1]) + '</option>').join('');
-  $('bl_list').innerHTML = '<table class="bltab"><tr><th>时间</th><th>商户</th><th>金额</th><th>类别</th><th>对应景点</th><th>不计入</th></tr>' + BL.rows.map(r =>
+  $('bl_list').innerHTML = '<table class="bltab"><tr><th>时间</th><th>商户</th><th>金额</th><th>类别</th><th>对应景点</th><th>不计入</th></tr>' + V.rows.map(r =>
+    ro ? '<tr class="' + (r.excluded ? 'ex' : '') + '"><td>' + esc(r.date.slice(5) + ' ' + r.time) + '</td><td>' + esc(r.merchant) + '</td><td>' + r.amount + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.source === 'wechat' ? '微信' : r.source === 'alipay' ? '支付宝' : r.source) + '</td><td></td></tr>' :
     '<tr class="' + (r.excluded ? 'ex' : '') + '" data-id="' + esc(r.id) + '"><td>' + esc(r.date.slice(5) + ' ' + r.time) + '</td><td>' + esc(r.merchant) + '</td><td>' + r.amount + '</td>' +
     '<td><select class="c">' + opt(BL.categories, r.category, x => [x, x]) + '</select></td>' +
     '<td><select class="p"><option value="">—</option>' + opt(BL.places, r.place_id || '', x => [x.id, x.name]) + '</select></td>' +
     '<td><input type="checkbox" class="x"' + (r.excluded ? ' checked' : '') + '></td></tr>').join('') + '</table>';
-  $('bl_list').querySelectorAll('tr[data-id]').forEach(tr => {
+  if (!ro) $('bl_list').querySelectorAll('tr[data-id]').forEach(tr => {
     const id = tr.dataset.id, send = async o => { try { await api('bills_edit', Object.assign({id: id}, o)); await blLoad(); } catch (e) { blSay(e.message, true); } };
     tr.querySelector('.c').onchange = e => send({category: e.target.value, remember: true});
     tr.querySelector('.p').onchange = e => send({place_id: e.target.value});

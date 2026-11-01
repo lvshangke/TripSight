@@ -83,8 +83,12 @@ def test_import_and_summary_through_tools(tmp_path):
 def test_needs_trip_dates(tmp_path):
     s.new_trip(num_days=2, mode="transit", city="北京")
     _wx(tmp_path / "a.xlsx")
-    with pytest.raises(Exception, match="具体日期"):
-        s.import_bills(str(tmp_path / "a.xlsx"))
+    out = s.import_bills(str(tmp_path / "a.xlsx"))
+    assert "账单池" in out and "具体日期" in out and bl.load(s._ledger_path()) == []
+    from tripcore import web
+    r = web.bills_range({})
+    assert r["rows"] and r["summary"]["total"] > 0 and r["first"] <= r["last"]
+    assert len(web.bills_range({"start": "2999-01-01"})["rows"]) == 0
 
 
 
@@ -121,3 +125,12 @@ def test_handbook_spending_page_is_optional_and_selective(tmp_path):
     assert "某某面馆" not in page and "滴滴" not in page                      # 没有商户名
     with pytest.raises(Exception, match="类别只能是"):
         s.export_handbook(cards=False, show_spending=True, spending_categories=["乱写"])
+
+
+def test_pool_keeps_out_of_range_bills_for_separate_stats(tmp_path):
+    from tripcore import web
+    _trip(); _wx(tmp_path / "a.xlsx"); _ali(tmp_path / "b.csv")
+    s.import_bills(str(tmp_path))
+    pool = web.bills_range({})
+    in_trip = bl.load(s._ledger_path())
+    assert len(pool["rows"]) > len(in_trip) and pool["pool_count"] == len(pool["rows"])

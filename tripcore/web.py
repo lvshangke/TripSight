@@ -978,6 +978,7 @@ def bills_state() -> dict[str, Any]:
     return {"rows": led, "summary": _bl.summarize(led) if led else None, "categories": _bl.CATEGORIES + [_bl.TRANSFER],
             "places": [{"id": p.id, "name": p.name} for p in trip.places], "has_dates": trip.day_date(0) is not None,
             "rules": len(_bl.load_rules(ms._rules_path())), "watch": [str(x) for x in ms._watch_folders()],
+            "pool": {"count": len(_bl.load(ms._bills_pool_path())), "first": min((x["date"] for x in _bl.load(ms._bills_pool_path())), default=""), "last": max((x["date"] for x in _bl.load(ms._bills_pool_path())), default="")},
             "report": ms._load_json_file(ms._bills_report_path()) or None, "shortcut": _bl.SHORTCUT_STEPS, "icloud": str(_bl.icloud_folder())}
 
 
@@ -1004,6 +1005,16 @@ def bills_import(body: dict) -> dict[str, Any]:
         return {"message": ms.import_bills(str(body.get("path") or ""))}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
+
+
+def bills_range(body: dict) -> dict[str, Any]:
+    """不受行程日期限制的统计：账单池里所有导入过的消费，按 start～end（可空）筛出来分析。只读。"""
+    from . import bills as _bl
+    pool = _bl.load(ms._bills_pool_path())
+    a, b = str(body.get("start") or ""), str(body.get("end") or "")
+    rows = [x for x in pool if (not a or x["date"] >= a) and (not b or x["date"] <= b)]
+    return {"rows": rows, "summary": _bl.summarize(rows) if rows else None, "places": [],
+            "first": min((x["date"] for x in pool), default=""), "last": max((x["date"] for x in pool), default=""), "pool_count": len(pool)}
 
 
 def bills_scan(body: dict) -> dict[str, Any]:
@@ -1101,7 +1112,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1179,7 +1190,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path", "bills_range"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

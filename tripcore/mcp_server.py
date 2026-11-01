@@ -1755,18 +1755,31 @@ def _trip_range(trip: Trip) -> tuple[Any, Any]:
     return a, b
 
 
+def _bills_pool_path() -> Path:
+    return _root_dir() / "bills_pool.json"
+
+
 def _bills_report_path() -> Path:
     return trip_path().with_name("bills_report.json")
 
 
+def _trip_range_or_none(trip: Trip):
+    try:
+        return _trip_range(trip)
+    except ToolError:
+        return None
+
+
 def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], list[str]]:
     from . import bills as _bl
-    a, b = _trip_range(trip)
+    rng = _trip_range_or_none(trip)                          # 行程没有具体日期也能导入：只记进账单池，不进行程账本
+    a, b = rng if rng else (date(1, 1, 1), date(1, 1, 1))
     ledger = _bl.load(_ledger_path())
     names = {pl.id: pl.name for pl in trip.places}
     rules = _bl.load_rules(_rules_path())
     tot = {"added": 0, "outside": 0, "duplicate": 0}
     notes: list[str] = []
+    pool = _bl.load(_bills_pool_path())                    # 账单池：不管日期，导入的消费都记在这里，工作台“全部账单/自选日期”统计用
     rep_files: list[dict[str, Any]] = []
     for f in files:
         try:
@@ -1778,7 +1791,8 @@ def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], l
         except (_bl.BillError, OSError) as e:
             notes.append(f"{f.name}：{e}")
             continue
-        r = _bl.add_to_ledger(ledger, txns, a, b, names, rules)
+        r = _bl.add_to_ledger(ledger, txns, a, b, names, rules) if rng else {"added": 0, "outside": len(txns), "duplicate": 0}
+        _bl.add_to_ledger(pool, txns, date(1, 1, 1), date(9999, 12, 31), {}, rules)
         for k in tot:
             tot[k] += r[k]
         label = {"wechat": "微信", "alipay": "支付宝", "applepay": "Apple Pay"}.get(txns[0].source, "") if txns else ""
@@ -1787,9 +1801,13 @@ def _ingest_bill_files(trip: Trip, files: list[Path]) -> tuple[dict[str, int], l
         rep_files.append({"name": f.name, "source": label, "rows": st["rows"], "first": dts[0] if dts else "", "last": dts[-1] if dts else "",
                           "added": r["added"], "outside": r["outside"], "duplicate": r["duplicate"]})
     _bl.save(_ledger_path(), ledger)
+    try:
+        _bl.save(_bills_pool_path(), pool)
+    except OSError:
+        pass
     try:                                                                  # 记下这次导入的情况，工作台“花费”页一直显示，不会因为没记进账本就什么都看不到
         from datetime import datetime as _dt
-        _bills_report_path().write_text(json.dumps({"at": _dt.now().strftime("%Y-%m-%d %H:%M"), "trip_start": a.isoformat(), "trip_end": b.isoformat(),
+        _bills_report_path().write_text(json.dumps({"at": _dt.now().strftime("%Y-%m-%d %H:%M"), "trip_start": a.isoformat() if rng else "", "trip_end": b.isoformat() if rng else "",
                                                     "files": rep_files, "notes": notes, **tot}, ensure_ascii=False), encoding="utf-8")
     except OSError:
         pass
@@ -1803,7 +1821,8 @@ def import_bills(path: str = "") -> str:
     个人转账和群收款单独列出不计入总额。重复导入同一份账单不会重复记。行程要有具体日期。"""
     from . import bills as _bl
     trip = _load()
-    a, b = _trip_range(trip)
+    rng = _trip_range_or_none(trip)
+    a, b = rng if rng else (None, None)
     p = Path(path).expanduser() if path.strip() else Path.home() / "Downloads"
     if p.is_dir():
         files = [f for f in sorted(p.iterdir()) if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in _bl.SUFFIXES and _bl.sniff(f)]
@@ -1814,7 +1833,10 @@ def import_bills(path: str = "") -> str:
     else:
         raise ToolError(f"找不到：{p}（请让用户确认路径；不会自动查找）。")
     tot, notes = _ingest_bill_files(trip, files)
-    return (f"账单已导入：行程期间（{a}～{b}）新记 {tot['added']} 笔，期间之外 {tot['outside']} 笔没记，重复 {tot['duplicate']} 笔。\n"
+    if rng is None:
+        return ("账单已读入账单池，但这个行程还没有具体日期，没有记进行程账本。工作台“花费”页选“全部账单”或“自选日期”可以看统计；"
+                "给行程设了日期再导入一次，就会按行程期间统计。\n" + "\n".join(notes))
+    return (f"账单已导入：行程期间（{a}～{b}）新记 {tot['added']} 笔，期间之外 {tot['outside']} 笔没记（仍可在“全部账单”里统计），重复 {tot['duplicate']} 笔。\n"
             + "\n".join(notes) + "\n用 spending_summary 看统计；商户明细只在工作台里给用户看，需要改分类让用户去工作台改。")
 
 
