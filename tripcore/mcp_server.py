@@ -1627,8 +1627,16 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     ndays = (last - first).days + 1
     if ndays > 30:
         raise ToolError(f"照片跨度 {ndays} 天，超过行程上限 30 天。请先把照片分到不同文件夹。")
-    new_trip(name=name or f"照片还原 {first:%m.%d}-{last:%m.%d}", num_days=ndays, start_date=first.isoformat(),
-             end_date=last.isoformat(), mode="drive")
+    auto = f"照片还原 {first:%m.%d}-{last:%m.%d}"
+    shell = _restore_shell_name()
+    if shell is not None:                                  # 用户在页面上先建好了一个空的“恢复行程”：照片读进它里面，不再另建
+        def fill(t: Trip) -> None:
+            t.meta.num_days, t.meta.mode = ndays, "drive"
+            t.meta.date_mode, t.meta.start_date, t.meta.end_date = DateMode.EXACT, first, last
+            t.meta.name = name or (auto if shell.startswith(RESTORE_DEFAULT) else shell)
+        _save(commit(_load(), fill))
+    else:
+        new_trip(name=name or auto, num_days=ndays, start_date=first.isoformat(), end_date=last.isoformat(), mode="drive")
     ids: list[str] = []
     stop_names, named = _stop_names(keep) if auto_name else ([f"{sp.start:%m-%d %H:%M} 停留点" for sp in keep], 0)
 
@@ -1680,6 +1688,35 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         lines.append(f"第{d + 1}天 {first.fromordinal(first.toordinal() + d).isoformat()}：" + ("；".join(row) if row else "（这天没有保留的停留点）"))
     lines.append("下一步：对每个点用 view_stop 看缩略图和候选地名，向用户确认后用 update_place 改名；介绍和描写用 save_stop_story 写；最后 export_handbook。")
     return "\n".join(lines)
+
+
+RESTORE_DEFAULT = "恢复行程 "
+
+
+def _restore_shell_name() -> Optional[str]:
+    """当前行程如果是 new_restore_trip 建的空壳（还没读过照片、没有景点），返回它的名字，否则 None。"""
+    try:
+        t = _load()
+    except ToolError:
+        return None
+    return t.meta.name if _load_json_file(_photo_trip_path()).get("shell") and not t.places else None
+
+
+def new_restore_trip(name: str = "") -> str:
+    """新建一个空的“恢复行程”并切换到它（原来的行程都还在）：之后在 TripSight 页面的恢复页选照片文件夹/相册，或用 import_photo_trip，
+    照片会读进这个行程里。用户要恢复一段走过的旅程、又没有现成的恢复行程可用时先调用它；name 不填就用“恢复行程 月.日 时:分”。"""
+    import datetime as _dt
+    nm = (name or "").strip() or f"{RESTORE_DEFAULT}{_dt.datetime.now():%m.%d %H:%M}"
+    bad = _guard_text(nm)
+    if bad:
+        raise ToolError("名字" + "；".join(bad))
+    new_trip(name=nm, num_days=1, mode="drive")
+    _photo_trip_path().write_text(json.dumps({"folder": "", "album": "", "shell": True, "stops": []}, ensure_ascii=False), encoding="utf-8")
+    try:
+        (_root_dir() / "restore_draft.json").unlink()
+    except OSError:
+        pass
+    return f"已新建恢复行程「{nm}」并切换到它。下一步选照片文件夹或相册。"
 
 
 def restore_status() -> str:
@@ -3464,7 +3501,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

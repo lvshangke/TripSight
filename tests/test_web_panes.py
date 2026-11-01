@@ -130,3 +130,35 @@ def test_page_uses_inpage_dialog_and_nav_handler_skips_action_buttons():
     h = page_html()
     assert "confirm(" not in h.replace("function ask", "")       # 内置浏览器里原生 confirm 可能不弹，要用页内确认框
     assert "#topnav button[data-pg]" in h and "document.querySelectorAll('#topnav button').forEach(b => b.onclick" not in h
+
+
+def test_new_restore_trip_is_an_empty_restore_shell_and_import_fills_it(tmp_path, monkeypatch):
+    import pytest
+    from datetime import datetime, timedelta
+    from tripcore import web, workspace as ws
+    from tripcore import mcp_server as s
+    from tests.test_phototrip import _jpg
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    if s._single_file_mode():
+        pytest.skip("single file mode")
+    s.new_trip(name="计划A", num_days=2)
+    n0 = len(ws.list_trips(s._root_dir()))
+    r = web.trip_new_restore({"name": ""})
+    kinds = {t["slug"]: t["kind"] for t in ws.list_trips(s._root_dir())}
+    assert len(kinds) == n0 + 1 and kinds[r["slug"]] == "restore" and ws.active_slug(s._root_dir()) == r["slug"]
+    st = web.hb_state()
+    assert st["restored"] is False and st["stops"] == [] and st["name"].startswith("恢复行程 ")
+    assert "还没有做过预览" in s.restore_status() and "照片恢复的行程" in s.restore_status()
+    ph = tmp_path / "ph"; ph.mkdir()
+    t0 = datetime(2026, 6, 19, 10, 0)
+    for i in range(4):
+        _jpg(ph / f"a{i}.jpg", t0 + timedelta(minutes=3 * i), 28.70, 121.40)
+    web.hb_import({"folder": str(ph)})
+    assert len(ws.list_trips(s._root_dir())) == n0 + 1                      # 读进了刚建的壳，没有再多出一个行程
+    st = web.hb_state()
+    assert st["restored"] is True and st["name"].startswith("照片还原 ") and st["stops"]
+    # 起了名字就用用户的名字
+    web.trip_new_restore({"name": "台州周末"})
+    web.hb_import({"folder": str(ph)})
+    assert web.hb_state()["name"] == "台州周末"

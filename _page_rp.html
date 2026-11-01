@@ -867,7 +867,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #rp .steps span i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
 #rp .steps span.on{background:var(--acc-soft2);color:var(--acc);font-weight:600}#rp .steps span.on i{background:var(--acc);color:#fff}#rp .steps span.done i{background:#7a9a5b;color:#fff}#rp .steps span.done{cursor:pointer;color:var(--ink2)}
 #rp .hbtop{display:none}
-#rp.on{flex-direction:row}#rp_side{width:430px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-right:1px solid var(--line);box-shadow:2px 0 18px rgba(80,60,30,.05);z-index:2}
+#rp.on{flex-direction:row}#rp_side{position:relative}#rp_gate{display:none;position:absolute;inset:0;z-index:5;background:var(--paper);align-items:center;justify-content:center;text-align:center;padding:30px}#rp_gate.on{display:flex}#rp_gate b{font-size:18px}#rp_gate p{color:var(--sub);font-size:14px;line-height:1.6;margin:10px 0 18px}
+#nr{position:fixed;inset:0;background:#0006;z-index:3000;display:none;align-items:center;justify-content:center}#nr.on{display:flex}#nr form{background:var(--paper);border-radius:16px;padding:22px 24px;width:min(400px,92vw);box-shadow:var(--shadow);font-size:14px}#nr form input{width:100%;margin-top:4px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box}#nr .bt{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}#nr .err{color:#a63d2a;margin-top:6px;min-height:18px}#rp_side{width:430px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-right:1px solid var(--line);box-shadow:2px 0 18px rgba(80,60,30,.05);z-index:2}
 #rp .rtop{display:block;padding:16px 20px 6px;background:transparent;border:0}#rp .steps{justify-content:flex-start;flex-wrap:nowrap;gap:4px}
 #rp .steps span{padding:4px 10px 4px 4px;font-size:13px;gap:6px}#rp .steps span:not(.on){font-size:0;gap:0;padding:4px}#rp .steps span:not(.on) i{font-size:12px}
 #rp_body.pgbody{padding:8px 20px 18px}#rp .rfoot{padding:12px 20px;border-top:1px solid var(--line);background:var(--paper)}#rp .rfoot .tlnote{flex:1;text-align:center;font-size:12px;line-height:1.35}
@@ -941,7 +942,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
 <div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
 <button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
-<div class="pg" id="rp"><aside id="rp_side"><div class="rtop"><div class="steps" id="rp_steps"></div></div>
+<div class="pg" id="rp"><aside id="rp_side"><div id="rp_gate"><div><b>先新建一个恢复行程</b><p>恢复的照片会读进这个行程里，不会改动你现有的行程。</p><button class="pri" id="rp_gate_btn">＋ 恢复新的行程</button></div></div><div class="rtop"><div class="steps" id="rp_steps"></div></div>
 <div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></aside>
 <section id="rp_main"><div id="rmap"></div><div id="rmap_chip"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
 <div id="rp_act"><div class="ah"><span class="dot" id="act_dot"></span><b id="act_title">助手</b><span class="tlnote" id="act_sub">空闲</span><button id="act_fold" title="收起/展开">▾</button></div><div id="act_list"></div></div>
@@ -1003,6 +1004,9 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="ap_list"></div><div class="w" id="ap_warn"></div>
 <div class="btns"><span style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
 <button id="ap_cancel">取消</button><button id="ap_ok" class="pri" disabled>加入行程</button></div><div class="err" id="ap_err"></div></div></div>
+<div id="nr"><form id="nrf" autocomplete="off"><h3>恢复新的行程</h3><div class="tlnote" style="margin-bottom:8px">先建一个空的恢复行程，再选照片文件夹或相册读进来。现有的行程都还在。</div>
+<label>行程名称（可不填）</label><input id="nr_name" maxlength="40" placeholder="例如：台州周末；不填就用“恢复行程 月.日 时:分”"><div id="nr_err" class="err"></div>
+<div class="bt"><button type="button" id="nr_cancel">取消</button><button type="submit" class="pri" id="nr_ok">新建并开始</button></div></form></div>
 <div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
 <label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
 <label>目的地城市（选填，之后查坐标会限定在这个城市附近）</label><input id="nt_city" maxlength="40" placeholder="例如：东京">
@@ -1057,6 +1061,20 @@ function ask(msg, okText) {
     document.addEventListener('keydown', kd, true); document.body.appendChild(w); w.querySelector('.ayes').focus();
   });
 }
+function rpGate() { const r = TRIPS_R; const cur = r && !r.single ? r.trips.find(t => t.slug === r.current) : null; $('rp_gate').classList.toggle('on', !!(r && !r.single && PGCUR === 'restore' && !(cur && cur.kind === 'restore'))); }
+function nrOpen() { $('nr_err').textContent = ''; $('nr_name').value = ''; $('nr').classList.add('on'); $('nr_name').focus(); }
+function nrClose() { $('nr').classList.remove('on'); }
+$('nr_cancel').onclick = nrClose; $('nr').onclick = e => { if (e.target === $('nr')) nrClose(); };
+$('rp_gate_btn').onclick = nrOpen;
+$('nrf').onsubmit = async e => {
+  e.preventDefault(); $('nr_ok').disabled = true; $('nr_err').textContent = '';
+  try {
+    const r = await api('trip_new_restore', {name: $('nr_name').value}); nrClose(); toast(r.message);
+    HB.sel.clear(); $('hb_folder').value = ''; $('hb_pvo').innerHTML = ''; try { ACT.since = Date.now() / 1000 - 1; ACT.evs.clear(); actRender(); } catch (x) {}
+    await load(); await pgShow('restore', 1);
+    $('rp_msg').textContent = '新的恢复行程已建好。选照片文件夹或相册，先预览，再恢复。';
+  } catch (er) { $('nr_err').textContent = er.message; } finally { $('nr_ok').disabled = false; }
+};
 let TRIPS_R = null;
 $('trip_del').onclick = async () => {
   const r = TRIPS_R; if (!r || r.single) return toast('单文件模式不能删除行程。', true);
@@ -1075,7 +1093,7 @@ const needKind = () => PGCUR === 'plan' ? 'plan' : (PGCUR === 'bill' ? '' : 'res
 const lastKey = k => 'tsLast_' + k;
 function rememberTrip(r) { try { const c = r.trips.find(t => t.slug === r.current); if (c) localStorage.setItem(lastKey(c.kind), c.slug); } catch (e) {} }
 function lastTrip(r, k) { let v = ''; try { v = localStorage.getItem(lastKey(k)) || ''; } catch (e) {} return r.trips.find(t => t.kind === k && t.slug === v) || r.trips.filter(t => t.kind === k).slice(-1)[0]; }
-async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; rememberTrip(TRIPS_R); fillTripSel(); } catch (e) {} }
+async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; rememberTrip(TRIPS_R); fillTripSel(); rpGate(); } catch (e) {} }
 function fillTripSel() {
   const r = TRIPS_R; if (!r) return; const sel = $('trip'), k = needKind(); sel.innerHTML = '';
   const list = r.trips.filter(t => !k || r.single || t.kind === k);
@@ -1129,7 +1147,7 @@ $('ntf').onsubmit = async e => {
 $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
   if (want === '__new__') { await loadTrips(); ntOpen(); return; }
-  if (want === '__newrestore__') { await loadTrips(); $('hb_folder').value = ''; HB.sel.clear(); rsGo(1); $('rp_msg').textContent = '选新的照片文件夹或相册，读取后会新建一个恢复行程，现有的行程都还在。'; return; }
+  if (want === '__newrestore__') { await loadTrips(); nrOpen(); return; }
   if (pending && !(await ask('有一个还没确认的修改预览，切换行程会放弃它。继续吗？'))) { await loadTrips(); return; }
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); }
   catch (e) { say(e.message, true); await loadTrips(); }
@@ -1613,7 +1631,7 @@ window.addEventListener('resize', () => { if (PGCUR === 'restore' && RMAP) RMAP.
 const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
 async function pgShow(name, step) {
   PGCUR = name; await ensureKind(name); fillTripSel(); moClose(); $('home').classList.remove('on');
-  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop();
+  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop(); rpGate();
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
@@ -1638,10 +1656,13 @@ function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {
 $('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
-$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', {folder: $('vd_path').value}); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
+let VD_ALBUM = '';
+const vdSrc = () => VD_ALBUM ? {album: VD_ALBUM} : {folder: $('vd_path').value};
+$('vd_path').oninput = () => { VD_ALBUM = ''; };
+$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', vdSrc()); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
 $('vd_cut').onclick = async () => {
   $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
-  try { const r = await api('video_cut', {folder: $('vd_path').value, target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
+  try { const r = await api('video_cut', {...vdSrc(), target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
   catch (e) { $('vd_out').textContent = e.message; } finally { $('vd_cut').disabled = false; }
 };
 async function fpLoad(withBm) {
@@ -1664,7 +1685,7 @@ async function hbLoad() {
 function hbRender() {
   const d = HB.data, restore = HB.mode === 'restore';
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
-  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = '照片文件夹里有 ' + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
+  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = (d.album_videos ? '照片 App 相册里有 ' : '照片文件夹里有 ') + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
   $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
@@ -1765,7 +1786,7 @@ $('hb_pv').onclick = async () => {
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
       r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
-      (r.videos ? '<div class="tlnote">同时在这个文件夹里发现 <b>' + r.videos + '</b> 段视频（只看这一层）：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : (r.album_mode ? '' : '')) +
+      (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : '') +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
       $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
@@ -1786,7 +1807,7 @@ window.addEventListener('message', async ev => {
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
-$('hb_tovid').onclick = async () => { await pgShow('vid'); if (HB.data && HB.data.folder) { $('vd_path').value = HB.data.folder; $('vd_scan').click(); } };
+$('hb_tovid').onclick = async () => { const d = HB.data; await pgShow('vid'); if (!d) return; if (d.album) { VD_ALBUM = d.album; $('vd_path').value = '照片 App 相册：' + d.album; $('vd_scan').click(); } else if (d.folder) { VD_ALBUM = ''; $('vd_path').value = d.folder; $('vd_scan').click(); } };
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }

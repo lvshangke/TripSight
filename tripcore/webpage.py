@@ -212,7 +212,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 #rp .steps span i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink2);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
 #rp .steps span.on{background:var(--acc-soft2);color:var(--acc);font-weight:600}#rp .steps span.on i{background:var(--acc);color:#fff}#rp .steps span.done i{background:#7a9a5b;color:#fff}#rp .steps span.done{cursor:pointer;color:var(--ink2)}
 #rp .hbtop{display:none}
-#rp.on{flex-direction:row}#rp_side{width:430px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-right:1px solid var(--line);box-shadow:2px 0 18px rgba(80,60,30,.05);z-index:2}
+#rp.on{flex-direction:row}#rp_side{position:relative}#rp_gate{display:none;position:absolute;inset:0;z-index:5;background:var(--paper);align-items:center;justify-content:center;text-align:center;padding:30px}#rp_gate.on{display:flex}#rp_gate b{font-size:18px}#rp_gate p{color:var(--sub);font-size:14px;line-height:1.6;margin:10px 0 18px}
+#nr{position:fixed;inset:0;background:#0006;z-index:3000;display:none;align-items:center;justify-content:center}#nr.on{display:flex}#nr form{background:var(--paper);border-radius:16px;padding:22px 24px;width:min(400px,92vw);box-shadow:var(--shadow);font-size:14px}#nr form input{width:100%;margin-top:4px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box}#nr .bt{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}#nr .err{color:#a63d2a;margin-top:6px;min-height:18px}#rp_side{width:430px;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-right:1px solid var(--line);box-shadow:2px 0 18px rgba(80,60,30,.05);z-index:2}
 #rp .rtop{display:block;padding:16px 20px 6px;background:transparent;border:0}#rp .steps{justify-content:flex-start;flex-wrap:nowrap;gap:4px}
 #rp .steps span{padding:4px 10px 4px 4px;font-size:13px;gap:6px}#rp .steps span:not(.on){font-size:0;gap:0;padding:4px}#rp .steps span:not(.on) i{font-size:12px}
 #rp_body.pgbody{padding:8px 20px 18px}#rp .rfoot{padding:12px 20px;border-top:1px solid var(--line);background:var(--paper)}#rp .rfoot .tlnote{flex:1;text-align:center;font-size:12px;line-height:1.35}
@@ -286,7 +287,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
 <div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
 <button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
-<div class="pg" id="rp"><aside id="rp_side"><div class="rtop"><div class="steps" id="rp_steps"></div></div>
+<div class="pg" id="rp"><aside id="rp_side"><div id="rp_gate"><div><b>先新建一个恢复行程</b><p>恢复的照片会读进这个行程里，不会改动你现有的行程。</p><button class="pri" id="rp_gate_btn">＋ 恢复新的行程</button></div></div><div class="rtop"><div class="steps" id="rp_steps"></div></div>
 <div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></aside>
 <section id="rp_main"><div id="rmap"></div><div id="rmap_chip"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
 <div id="rp_act"><div class="ah"><span class="dot" id="act_dot"></span><b id="act_title">助手</b><span class="tlnote" id="act_sub">空闲</span><button id="act_fold" title="收起/展开">▾</button></div><div id="act_list"></div></div>
@@ -309,7 +310,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="不在行程目录里存照片副本，省磁盘；导出时才从原文件缩小并去掉定位。原文件被移走或删除后图会缺失"><input type="checkbox" id="hb_link"> 只引用照片（不复制）</label>
 <input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置"><button class="pk" data-pick="file" data-to="hb_track">选文件</button><button class="pk" data-pick="folder" data-to="hb_track">选文件夹</button>
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
-<label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
+<label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；照片会读进当前这个恢复行程，其他行程不受影响。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <span class="hbimp" id="hb_vidline" style="display:none"><span id="hb_vidn"></span><button id="hb_tovid">去生成粗剪</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
@@ -348,6 +349,9 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="ap_list"></div><div class="w" id="ap_warn"></div>
 <div class="btns"><span style="flex:1;font-size:13px;color:#555">停留 <input id="ap_dur" class="dur" type="number" min="10" max="720" step="15" value="90"> 分钟</span>
 <button id="ap_cancel">取消</button><button id="ap_ok" class="pri" disabled>加入行程</button></div><div class="err" id="ap_err"></div></div></div>
+<div id="nr"><form id="nrf" autocomplete="off"><h3>恢复新的行程</h3><div class="tlnote" style="margin-bottom:8px">先建一个空的恢复行程，再选照片文件夹或相册读进来。现有的行程都还在。</div>
+<label>行程名称（可不填）</label><input id="nr_name" maxlength="40" placeholder="例如：台州周末；不填就用“恢复行程 月.日 时:分”"><div id="nr_err" class="err"></div>
+<div class="bt"><button type="button" id="nr_cancel">取消</button><button type="submit" class="pri" id="nr_ok">新建并开始</button></div></form></div>
 <div id="nt"><form id="ntf" autocomplete="off"><h3>新建行程</h3>
 <label>行程名称（必填）</label><input id="nt_name" maxlength="40" placeholder="例如：东京5日">
 <label>目的地城市（选填，之后查坐标会限定在这个城市附近）</label><input id="nt_city" maxlength="40" placeholder="例如：东京">
@@ -397,6 +401,20 @@ function ask(msg, okText) {
     document.addEventListener('keydown', kd, true); document.body.appendChild(w); w.querySelector('.ayes').focus();
   });
 }
+function rpGate() { const r = TRIPS_R; const cur = r && !r.single ? r.trips.find(t => t.slug === r.current) : null; $('rp_gate').classList.toggle('on', !!(r && !r.single && PGCUR === 'restore' && !(cur && cur.kind === 'restore'))); }
+function nrOpen() { $('nr_err').textContent = ''; $('nr_name').value = ''; $('nr').classList.add('on'); $('nr_name').focus(); }
+function nrClose() { $('nr').classList.remove('on'); }
+$('nr_cancel').onclick = nrClose; $('nr').onclick = e => { if (e.target === $('nr')) nrClose(); };
+$('rp_gate_btn').onclick = nrOpen;
+$('nrf').onsubmit = async e => {
+  e.preventDefault(); $('nr_ok').disabled = true; $('nr_err').textContent = '';
+  try {
+    const r = await api('trip_new_restore', {name: $('nr_name').value}); nrClose(); toast(r.message);
+    HB.sel.clear(); $('hb_folder').value = ''; $('hb_pvo').innerHTML = ''; try { ACT.since = Date.now() / 1000 - 1; ACT.evs.clear(); actRender(); } catch (x) {}
+    await load(); await pgShow('restore', 1);
+    $('rp_msg').textContent = '新的恢复行程已建好。选照片文件夹或相册，先预览，再恢复。';
+  } catch (er) { $('nr_err').textContent = er.message; } finally { $('nr_ok').disabled = false; }
+};
 let TRIPS_R = null;
 $('trip_del').onclick = async () => {
   const r = TRIPS_R; if (!r || r.single) return toast('单文件模式不能删除行程。', true);
@@ -415,7 +433,7 @@ const needKind = () => PGCUR === 'plan' ? 'plan' : (PGCUR === 'bill' ? '' : 'res
 const lastKey = k => 'tsLast_' + k;
 function rememberTrip(r) { try { const c = r.trips.find(t => t.slug === r.current); if (c) localStorage.setItem(lastKey(c.kind), c.slug); } catch (e) {} }
 function lastTrip(r, k) { let v = ''; try { v = localStorage.getItem(lastKey(k)) || ''; } catch (e) {} return r.trips.find(t => t.kind === k && t.slug === v) || r.trips.filter(t => t.kind === k).slice(-1)[0]; }
-async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; rememberTrip(TRIPS_R); fillTripSel(); } catch (e) {} }
+async function loadTrips() { try { TRIPS_R = await api('trips'); curTrip = TRIPS_R.current; rememberTrip(TRIPS_R); fillTripSel(); rpGate(); } catch (e) {} }
 function fillTripSel() {
   const r = TRIPS_R; if (!r) return; const sel = $('trip'), k = needKind(); sel.innerHTML = '';
   const list = r.trips.filter(t => !k || r.single || t.kind === k);
@@ -469,7 +487,7 @@ $('ntf').onsubmit = async e => {
 $('trip').onchange = async () => {
   const sel = $('trip'), want = sel.value;
   if (want === '__new__') { await loadTrips(); ntOpen(); return; }
-  if (want === '__newrestore__') { await loadTrips(); $('hb_folder').value = ''; HB.sel.clear(); rsGo(1); $('rp_msg').textContent = '选新的照片文件夹或相册，读取后会新建一个恢复行程，现有的行程都还在。'; return; }
+  if (want === '__newrestore__') { await loadTrips(); nrOpen(); return; }
   if (pending && !(await ask('有一个还没确认的修改预览，切换行程会放弃它。继续吗？'))) { await loadTrips(); return; }
   try { const r = await api('switch', {slug: want}); closePrev(); picks = []; calMonth = null; selDay = 0; say('已切换到「' + r.title + '」。助手之后也针对这个行程。'); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); }
   catch (e) { say(e.message, true); await loadTrips(); }
@@ -921,7 +939,7 @@ function rmapSelect(m) { if (RSEL) RSEL.setIcon(rpin(RSEL._p.n)); RSEL = m; m.se
 function rmapFromHb() {
   if (!HB.data || HB.mode !== 'restore') return;
   const pts = HB.data.stops.filter(x => x.restored && x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: x.day, id: x.id, tip: x.name}));
-  $('rmap_chip').className = ''; $('rmap_chip').textContent = '当前行程：' + HB.data.name + '（' + pts.length + ' 处）';
+  $('rmap_chip').className = ''; $('rmap_chip').textContent = $('rp_gate').classList.contains('on') ? '' : '当前行程：' + HB.data.name + '（' + pts.length + ' 处）'; $('rmap_chip').style.display = $('rmap_chip').textContent ? '' : 'none';
   rmapDraw(pts, p => { const el = $('hb_' + p.id); if (el && RS.step === 4) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); } });
 }
 // ---- 助手运行过程（轮询 activity）
@@ -953,7 +971,7 @@ window.addEventListener('resize', () => { if (PGCUR === 'restore' && RMAP) RMAP.
 const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
 async function pgShow(name, step) {
   PGCUR = name; await ensureKind(name); fillTripSel(); moClose(); $('home').classList.remove('on');
-  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop();
+  chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') actStart(); else actStop(); rpGate();
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
   ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
