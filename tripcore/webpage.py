@@ -312,7 +312,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
-<div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <span class="hbimp" id="hb_vidline" style="display:none"><span id="hb_vidn"></span><button id="hb_tovid">去生成粗剪</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
@@ -1004,6 +1004,7 @@ async function hbLoad() {
 function hbRender() {
   const d = HB.data, restore = HB.mode === 'restore';
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
+  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = '照片文件夹里有 ' + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
   $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
@@ -1104,6 +1105,7 @@ $('hb_pv').onclick = async () => {
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
       r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
+      (r.videos ? '<div class="tlnote">同时在这个文件夹里发现 <b>' + r.videos + '</b> 段视频（只看这一层）：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : (r.album_mode ? '' : '')) +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
       $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
@@ -1124,6 +1126,7 @@ window.addEventListener('message', async ev => {
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
+$('hb_tovid').onclick = async () => { await pgShow('vid'); if (HB.data && HB.data.folder) { $('vd_path').value = HB.data.folder; $('vd_scan').click(); } };
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }

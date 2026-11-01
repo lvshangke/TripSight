@@ -332,3 +332,14 @@ def test_restore_status_sees_preview_draft_before_any_trip_is_created(tmp_path):
     out = s.restore_status()
     assert "旧计划" in out and "预览" in out and "聚成" in out and str(tmp_path) in out
     assert s._load().meta.name == "旧计划"            # 预览没有新建行程
+
+
+def test_preview_and_state_report_videos_in_same_folder(tmp_path):
+    from tripcore import web
+    a = _album(tmp_path)
+    for n in ("c1.mov", "c2.mp4"):
+        (a / n).write_bytes(b"x")
+    (a / ".hidden.mov").write_bytes(b"x")
+    assert web.hb_preview({"folder": str(a)})["videos"] == 2
+    s.import_photo_trip(str(a))
+    assert web.hb_state()["videos"] == 2

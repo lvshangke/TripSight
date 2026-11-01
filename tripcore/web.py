@@ -637,6 +637,15 @@ def _write_stories(data: dict) -> None:
         raise HttpError(500, f"保存失败：{e}")
 
 
+def _video_count(folder: str) -> int:
+    """文件夹这一层有几段视频（和视频页的“整理/粗剪”读取范围一致，不含子文件夹）。"""
+    from .video import VIDEO_EXT
+    try:
+        return sum(1 for p in Path(folder).expanduser().iterdir() if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in VIDEO_EXT)
+    except OSError:
+        return 0
+
+
 def _gcj_pos(lat: float, lon: float) -> list[float]:
     """页面地图用高德瓦片（GCJ-02），照片里的 GPS 是 WGS-84，要换算才对得上底图。"""
     from .coords import wgs84_to_gcj02
@@ -669,7 +678,8 @@ def hb_state() -> dict[str, Any]:
     for r in rows:
         r["region"] = labels.get(r["id"], "")
     return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""), "album": side.get("album", ""),
-            "vision": bool(_vi.config()), "max_photos": 6, "day_titles": ms._day_titles()}
+            "vision": bool(_vi.config()), "max_photos": 6, "day_titles": ms._day_titles(),
+            "videos": 0 if side.get("album") or not side.get("folder") else _video_count(side["folder"])}
 
 
 def hb_import(body: dict) -> dict[str, Any]:
@@ -1017,7 +1027,8 @@ def hb_preview(body: dict) -> dict[str, Any]:
     rows += [{"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
     _save_draft(folder, album, radius, mn, len(stops), len(keep), len(photos), keep)
     out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
-           "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": ""}
+           "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": "",
+           "videos": 0 if album else _video_count(str(folder))}
     if body.get("basemap") and rows:
         out.update(_preview_basemap(rows))
     return out
