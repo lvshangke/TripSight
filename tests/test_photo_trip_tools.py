@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import json
 import pytest
 
 pytest.importorskip("mcp")
@@ -304,3 +305,20 @@ def test_photo_scale_saved_and_applied_to_export(tmp_path, monkeypatch):
     assert "--s:0.6" in page or "--s:1.6" in page
     web.hb_photo_scale({"id": first["id"], "scale": 100})
     assert "scale" not in [x for x in s._ph.load(s._photo_index()) if x["id"] == first["id"]][0]
+
+
+def test_activity_log_records_tool_calls_and_hides_secrets(tmp_path):
+    import asyncio
+    from tripcore import web, runner
+    s.new_trip(name="x", num_days=1)
+    srv = s.build_server()
+    asyncio.run(srv.call_tool("show_trip", {}))
+    runner.run_tool("list_trips", "")
+    with pytest.raises(Exception):
+        asyncio.run(srv.call_tool("set_day_title", {"day": 5, "title": "x", "api_key": "SECRET"}))
+    ev = web.activity({})["events"]
+    names = [e["name"] for e in ev]
+    assert names[-3:] == ["show_trip", "list_trips", "set_day_title"]
+    assert ev[0]["state"] == "ok" and ev[0]["label"] and ev[-1]["state"] == "err"
+    assert "SECRET" not in json.dumps(ev, ensure_ascii=False)
+    assert web.activity({"since": ev[-1]["ts"]})["events"] == []

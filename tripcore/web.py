@@ -637,6 +637,13 @@ def _write_stories(data: dict) -> None:
         raise HttpError(500, f"保存失败：{e}")
 
 
+def _gcj_pos(lat: float, lon: float) -> list[float]:
+    """页面地图用高德瓦片（GCJ-02），照片里的 GPS 是 WGS-84，要换算才对得上底图。"""
+    from .coords import wgs84_to_gcj02
+    g = wgs84_to_gcj02(lat, lon)
+    return [round(g[0], 6), round(g[1], 6)]
+
+
 def hb_state() -> dict[str, Any]:
     from . import vision as _vi
     trip = ms._load()
@@ -654,7 +661,7 @@ def hb_state() -> dict[str, Any]:
     for p in sorted(trip.places, key=lambda q: (order.get(q.id, 99), 0)):
         if p.id not in order:
             continue
-        rows.append({"id": p.id, "name": p.name, "day": order[p.id] + 1, "restored": p.id in recs,
+        rows.append({"id": p.id, "name": p.name, "day": order[p.id] + 1, "restored": p.id in recs, "pos": _gcj_pos(p.lat, p.lon),
                      "start": (recs.get(p.id) or {}).get("start", "")[11:16], "end": (recs.get(p.id) or {}).get("end", "")[11:16],
                      "photos": [{"id": x["id"], "hide": bool(x.get("hide")), "thumb": _ph.thumb_uri(folder, x["file"], 200, 65)} for x in photos if x.get("place_id") == p.id],
                      "story": stories.get(p.id) or {}})
@@ -733,6 +740,16 @@ def hb_merge(body: dict) -> dict[str, Any]:
         return {"message": ms.merge_stops(ids, name=str(body.get("name") or ""))}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
+
+
+def activity(body: dict) -> dict[str, Any]:
+    """助手（任何 agent）最近调用了哪些工具：since 之后有变化的。页面轮询用，只读。"""
+    from . import activity as _ac
+    try:
+        since = float(body.get("since") or 0)
+    except (TypeError, ValueError):
+        since = 0.0
+    return {"events": _ac.read_since(ms._activity_path(), since), "now": time.time()}
 
 
 def hb_day_title(body: dict) -> dict[str, Any]:
@@ -995,9 +1012,9 @@ def hb_preview(body: dict) -> dict[str, Any]:
     rows = []
     for x in keep[:80]:
         names = sorted(x.files)[:3] if x.files else []
-        rows.append({"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"),
+        rows.append({"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"),
                      "thumbs": [u for u in (_ph.thumb_uri(root, f, 120, 60) for f in names) if u]})
-    rows += [{"lat": x.lat, "lon": x.lon, "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
+    rows += [{"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
     out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
            "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": ""}
     if body.get("basemap") and rows:
@@ -1170,7 +1187,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "export_dir": export_dir, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "export_dir": export_dir, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1248,7 +1265,7 @@ def make_handler(token: str, state: dict):
             if rest[4:] == "chat":
                 self._chat(body)
                 return
-            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path", "bills_range"))
+            self._run(lambda: ROUTES_POST[rest[4:]](body), write=rest[4:] not in ("lookup", "share_preview", "share_image", "share_gif", "travelogue", "travelogue_check", "photo_full", "hb_describe", "hb_preview", "hb_albums", "hb_style_preview", "pick_path", "bills_range", "activity"))
 
         def _chat(self, body: dict) -> None:
             """把一条消息转给 nanobot 并把流式回复原样转给页面。不带 key 给页面，错误只给友好提示。"""

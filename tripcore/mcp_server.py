@@ -109,6 +109,11 @@ def export_root() -> Path:
     return Path.home() / "Documents" / "TripSight"
 
 
+def _activity_path() -> Path:
+    """所有 agent 调用工具的实时记录（TripSight 页面轮询它）。放在根目录，切换行程也连续。"""
+    return _root_dir() / "activity.jsonl"
+
+
 def _export_dir_file() -> Path:
     return _root_dir() / "export_dir.txt"
 
@@ -3459,8 +3464,11 @@ def build_server():
     def wrap(fn):
         @functools.wraps(fn)
         def inner(*a, **kw):
+            from .activity import Tracked
             try:
-                return fn(*a, **kw)
+                with Tracked(_activity_path(), fn.__name__, kw) as t:
+                    t.result = fn(*a, **kw)
+                    return t.result
             except ToolError as e:
                 raise ValueError(str(e)) from None
         return inner

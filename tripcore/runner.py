@@ -55,8 +55,10 @@ def run_tool(name: str, raw: str = "", out_dir: Path | None = None) -> str:
     if not isinstance(args, dict):
         raise RunError("参数要写成 JSON 对象，例如 '{\"day\": 1}'。")
     fn = tools[name]
+    from .activity import Tracked
     try:
-        res = fn(**_coerce(fn, args))
+        with Tracked(ms._activity_path(), name, args) as t:
+            t.result = res = fn(**_coerce(fn, args))
     except ms.ToolError as e:
         raise RunError(str(e))
     if isinstance(res, str):
