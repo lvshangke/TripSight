@@ -343,3 +343,28 @@ def test_preview_and_state_report_videos_in_same_folder(tmp_path):
     assert web.hb_preview({"folder": str(a)})["videos"] == 2
     s.import_photo_trip(str(a))
     assert web.hb_state()["videos"] == 2
+
+
+def test_album_videos_are_read_by_path_without_copying(tmp_path, monkeypatch):
+    from types import SimpleNamespace as NS
+    from tripcore import photoslib as pl, video as vd, web
+    f1, f2 = tmp_path / "a.mov", tmp_path / "b.mp4"
+    f1.write_bytes(b"x"); f2.write_bytes(b"x")
+    vids = [NS(path=str(f1), hidden=False, intrash=False), NS(path=str(f2), hidden=False, intrash=False),
+            NS(path=None, hidden=False, intrash=False),                      # 只在 iCloud 上
+            NS(path=str(tmp_path / "t.mov"), hidden=False, intrash=True)]
+    db = NS(album_info=[NS(title="旅行", photos=[1])], photos=lambda albums, images, movies: vids if movies and not images else [])
+    monkeypatch.setattr(pl, "_open_db", lambda: db)
+    paths, missing = pl.album_videos("旅行")
+    assert paths == [f1, f2] and missing == 1
+    assert web._album_video_count("旅行") == 3
+    with pytest.raises(pl.PhotosLibError):
+        pl.album_videos("没有这个")
+    seen = []
+    monkeypatch.setattr(vd, "need_ffmpeg", lambda: None)
+    monkeypatch.setattr(vd, "probe", lambda p: seen.append(p) or vd.Clip(p.name, str(p), 5.0, None, None, None, 1920, 1080, True))
+    s.import_photo_trip(str(_album(tmp_path / "ph")) if (tmp_path / "ph").mkdir() is None else "")
+    out = s.scan_videos(album="旅行")
+    assert seen == [f1, f2] and "2 段视频" in out and "另有 1 个读不了" in out
+    with pytest.raises(s.ToolError):
+        s.scan_videos()

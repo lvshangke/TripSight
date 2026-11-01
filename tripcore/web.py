@@ -637,6 +637,16 @@ def _write_stories(data: dict) -> None:
         raise HttpError(500, f"保存失败：{e}")
 
 
+def _album_video_count(album: str) -> int:
+    """相册里本机有原文件的视频个数；读不了（没装 osxphotos、没权限等）按 0。"""
+    try:
+        from . import photoslib as _pl
+        paths, missing = _pl.album_videos(album)
+        return len(paths) + missing
+    except Exception:
+        return 0
+
+
 def _video_count(folder: str) -> int:
     """文件夹这一层有几段视频（和视频页的“整理/粗剪”读取范围一致，不含子文件夹）。"""
     from .video import VIDEO_EXT
@@ -679,7 +689,7 @@ def hb_state() -> dict[str, Any]:
         r["region"] = labels.get(r["id"], "")
     return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""), "album": side.get("album", ""),
             "vision": bool(_vi.config()), "max_photos": 6, "day_titles": ms._day_titles(),
-            "videos": 0 if side.get("album") or not side.get("folder") else _video_count(side["folder"])}
+            "videos": (int(side.get("videos") or 0) if side.get("album") else (_video_count(side["folder"]) if side.get("folder") else 0)), "album_videos": bool(side.get("album"))}
 
 
 def hb_import(body: dict) -> dict[str, Any]:
@@ -1028,7 +1038,7 @@ def hb_preview(body: dict) -> dict[str, Any]:
     _save_draft(folder, album, radius, mn, len(stops), len(keep), len(photos), keep)
     out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
            "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": "",
-           "videos": 0 if album else _video_count(str(folder))}
+           "videos": _album_video_count(album) if album else _video_count(str(folder))}
     if body.get("basemap") and rows:
         out.update(_preview_basemap(rows))
     return out
@@ -1170,17 +1180,17 @@ def cal_export(body: dict) -> dict[str, Any]:
 
 def video_scan(body: dict) -> dict[str, Any]:
     folder = str(body.get("folder") or "").strip()
-    if not folder:
+    if not folder and not str(body.get("album") or "").strip():
         raise HttpError(400, "先填视频文件夹的完整路径。")
     try:
-        return {"message": ms.scan_videos(folder)}
+        return {"message": ms.scan_videos(folder, str(body.get("album") or "").strip())}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
 
 def video_cut(body: dict) -> dict[str, Any]:
     folder = str(body.get("folder") or "").strip()
-    if not folder:
+    if not folder and not str(body.get("album") or "").strip():
         raise HttpError(400, "先填视频文件夹的完整路径。")
     try:
         target = int(body.get("target_seconds") or 0)
@@ -1189,7 +1199,7 @@ def video_cut(body: dict) -> dict[str, Any]:
         raise HttpError(400, "时长要填数字。")
     try:
         return {"message": ms.export_rough_cut(folder, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
-                                               jianying_dir=str(body.get("jianying_dir") or "").strip())}
+                                               jianying_dir=str(body.get("jianying_dir") or "").strip(), album=str(body.get("album") or "").strip())}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 

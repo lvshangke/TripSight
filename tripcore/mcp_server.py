@@ -1284,27 +1284,40 @@ def _video_stops() -> tuple[list[dict], list[dict]]:
     return stops, order
 
 
-def _video_scan(folder: str):
+def _video_scan(folder: str, album: str = ""):
     from . import video as _v
-    root = Path(folder).expanduser()
-    if not root.is_dir():
-        raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+    missing = 0
     try:
-        clips, bad = _v.scan(root)
+        if album:
+            from . import photoslib as _pl
+            try:
+                files, missing = _pl.album_videos(album)
+            except _pl.PhotosLibError as e:
+                raise ToolError(str(e))
+            clips, bad = _v.scan_files(files)
+        else:
+            if not folder:
+                raise ToolError("要给视频文件夹 folder，或（Mac 上）照片 App 的相册名 album。")
+            root = Path(folder).expanduser()
+            if not root.is_dir():
+                raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+            clips, bad = _v.scan(root)
     except _v.VideoError as e:
         raise ToolError(str(e))
+    bad += missing                                   # 相册里只在 iCloud 上、本机没有原文件的，算“读不了”
     if not clips:
-        raise ToolError("文件夹里没有读到视频（支持 .mov / .mp4 / .m4v，不递归子文件夹）。")
+        raise ToolError("没有读到视频（支持 .mov / .mp4 / .m4v；文件夹不递归子文件夹" + (f"；相册里有 {missing} 段只在 iCloud 上、本机没有原文件，需要先在照片 App 里下载" if missing else "") + "）。")
     stops, order = _video_stops()
     n = _v.assign(clips, stops)
     return _v, clips, bad, n, order
 
 
-def scan_videos(folder: str) -> str:
+def scan_videos(folder: str = "", album: str = "") -> str:
     """整理用户的视频素材：扫描 folder（用户给的文件夹，不递归）里的 .mov/.mp4/.m4v，读拍摄时间、位置（iPhone 视频自带）、时长，
     按拍摄时间和位置归到行程里的各个景点，返回每个景点有几段、多长，以及归不上的。只读元数据，不看画面内容；需要本机装好 ffmpeg。
-    归不上的多半是没带位置、时间又对不上，让用户检查或手动指定；要出粗剪片用 export_rough_cut。"""
-    _v, clips, bad, n, order = _video_scan(folder)
+    归不上的多半是没带位置、时间又对不上，让用户检查或手动指定；要出粗剪片用 export_rough_cut。
+    视频在照片 App 相册里时给 album=相册名（Mac，只读本机原文件，不复制；只在 iCloud 上的读不了），不用先导出。"""
+    _v, clips, bad, n, order = _video_scan(folder, album)
     names = {o["id"]: o["name"] for o in order}
     per: dict[str, list] = {}
     for c in clips:
@@ -1321,13 +1334,13 @@ def scan_videos(folder: str) -> str:
 
 
 def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
-                     jianying_dir: str = "", draft_name: str = "") -> str:
+                     jianying_dir: str = "", draft_name: str = "", album: str = "") -> str:
     """把用户的视频素材按行程顺序粗剪成一条片子：每个景点取中间一段（最多 clip_max 秒），景点开头显示地名，每天前插一张“第N天”卡片和一张当天真实路线的小卡片。
     target_seconds=0 表示不限长度，否则自动按素材量缩短每段、必要时每个景点删几段。输出到 ~/Documents/TripSight/粗剪/：粗剪.mp4、字幕 .srt、片段清单 .md。
     jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；草稿格式随剪映版本变，打不开就用 mp4+srt）。
     不自带音乐、不加特效，创意部分留给用户在剪映里做；视频内容不会交给模型。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
     import datetime as _dt
-    _v, clips, bad, n, order = _video_scan(folder)
+    _v, clips, bad, n, order = _video_scan(folder, album)
     try:
         segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards))
         size = _v._canvas(clips)
@@ -1643,7 +1656,14 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
             except _ph.PhotoError:
                 failed += 1
     _ph.save(_photo_index(), items)
-    _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "stops": [
+    vids = 0
+    if album:
+        try:
+            _pv, _miss = _pl.album_videos(album)
+            vids = len(_pv) + _miss
+        except Exception:
+            vids = 0
+    _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "videos": vids, "stops": [
         {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files, "guessed": sp.guessed}
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"

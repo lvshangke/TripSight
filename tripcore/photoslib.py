@@ -5,7 +5,7 @@
 - 聚类只用数据库里的时间和位置，不打开图片文件；真正要放进手册/拼图的几张才读文件：优先原图（JPEG/PNG），
   原图是 HEIC 或只在 iCloud 上时，退回照片 App 本机已有的最大预览图；都没有就跳过这一张。
 - 返回的 Photo.file 是绝对路径，和“文件夹”流程共用同一套聚类、挑图、拼图（Path(folder) / 绝对路径 就是这个绝对路径）。
-- 视频先不处理（movies=False）。
+- 照片只读 images；视频另用 album_videos 取原文件路径（只在本机、只读、不复制），给“视频粗剪”用，不进行程聚类。
 - 想指定别的照片库：环境变量 TRIPSIGHT_PHOTOS_LIBRARY，指向 .photoslibrary 文件夹。
 """
 
@@ -105,6 +105,25 @@ def read_album(album: str) -> tuple[list[Photo], list[tuple[str, Any]], dict[str
     out.sort(key=lambda x: (x.taken, x.file))
     untagged.sort(key=lambda x: (x[1], x[0]))
     return out, untagged, stats
+
+
+def album_videos(album: str) -> tuple[list[Path], int]:
+    """相册里的视频 → (本机有原文件的路径列表, 只在 iCloud 上没下载的个数)。只读，不复制、不改照片库。"""
+    from .video import VIDEO_EXT
+    db = _open_db()
+    if album not in {x["name"] for x in list_albums_from(db)}:
+        raise PhotosLibError(f"照片 App 里没有叫「{album}」的相册。")
+    paths: list[Path] = []
+    missing = 0
+    for p in db.photos(albums=[album], images=False, movies=True):
+        if getattr(p, "hidden", False) or getattr(p, "intrash", False):
+            continue
+        f = getattr(p, "path", None)
+        if f and Path(f).is_file() and Path(f).suffix.lower() in VIDEO_EXT:
+            paths.append(Path(f))
+        else:
+            missing += 1
+    return sorted(paths), missing
 
 
 def list_albums_from(db: Any) -> list[dict[str, Any]]:

@@ -978,10 +978,13 @@ function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {
 $('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
-$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', {folder: $('vd_path').value}); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
+let VD_ALBUM = '';
+const vdSrc = () => VD_ALBUM ? {album: VD_ALBUM} : {folder: $('vd_path').value};
+$('vd_path').oninput = () => { VD_ALBUM = ''; };
+$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', vdSrc()); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
 $('vd_cut').onclick = async () => {
   $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
-  try { const r = await api('video_cut', {folder: $('vd_path').value, target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
+  try { const r = await api('video_cut', {...vdSrc(), target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
   catch (e) { $('vd_out').textContent = e.message; } finally { $('vd_cut').disabled = false; }
 };
 async function fpLoad(withBm) {
@@ -1004,7 +1007,7 @@ async function hbLoad() {
 function hbRender() {
   const d = HB.data, restore = HB.mode === 'restore';
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
-  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = '照片文件夹里有 ' + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
+  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = (d.album_videos ? '照片 App 相册里有 ' : '照片文件夹里有 ') + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
   $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
@@ -1105,7 +1108,7 @@ $('hb_pv').onclick = async () => {
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
       r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
-      (r.videos ? '<div class="tlnote">同时在这个文件夹里发现 <b>' + r.videos + '</b> 段视频（只看这一层）：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : (r.album_mode ? '' : '')) +
+      (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : '') +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
       $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
@@ -1126,7 +1129,7 @@ window.addEventListener('message', async ev => {
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
-$('hb_tovid').onclick = async () => { await pgShow('vid'); if (HB.data && HB.data.folder) { $('vd_path').value = HB.data.folder; $('vd_scan').click(); } };
+$('hb_tovid').onclick = async () => { const d = HB.data; await pgShow('vid'); if (!d) return; if (d.album) { VD_ALBUM = d.album; $('vd_path').value = '照片 App 相册：' + d.album; $('vd_scan').click(); } else if (d.folder) { VD_ALBUM = ''; $('vd_path').value = d.folder; $('vd_scan').click(); } };
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }

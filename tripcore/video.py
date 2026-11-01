@@ -115,12 +115,15 @@ def probe(path: Path) -> Optional[Clip]:
 
 def scan(folder: Path) -> tuple[list[Clip], int]:
     """扫描文件夹（不递归）里的视频。返回 (读到的片段按拍摄时间排序, 读不了的个数)。"""
+    return scan_files([p for p in sorted(folder.iterdir()) if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in VIDEO_EXT])
+
+
+def scan_files(paths: list[Path]) -> tuple[list[Clip], int]:
+    """读一组视频文件（文件夹里的，或照片 App 相册里视频的原文件路径，只读不复制）。"""
     need_ffmpeg()
     out: list[Clip] = []
     bad = 0
-    for p in sorted(folder.iterdir()):
-        if not p.is_file() or p.name.startswith(".") or p.suffix.lower() not in VIDEO_EXT:
-            continue
+    for p in paths:
         c = probe(p)
         if c:
             out.append(c)
