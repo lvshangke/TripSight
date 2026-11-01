@@ -230,3 +230,46 @@ def test_card_photos_count_one_to_five(tmp_path, monkeypatch):
     for n in (1, 3, 5):
         card = web.hb_style_preview({"style": "手账", "card_photos": n})["card"]
         assert card.count('class="ph ') == n and f'class="col n{n}"' in card
+
+
+def test_delete_stop_removes_locked_stop_photos_and_record(tmp_path):
+    from tripcore import web
+    s.import_photo_trip(str(_album(tmp_path)))
+    t = s._load()
+    pid, name = t.places[0].id, t.places[0].name
+    n_before = len(s._ph.load(s._photo_index()))
+    r = web.hb_stop_delete({"place_id": pid})
+    assert name in r["message"]
+    t = s._load()
+    assert pid not in [p.id for p in t.places] and all(i.place_id != pid for d in t.plan.days for i in d.items)
+    items = s._ph.load(s._photo_index())
+    assert len(items) < n_before and all(x.get("place_id") != pid for x in items)
+    assert pid not in [x["place_id"] for x in s._load_json_file(s._photo_trip_path())["stops"]]
+    with pytest.raises(web.HttpError):
+        web.hb_stop_delete({"place_id": pid})
+
+
+def test_autoname_renames_old_stop_names_without_touching_manual_ones(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.setattr(s, "_stop_names", lambda keep: (["神仙居"] * 0 + [f"地名{i}" for i in range(len(keep))], len(keep)))
+    s.import_photo_trip(str(_album(tmp_path)), auto_name=False)
+    t = s._load()
+    assert all(p.name.endswith("停留点") for p in t.places)
+    s.update_place(t.places[1].id, name="我自己起的名字")
+    r = web.hb_autoname({})
+    assert "1 个" in r["message"] or "重新起名 1" in r["message"]
+    names = [p.name for p in s._load().places]
+    assert names == ["地名0", "我自己起的名字"]
+    assert "没有需要" in web.hb_autoname({})["message"]
+
+
+def test_export_dir_setting_roundtrip(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.delenv("TRIPCORE_EXPORT_DIR", raising=False)
+    s.new_trip(name="x", num_days=1)
+    default = web.export_dir({})
+    assert default["custom"] is False
+    target = tmp_path / "我的导出"
+    r = web.export_dir({"path": str(target)})
+    assert r["custom"] and Path(r["path"]) == target.resolve() and s.export_root() == target.resolve()
+    assert web.export_dir({"path": ""})["custom"] is False

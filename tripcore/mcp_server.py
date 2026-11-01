@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import secrets
 from datetime import date
@@ -97,9 +98,45 @@ def export_root() -> Path:
     e = os.environ.get("TRIPCORE_EXPORT_DIR")
     if e:
         return Path(e).expanduser()
+    try:
+        c = _export_dir_file().read_text(encoding="utf-8").strip()
+    except OSError:
+        c = ""
+    if c:
+        return Path(c).expanduser()
     if os.environ.get("TRIPCORE_FILE"):
         return trip_path().with_name("exports")
     return Path.home() / "Documents" / "TripSight"
+
+
+def _export_dir_file() -> Path:
+    return _root_dir() / "export_dir.txt"
+
+
+def set_export_dir(path: str) -> str:
+    """用户自己选的导出文件夹（工作台里“选择文件夹”）；空串 = 恢复默认。返回生效的路径。"""
+    path = (path or "").strip()
+    f = _export_dir_file()
+    if not path:
+        try:
+            f.unlink()
+        except OSError:
+            try:
+                f.write_text("", encoding="utf-8")
+            except OSError:
+                pass
+        return str(export_root())
+    d = Path(path).expanduser()
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        probe = d / ".tripsight-write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as e:
+        raise ToolError(f"这个文件夹写不进去：{e}")
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(str(d.resolve()), encoding="utf-8")
+    return str(export_root())
 
 
 def trip_path() -> Path:
@@ -1683,6 +1720,69 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
             stories.pop(i, None)
         _stories_path().write_text(json.dumps(stories, ensure_ascii=False), encoding="utf-8")
     return f"已把 {'、'.join(ids)} 合并成 {keep}（{n} 张照片，{start[11:16]}–{end[11:16]}）。原来这些点上写的介绍和描写已清掉，需要的话对合并后的点重新写。"
+
+
+def delete_stop(place_id: str) -> str:
+    """工作台用：从还原出来的行程里删掉一个停留点（景点、它的照片、拍摄记录、文字一并去掉；原照片文件不动）。
+    不受“锁定”限制——锁定只是防止被自动改期，用户自己点删除就是要删。"""
+    trip = _load()
+    try:
+        place = trip.place(place_id)
+    except KeyError as e:
+        raise ToolError(str(e))
+
+    def mutate(t: Trip) -> None:
+        t.places = [p for p in t.places if p.id != place_id]
+        for p in t.places:
+            p.backups = [b for b in p.backups if b != place_id]
+        if t.plan:
+            for d in t.plan.days:
+                d.items = [it for it in d.items if it.place_id != place_id]
+            t.plan.unscheduled = [u for u in t.plan.unscheduled if u.place_id != place_id]
+
+    _save(commit(trip, mutate))
+    items = _ph.load(_photo_index())
+    n = 0
+    for x in [x for x in items if x.get("place_id") == place_id]:
+        try:
+            _ph.remove(_photo_dir(), items, x["id"])
+            n += 1
+        except _ph.PhotoError:
+            pass
+    _ph.save(_photo_index(), items)
+    side = _load_json_file(_photo_trip_path())
+    if side.get("stops"):
+        side["stops"] = [x for x in side["stops"] if x["place_id"] != place_id]
+        _photo_trip_path().write_text(json.dumps(side, ensure_ascii=False), encoding="utf-8")
+    stories = _load_json_file(_stories_path())
+    if stories.pop(place_id, None) is not None:
+        _stories_path().write_text(json.dumps(stories, ensure_ascii=False), encoding="utf-8")
+    return f"已删除「{place.name}」（{n} 张照片的副本一并去掉；你相册里的原照片没动）。"
+
+
+def autoname_stops() -> str:
+    """给名字还是“…停留点”（旧版还原留下的）或“区县 · 时间”的还原点重新起名：高德反查（你自己的 key，只发坐标）。
+    没有 key 或查不到就改成“区县 · 时间”，不猜。用户手动改过的名字不会动。"""
+    from types import SimpleNamespace as NS
+    import datetime as _dt
+    side = _load_json_file(_photo_trip_path())
+    recs = {x["place_id"]: x for x in side.get("stops", [])}
+    trip = _load()
+    todo = [p for p in trip.places if p.id in recs and (p.name.endswith("停留点") or " · " in p.name or re.fullmatch(r"\d\d-\d\d \d\d:\d\d", p.name))]
+    if not todo:
+        return "没有需要重新起名的点（名字都是手动改过或已经查到地名的）。"
+    keep = [NS(lat=p.lat, lon=p.lon, start=_dt.datetime.fromisoformat(recs[p.id]["start"])) for p in todo]
+    names, found = _stop_names(keep)
+    mp = {p.id: nm for p, nm in zip(todo, names)}
+
+    def mutate(t: Trip) -> None:
+        for p in t.places:
+            if p.id in mp:
+                p.name = mp[p.id]
+    _save(commit(trip, mutate))
+    if found:
+        return f"重新起名 {len(todo)} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。"
+    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名（没配高德 key 或查询失败），先写成“区县 · 时间”或日期时间，可以手动改。配好 AMAP_KEY 后再点一次。"
 
 
 def _regions_path() -> Path:

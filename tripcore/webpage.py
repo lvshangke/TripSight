@@ -136,7 +136,7 @@ button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
 .warn{background:#fff8ed;border:1px solid #f1e3cd;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:13px;color:#8a4b00}
 .hbtop{display:flex;align-items:center;gap:12px;margin-bottom:8px}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .hbimp{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}#hb_folder{flex:1;min-width:260px}
-.hbs{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0;background:var(--paper)}.hbs .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hbs .h input.nm{flex:1;min-width:140px;font:inherit;font-weight:700;padding:3px 6px;border:1px solid var(--line2);border-radius:6px}
+.hbs{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0;background:var(--paper)}.hbs .dels{margin-left:auto;color:#b91c1c;border-color:#e7b4ae;background:#fff}.hbs .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hbs .h input.nm{flex:1;min-width:140px;font:inherit;font-weight:700;padding:3px 6px;border:1px solid var(--line2);border-radius:6px}
 .hbs .dy{font-size:12px;background:var(--acc-soft);color:#2347a5;border-radius:99px;padding:1px 8px}.hbs .tm{font-size:12px;color:var(--sub)}
 .hbp{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.hbp .c{width:96px}.hbp img{width:96px;height:72px;object-fit:cover;border-radius:6px;display:block;cursor:zoom-in}.hbp .c.cover img{outline:2px solid #c4553a}
 .hbp .bt{display:flex;justify-content:space-between;margin-top:2px}.hbp .bt{align-items:center}.hbp .bt button,.hbp .bt span{padding:0 5px;font-size:12px;white-space:nowrap;line-height:20px}.hbp .add{width:96px;height:72px;border:1px dashed #999;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--acc);cursor:pointer;font-size:12px}
@@ -279,9 +279,9 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置"><button class="pk" data-pick="file" data-to="hb_track">选文件</button><button class="pk" data-pick="folder" data-to="hb_track">选文件夹</button>
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；会新建一个行程，原来的行程还在。</div></div>
-<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
+<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
-<div class="hbexp"><b>确定最终版并导出</b> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
@@ -907,7 +907,7 @@ function hbCard(s, restore) {
     '<div class="bt">' + (i ? '<button data-a="front" title="设为封面">★</button>' : '<span class="tm" title="当前封面">★</span>') + '<button data-a="hide" title="' + (p.hide ? '现在不放进手册，点一下放进去' : '放进手册（点一下改为不放）') + '">' + (p.hide ? '🚫' : '👁') + '</button><button data-a="del" title="删除这张">✕</button></div></div>').join('');
   const add = s.photos.length < HB.data.max_photos ? '<label class="add" data-a="add">＋照片<input type="file" accept="image/jpeg,image/png,image/webp" hidden></label>' : '';
   return '<div class="hbs" id="hb_' + esc(s.id) + '"><div class="h">' + (restore ? '<input type="checkbox" class="sel" ' + (HB.sel.has(s.id) ? 'checked' : '') + ' title="选中后可合并">' : '') +
-    '<span class="dy">第 ' + s.day + ' 天</span>' + (s.region ? '<span class="dy">' + esc(s.region) + '</span>' : '') + '<input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + '</div>' +
+    '<span class="dy">第 ' + s.day + ' 天</span>' + (s.region ? '<span class="dy">' + esc(s.region) + '</span>' : '') + '<input class="nm" value="' + esc(s.name) + '" maxlength="40">' + (s.start ? '<span class="tm">' + esc(s.start) + '–' + esc(s.end) + '</span>' : '') + (restore ? '<button data-a="delstop" class="dels" title="删除这个地点（连同它的照片和文字，原照片不动）">🗑 删除地点</button>' : '') + '</div>' +
     '<div class="hbp">' + ph + add + '</div>' +
     '<div class="lb2">我的话 <button data-a="ai"' + (HB.data.vision ? '' : ' disabled title="还没有配置能读图的模型（DASHSCOPE_API_KEY、TRIPSIGHT_VISION_MODEL），先留空或自己写"') + '>用 AI 看图起草</button><span class="tlnote">草稿不会自动保存，改完点“保存”</span></div>' +
     '<textarea class="imp" maxlength="300" placeholder="写几句这里的光线、天气、心情（300 字内）">' + esc(st.impression || '') + '</textarea>' +
@@ -931,12 +931,17 @@ function hbWire(s) {
     c.querySelector('img').onclick = () => lbOpen(lbList, i);
     c.querySelectorAll('button').forEach(b => b.onclick = async () => {
       try {
-        if (b.dataset.a === 'del') { if (!confirm('删掉这张照片？（只删手册里的这一份，原图不动）')) return; await api('photo_remove', {id: c.dataset.p}); }
+        if (b.dataset.a === 'del') { if (!confirm('从「' + s.name + '」删掉第 ' + (i + 1) + ' 张照片？\n只删手册里的这一份，你的原图不动。')) return; await api('photo_remove', {id: c.dataset.p}); toast('已从「' + s.name + '」删除第 ' + (i + 1) + ' 张照片'); }
         else await api('hb_photo_move', {id: c.dataset.p, to: b.dataset.a});
         await hbLoad();
       } catch (e) { note(e.message, true); }
     });
   });
+  const ds = box.querySelector('.dels');
+  if (ds) ds.onclick = async () => {
+    if (!confirm('删除地点「' + s.name + '」（第 ' + s.day + ' 天）？\n它的 ' + s.photos.length + ' 张照片副本和文字都会一起去掉；你相册里的原照片不动。')) return;
+    try { const r = await api('hb_stop_delete', {place_id: s.id}); HB.sel.delete(s.id); toast(r.message); await load(); await hbLoad(); hbPvSoon && hbPvSoon(); } catch (e) { note(e.message, true); }
+  };
   const inp = box.querySelector('.add input');
   if (inp) inp.onchange = () => {
     const f = inp.files[0]; if (!f) return;
@@ -993,6 +998,12 @@ $('hb_pv').onclick = async () => {
   } catch (e) { $('hb_pvo').textContent = e.message; if (window.rsDone) rsPreviewing(false, null, e.message); }
 };
 $('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
+$('hb_an').onclick = async () => { if (!confirm('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。')) return;
+  try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
+async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
+$('hb_dirpick').onclick = async () => { try { const r = await api('pick_path', {kind: 'folder', prompt: '请选择导出文件夹'}); if (r.path) { const d = await dirLoad({path: r.path}); if (d) toast('导出文件夹已改为 ' + d.path); } } catch (e) { toast(e.message, true); } };
+$('hb_dirdef').onclick = async () => { const d = await dirLoad({path: ''}); if (d) toast('已恢复默认导出文件夹：' + d.path); };
+dirLoad();
 $('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r = await api('hb_regions', {}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
@@ -1002,7 +1013,7 @@ $('hb_open').onclick = async () => { try { const r = await api('reveal_exports',
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ~/Documents/TripSight/ 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ' + $('hb_dirp').textContent + ' 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
   $('hb_exp').disabled = false;
 };
 

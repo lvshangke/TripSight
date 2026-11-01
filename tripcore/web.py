@@ -735,6 +735,32 @@ def hb_merge(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
 
 
+def hb_stop_delete(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.delete_stop(str(body.get("place_id") or ""))}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def hb_autoname(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.autoname_stops()}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def export_dir(body: dict) -> dict[str, Any]:
+    """读/改导出文件夹：body 没有 path 键 = 只读；path 为空串 = 恢复默认。"""
+    if "path" in body:
+        try:
+            ms.set_export_dir(str(body.get("path") or ""))
+        except ms.ToolError as e:
+            raise HttpError(400, str(e))
+    custom = (ms._export_dir_file().read_text(encoding="utf-8").strip() if ms._export_dir_file().exists() else "")
+    return {"path": str(ms.export_root()), "custom": bool(custom) or bool(os.environ.get("TRIPCORE_EXPORT_DIR")),
+            "locked": bool(os.environ.get("TRIPCORE_EXPORT_DIR"))}
+
+
 def hb_photo_move(body: dict) -> dict[str, Any]:
     """在同一个景点的照片里调整顺序：to = "front"（设为封面）| "left" | "right"。"""
     pid, to = str(body.get("id") or ""), str(body.get("to") or "")
@@ -1112,7 +1138,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_autoname": hb_autoname, "export_dir": export_dir, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
