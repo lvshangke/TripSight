@@ -712,7 +712,8 @@ def hb_import(body: dict) -> dict[str, Any]:
         raise HttpError(400, "半径要是数字。")
     try:
         msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album,
-                                track=str(body.get("track") or "").strip(), link_photos=bool(body.get("link_photos")))
+                                track=str(body.get("track") or "").strip(), link_photos=bool(body.get("link_photos")),
+                                start_date=str(body.get("start_date") or ""), end_date=str(body.get("end_date") or ""))
     except ms.ToolError as e:
         raise HttpError(400, str(e))
     return {"message": msg}
@@ -780,7 +781,7 @@ def restore_context(msg: str) -> str:
     return ("【TripSight 页面：恢复行程】\n页面状态：\n" + status + "\n"
             "说明：“恢复行程”是把用户拍过的照片（文件夹或 Mac 照片 App 相册）还原成走过的路线，不是从已有行程里挑一个。"
             "当前行程是空的恢复行程、用户又没给来源时，直接问他：照片在哪个文件夹（给完整路径）或哪个相册，或请他在页面左侧“选来源”里选；"
-            "有了来源先预览再恢复，用 import_photo_trip（folder 或 album），先和用户确认。不要列出已有的计划行程让用户选。\n\n用户说：" + msg)
+            "照片跨几年也能一次恢复（用户只想恢复一段时才带 start_date/end_date）；有了来源先预览再恢复，用 import_photo_trip（folder 或 album），先和用户确认。不要列出已有的计划行程让用户选。\n\n用户说：" + msg)
 
 
 def activity(body: dict) -> dict[str, Any]:
@@ -1046,6 +1047,16 @@ def hb_preview(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
     if not photos:
         raise HttpError(400, f"没有找到带位置的照片（统计：{st}）。")
+    months: dict[str, int] = {}
+    for p in photos:
+        months[f"{p.taken:%Y-%m}"] = months.get(f"{p.taken:%Y-%m}", 0) + 1
+    all_first, all_last = min(p.taken for p in photos).date(), max(p.taken for p in photos).date()
+    try:
+        photos, untagged = ms.date_filter(photos, untagged, str(body.get("start_date") or ""), str(body.get("end_date") or ""))
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+    if not photos:
+        raise HttpError(400, f"这段日期里没有带位置的照片（相册里的照片在 {all_first} 到 {all_last}）。")
     stops = _pt.cluster(photos, radius_m=radius)
     keep = [x for x in stops if x.n >= mn]
     guessed = _pt.assign_untagged(stops, untagged)
@@ -1059,7 +1070,11 @@ def hb_preview(body: dict) -> dict[str, Any]:
     _save_draft(folder, album, radius, mn, len(stops), len(keep), len(photos), keep)
     out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
            "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": "",
-           "videos": _album_video_count(album) if album else _video_count(str(folder))}
+           "videos": _album_video_count(album) if album else _video_count(str(folder)),
+           "first": min(p.taken for p in photos).date().isoformat(), "last": max(p.taken for p in photos).date().isoformat(),
+           "span_days": (max(p.taken for p in photos).date() - min(p.taken for p in photos).date()).days + 1,
+           "all_first": all_first.isoformat(), "all_last": all_last.isoformat(),
+           "months": [{"m": k, "n": v} for k, v in sorted(months.items())]}
     if body.get("basemap") and rows:
         out.update(_preview_basemap(rows))
     return out

@@ -309,6 +309,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label>来源 <select id="hb_src"><option value="folder">文件夹</option><option value="album">照片 App 相册（Mac）</option></select></label><select id="hb_album" style="display:none"><option value="">先点“读取相册列表”</option></select><button id="hb_al" style="display:none">读取相册列表</button><input id="hb_folder" placeholder="照片文件夹的完整路径，例如 /Users/你/Desktop/台州（照片要带位置信息）"><button class="pk" data-pick="folder" data-to="hb_folder">选文件夹</button>
 <label title="不在行程目录里存照片副本，省磁盘；导出时才从原文件缩小并去掉定位。原文件被移走或删除后图会缺失"><input type="checkbox" id="hb_link"> 只引用照片（不复制）</label>
 <input id="hb_track" placeholder="可选：轨迹文件（.gpx/.kml）或其文件夹的完整路径，用来给没有位置的照片补位置"><button class="pk" data-pick="file" data-to="hb_track">选文件</button><button class="pk" data-pick="folder" data-to="hb_track">选文件夹</button>
+<label title="可选：只恢复这一段；不填就是全部照片（跨几年也行）">只恢复这段日期 <input type="date" id="hb_d1"> – <input type="date" id="hb_d2"></label>
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；照片会读进当前这个恢复行程，其他行程不受影响。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
@@ -1102,7 +1103,7 @@ function hbWire(s) {
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { HB.mode = b.dataset.m; if (HB.data) hbRender(); });
 $('hb_go').onclick = async () => {
   $('hb_go').disabled = true; $('hb_list').textContent = '正在读取照片，几十秒内…';
-  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value, link_photos: $('hb_link').checked})); say(r.message.split('\n')[0]); await load(); await hbLoad(); if (window.rsDone) rsDone(true); } catch (e) { $('hb_list').textContent = e.message; if (window.rsDone) rsDone(false, e.message); }
+  try { const r = await api('hb_import', hbSrc({radius_m: +$('hb_r').value, track: $('hb_track').value, link_photos: $('hb_link').checked, start_date: $('hb_d1').value, end_date: $('hb_d2').value})); say(r.message.split('\n')[0]); await load(); await hbLoad(); if (window.rsDone) rsDone(true); } catch (e) { $('hb_list').textContent = e.message; if (window.rsDone) rsDone(false, e.message); }
   $('hb_go').disabled = false;
 };
 
@@ -1118,7 +1119,7 @@ $('hb_pvbm').checked = bmOn(); $('hb_pvbm').onchange = () => { try { localStorag
 $('hb_pv').onclick = async () => {
   $('hb_pvo').textContent = '正在预览…'; if (window.rsDone) rsPreviewing(true);
   try {
-    const r = await api('hb_preview', hbSrc({radius_m: +$('hb_r').value, basemap: $('hb_pvbm').checked}));
+    const r = await api('hb_preview', hbSrc({radius_m: +$('hb_r').value, basemap: $('hb_pvbm').checked, start_date: $('hb_d1').value, end_date: $('hb_d2').value}));
     const W = r.basemap ? r.bm_w : 760, H = r.basemap ? r.bm_h : 420; let pts;
     if (r.basemap) pts = r.xy.map(a => ({x: a[0], y: a[1]}));
     else { const la = r.stops.map(s => s.lat), lo = r.stops.map(s => s.lon), k = Math.cos((Math.min(...la) + Math.max(...la)) / 2 * Math.PI / 180), dx = (Math.max(...lo) - Math.min(...lo)) * k || 1e-6, dy = (Math.max(...la) - Math.min(...la)) || 1e-6, sc = Math.min((W - 80) / dx, (H - 80) / dy);
@@ -1126,8 +1127,11 @@ $('hb_pv').onclick = async () => {
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
       r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
+      (r.span_days > 30 ? '<div class="tlnote">这些照片从 ' + esc(r.first) + ' 到 ' + esc(r.last) + '，跨了 ' + r.span_days + ' 天：会按拍摄日期分成一天天，没照片的日子不显示。只想恢复其中一段？在上面选“只恢复这段日期”，或点照片多的月份：' +
+        r.months.slice().sort((a, b) => b.n - a.n).slice(0, 12).map(m => '<button class="pk hbm" data-m="' + m.m + '">' + m.m + '（' + m.n + '）</button>').join(' ') + '</div>' : '') +
       (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : '') +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
+    $('hb_pvo').querySelectorAll('.hbm').forEach(b => b.onclick = () => { const [y, m] = b.dataset.m.split('-'); $('hb_d1').value = b.dataset.m + '-01'; $('hb_d2').value = b.dataset.m + '-' + String(new Date(+y, +m, 0).getDate()).padStart(2, '0'); $('hb_pv').click(); });
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
       $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
     $('rmap_chip').className = 'pv'; $('rmap_chip').textContent = '预览：' + r.kept + ' 处，还没有恢复成行程（现有行程不受影响）';

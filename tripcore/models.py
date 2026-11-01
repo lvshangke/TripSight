@@ -241,7 +241,7 @@ class TripMeta(BaseModel):
     end_date: Optional[date] = None
     earliest_start: Optional[date] = None
     latest_end: Optional[date] = None
-    num_days: int = Field(default=3, ge=1, le=30)
+    num_days: int = Field(default=3, ge=1, le=3700)    # 规划行程在 new_trip 里另限 30 天；照片还原可跨好几年（没照片的日子不显示）
     pace: Pace = Pace.NORMAL
     mode: TravelMode = "transit"
     budget_total: Optional[float] = Field(default=None, ge=0)

@@ -319,7 +319,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     foot = '<div class="foot">营业时间来自地图服务，出发前请再核实。</div>' if any(p.opening_hours for p in trip.places) else ""
     title = e(trip.meta.name)
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
-            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(trip.plan.days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
+            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(days_html)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
             f'{"".join(days_html)}{sp_html}{foot}</div>{JS}{EDIT_JS if edit else ""}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 
@@ -361,7 +361,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     for d in ("photos", "media", "cards"):
         if not any((root / d).iterdir()):
             (root / d).rmdir()
-    cap = [f"{trip.meta.name}｜{len(trip.plan.days)} 天行程手册"]
+    cap = [f"{trip.meta.name}｜{len(card_jobs) and len({j[0] for j in card_jobs})} 天行程手册"]
     for idx, d, vs, km, legs, pic in card_jobs:
         cap.append(f"第{idx + 1}天：" + "→".join(v.place.name for v in vs))
     (root / "caption.txt").write_text("\n".join(cap) + "\n", encoding="utf-8"); files.append("caption.txt")

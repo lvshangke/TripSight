@@ -376,3 +376,23 @@ def test_restore_context_inlines_page_state_for_agents_without_the_tool(tmp_path
     out = web.restore_context("帮我恢复下行程")
     assert out.startswith("【TripSight 页面：恢复行程】") and "旧手机" in out and "照片恢复的行程" in out
     assert "不要列出已有的计划行程" in out and out.endswith("用户说：帮我恢复下行程")
+
+
+def test_long_span_restores_and_date_filter_works(tmp_path):
+    from tripcore import web
+    _album(tmp_path)
+    t1 = datetime(2023, 1, 5, 9, 0)
+    for i in range(4):
+        _jpg(tmp_path / f"old{i}.jpg", t1 + timedelta(minutes=2 * i), 31.2, 121.4, color=(5 * i, 9, 9))
+    s.import_photo_trip(str(tmp_path))
+    t = s._load()
+    assert t.meta.start_date.isoformat() == "2023-01-05" and t.meta.num_days > 1200 and sum(1 for d in t.plan.days if d.items) == 2
+    s.new_restore_trip("x")
+    s.import_photo_trip(str(tmp_path), start_date="2026-06-01", end_date="2026-06-30")
+    assert s._load().meta.start_date.isoformat() == "2026-06-19"
+    pv = web.hb_preview({"folder": str(tmp_path)})
+    assert pv["span_days"] > 30 and {m["m"] for m in pv["months"]} == {"2023-01", "2026-06"}
+    pv2 = web.hb_preview({"folder": str(tmp_path), "start_date": "2023-01-01", "end_date": "2023-01-31"})
+    assert pv2["span_days"] == 1 and pv2["kept"] == 1
+    with pytest.raises(s.ToolError):
+        s.date_filter([], [], "2026-13-01", "")

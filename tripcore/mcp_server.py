@@ -1576,7 +1576,8 @@ def _stop_names(keep: list) -> tuple[list[str], int]:
 
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
                       radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
-                      track: str = "", tz_hours: float = 8.0, link_photos: bool = False, auto_name: bool = True) -> str:
+                      track: str = "", tz_hours: float = 8.0, link_photos: bool = False, auto_name: bool = True,
+                      start_date: str = "", end_date: str = "") -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
@@ -1585,6 +1586,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     轨迹里的时间是 UTC，照片是当地时间，tz_hours 是当地与 UTC 的时差（默认 8）。轨迹只用来给照片定位，不会单独变成景点。
     link_photos=true 时照片只引用不复制（不在行程目录存副本，省磁盘）：记下原文件路径，导出时才现场缩小并去掉定位；
     原文件之后被移动或删除，对应的图就缺了（导出会提示）。默认 false，复制一份缩小去定位的副本。
+    照片可以跨好几年（整本手机相册也行）：按拍摄日期分天，没照片的日子不显示。start_date/end_date（YYYY-MM-DD，含）是可选的，用户只想恢复其中一段时才用，不要替他猜。
     景点名：有高德 key 时按每个点的坐标反查景区/小区/最近地标（auto_name=true，只发坐标；不想发就设 false）；查不到写“区县 · 时间”，再靠 view_stop 看图和候选地名、用 update_place 改成真实名字，不要猜。
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
@@ -1606,6 +1608,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
             photos, untagged, st = _pt.read_all(root)
         except ValueError as e:
             raise ToolError(str(e))
+    photos, untagged = date_filter(photos, untagged, start_date, end_date)
     tracked_n = 0
     if track and untagged:
         from . import trackfile as _tf
@@ -1625,18 +1628,19 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         raise ToolError(f"聚成了 {len(stops)} 个点，但没有一个达到 {min_photos} 张。可以降低 min_photos 或设 include_passing=true。")
     first, last = keep[0].day, keep[-1].day
     ndays = (last - first).days + 1
-    if ndays > 30:
-        raise ToolError(f"照片跨度 {ndays} 天，超过行程上限 30 天。请先把照片分到不同文件夹。")
+    if ndays > 3700:
+        raise ToolError(f"照片跨度 {ndays} 天（{first} 到 {last}），超过 10 年。请用 start_date / end_date 分段恢复。")
     auto = f"照片还原 {first:%m.%d}-{last:%m.%d}"
     shell = _restore_shell_name()
-    if shell is not None:                                  # 用户在页面上先建好了一个空的“恢复行程”：照片读进它里面，不再另建
-        def fill(t: Trip) -> None:
-            t.meta.num_days, t.meta.mode = ndays, "drive"
-            t.meta.date_mode, t.meta.start_date, t.meta.end_date = DateMode.EXACT, first, last
-            t.meta.name = name or (auto if shell.startswith(RESTORE_DEFAULT) else shell)
-        _save(commit(_load(), fill))
-    else:
-        new_trip(name=name or auto, num_days=ndays, start_date=first.isoformat(), end_date=last.isoformat(), mode="drive")
+    if shell is None:                                      # 没有现成的空壳：先新建一个（规划行程限 30 天，照片还原不受限，所以天数在下面填）
+        new_trip(name=name or auto, num_days=1, mode="drive")
+        shell = name or auto
+
+    def fill(t: Trip) -> None:                             # 用户在页面上先建好了空的“恢复行程”时，照片读进它里面，不再另建
+        t.meta.num_days, t.meta.mode = ndays, "drive"
+        t.meta.date_mode, t.meta.start_date, t.meta.end_date = DateMode.EXACT, first, last
+        t.meta.name = name or (auto if shell.startswith(RESTORE_DEFAULT) else shell)
+    _save(commit(_load(), fill))
     ids: list[str] = []
     stop_names, named = _stop_names(keep) if auto_name else ([f"{sp.start:%m-%d %H:%M} 停留点" for sp in keep], 0)
 
@@ -1691,6 +1695,25 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
 
 
 RESTORE_DEFAULT = "恢复行程 "
+
+
+def date_filter(photos: list, untagged: list, start: str = "", end: str = "") -> tuple[list, list]:
+    """只留拍摄日期在 [start, end]（含）内的照片；两端都可以不填。"""
+    def parse(v: str, label: str):
+        v = (v or "").strip()
+        if not v:
+            return None
+        try:
+            return date.fromisoformat(v)
+        except ValueError:
+            raise ToolError(f"{label}要写成 YYYY-MM-DD（例如 2025-10-01）。")
+    a, b = parse(start, "开始日期"), parse(end, "结束日期")
+    if a and b and a > b:
+        raise ToolError("开始日期不能晚于结束日期。")
+    def ok(p) -> bool:
+        d = (p[1] if isinstance(p, tuple) else p.taken).date()
+        return (a is None or d >= a) and (b is None or d <= b)
+    return [p for p in photos if ok(p)], [p for p in untagged if ok(p)]
 
 
 def _restore_shell_name() -> Optional[str]:
