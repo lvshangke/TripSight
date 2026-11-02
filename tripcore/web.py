@@ -861,7 +861,7 @@ def hb_stop_delete(body: dict) -> dict[str, Any]:
 
 def hb_autoname(body: dict) -> dict[str, Any]:
     try:
-        return {"message": ms.autoname_stops()}
+        return {"message": ms.autoname_stops(budget_s=0, retry_failed=bool(body.get("retry")))}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
@@ -1385,7 +1385,7 @@ def make_handler(token: str, state: dict):
             agent_msg = restore_context(msg) if body.get("ctx") == "restore" else msg
             payload = json.dumps({"messages": [{"role": "user", "content": agent_msg}], "session_id": sid, "stream": True})
             try:
-                conn = http.client.HTTPConnection(host, port, timeout=130)
+                conn = http.client.HTTPConnection(host, port, timeout=300)
                 conn.request("POST", "/v1/chat/completions", payload.encode("utf-8"), headers)
                 resp = conn.getresponse()
             except Exception:

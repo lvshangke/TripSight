@@ -1548,7 +1548,7 @@ def _load_json_file(p: Path) -> dict:
 _NAME_ERR: list[str] = []      # 最近一次起名遇到的第一个错误原因（给用户看，不是猜）
 
 
-def _stop_names(keep: list) -> tuple[list[str], int]:
+def _stop_names(keep: list, budget_s: float = 0.0) -> tuple[list[str], int]:
     """给每个停留点起名：高德反查（景区/小区/最近地标/街道）；没有 key 或查不到就写“区县 · 时间”，不猜。
     同名的点加上时间区分。返回 (名字列表, 查到真实名字的个数)。只发每个点的坐标，不发照片。"""
     client = None
@@ -1562,9 +1562,10 @@ def _stop_names(keep: list) -> tuple[list[str], int]:
     names: list[str] = []
     found = 0
     fails = 0
+    t_end = time.time() + budget_s if budget_s > 0 else None
     for sp in keep:
         w = None
-        if client is not None and fails < 3:               # 连着 3 次报错（key 不对、额度用完）就别再一个个试了
+        if client is not None and fails < 3 and (t_end is None or time.time() < t_end):               # 连着 3 次报错（key 不对、额度用完）就别再一个个试了
             try:
                 w = client.where(sp.lat, sp.lon)
                 fails = 0
@@ -1653,7 +1654,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         t.meta.name = name or (auto if shell.startswith(RESTORE_DEFAULT) else shell)
     _save(commit(_load(), fill))
     ids: list[str] = []
-    stop_names, named = _stop_names(keep) if auto_name else ([f"{sp.start:%m-%d %H:%M} 停留点" for sp in keep], 0)
+    stop_names, named = _stop_names(keep, budget_s=12.0) if auto_name else ([f"{sp.start:%m-%d %H:%M} 停留点" for sp in keep], 0)
 
     def mutate(t: Trip) -> None:
         days = [DayPlan(index=i) for i in range(ndays)]
@@ -1692,6 +1693,8 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
              f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个（自动起名 {named} 个）；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if auto_name and keep and named < len(keep) and not _NAME_ERR:
+        lines.append(f"为避免超时，地名只先查了一部分（{named}/{len(keep)} 个查到）；其余的调用 autoname_stops 接着查（可能要调几次，直到它说全部处理完）。")
     if auto_name and not named and _NAME_ERR:
         lines.append(f"景点没有查到真实地名，原因：{_NAME_ERR[0]}。先写成“区县 · 时间”；原因解决后可用 autoname_stops 重新起名（不要改用别的服务反查）。")
     if tracked_n:
@@ -1901,9 +1904,11 @@ def delete_stop(place_id: str) -> str:
     return f"已删除「{place.name}」（{n} 张照片的副本一并去掉；你相册里的原照片没动）。"
 
 
-def autoname_stops() -> str:
+def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
     """给名字还是“…停留点”（旧版还原留下的）或“区县 · 时间”的还原点重新起名：高德反查（你自己的 key，只发坐标）。
-    没有 key 或查不到就改成“区县 · 时间”，不猜。用户手动改过的名字不会动。"""
+    没有 key 或查不到就改成“区县 · 时间”，不猜。用户手动改过的名字不会动。
+    点多时一次只做约 budget_s 秒（默认 20，避免 agent 的工具超时），做完的先保存；结果里写“还剩 N 个”时就再调一次接着做，直到没有剩余。
+    查过但没查到的点不会反复查；retry_failed=true 才重新查它们（比如刚配好 key 之后）。"""
     from types import SimpleNamespace as NS
     import datetime as _dt
     side = _load_json_file(_photo_trip_path())
@@ -1912,18 +1917,39 @@ def autoname_stops() -> str:
     todo = [p for p in trip.places if p.id in recs and (p.name.endswith("停留点") or " · " in p.name or re.fullmatch(r"\d\d-\d\d \d\d:\d\d", p.name))]
     if not todo:
         return "没有需要重新起名的点（名字都是手动改过或已经查到地名的）。"
-    keep = [NS(lat=p.lat, lon=p.lon, start=_dt.datetime.fromisoformat(recs[p.id]["start"])) for p in todo]
-    names, found = _stop_names(keep)
-    mp = {p.id: nm for p, nm in zip(todo, names)}
+    tried_f = _photo_trip_path().with_name("autoname_tried.json")
+    tried = set() if retry_failed else set(_load_json_file(tried_f).get("ids") or [])
+    pending = [p for p in todo if p.id not in tried]
+    if not pending:
+        return f"没有剩余的点要查：{len(todo)} 个点已经查过（查不到的保持“区县 · 时间”）。key 刚配好想重查，用 retry_failed=true。"
+    t_end = time.time() + budget_s if budget_s and budget_s > 0 else None
+    done = found = 0
+    _NAME_ERR.clear()
+    for i in range(0, len(pending), 10):
+        if done and t_end is not None and time.time() > t_end:        # 至少做一批，再看时间
+            break
+        chunk = pending[i:i + 10]
+        keep = [NS(lat=p.lat, lon=p.lon, start=_dt.datetime.fromisoformat(recs[p.id]["start"])) for p in chunk]
+        err0 = list(_NAME_ERR)
+        names, f = _stop_names(keep)
+        mp = {p.id: nm for p, nm in zip(chunk, names)}
 
-    def mutate(t: Trip) -> None:
-        for p in t.places:
-            if p.id in mp:
-                p.name = mp[p.id]
-    _save(commit(trip, mutate))
+        def mutate(t: Trip, mp=mp) -> None:
+            for p in t.places:
+                if p.id in mp:
+                    p.name = mp[p.id]
+        _save(commit(_load(), mutate))
+        if f or not _NAME_ERR:                       # 没 key / 报错没查到的不算“查过”，配好 key 后直接再调就行
+            tried |= set(mp)
+            tried_f.write_text(json.dumps({"ids": sorted(tried)}), encoding="utf-8")
+        done += len(chunk); found += f
+        if _NAME_ERR and not f:                      # 这一批一个都没查到而且有报错（key 不对、额度用完）：别再往下试了
+            break
+    left = len(pending) - done
+    tail = f"还剩 {left} 个没查，请再调用一次 autoname_stops 接着做（每次只做约 {int(budget_s)} 秒，避免超时）。" if left > 0 else "全部处理完了。"
     if found:
-        return f"重新起名 {len(todo)} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。"
-    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名" + (f"。原因：{_NAME_ERR[0]}" if _NAME_ERR else "（高德没有返回名字）") + "。先写成“区县 · 时间”或日期时间，可以手动改；原因解决后再点一次。具体每次请求在 amap_calls.log 里（不含 key）。"
+        return f"本次处理 {done} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。{tail}"
+    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名" + (f"。原因：{_NAME_ERR[0]}" if _NAME_ERR else "（高德没有返回名字）") + "。先写成“区县 · 时间”或日期时间，可以手动改；原因解决后用 retry_failed=true 重查。具体每次请求在 amap_calls.log 里（不含 key）。" + (f"（还有 {left} 个没处理）" if left > 0 else "")
 
 
 def _day_titles_path() -> Path:

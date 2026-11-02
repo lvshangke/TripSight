@@ -459,3 +459,25 @@ def test_switching_trips_is_blocked_while_the_assistant_is_working(tmp_path, mon
     with pytest.raises(web.HttpError):
         web.switch({"slug": "x"})
     web._IMPORTING["n"] = 0
+
+
+def test_autoname_is_chunked_and_resumable(tmp_path, monkeypatch):
+    t0 = datetime(2026, 6, 19, 8, 0)
+    for k in range(25):
+        for i in range(3):
+            _jpg(tmp_path / f"s{k}_{i}.jpg", t0 + timedelta(hours=k, minutes=i), 28 + k * 0.05, 121 + k * 0.05, color=(k, i, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False, include_passing=False)
+    n = len([p for p in s._load().places])
+    calls = []
+
+    class Fake:
+        def where(self, la, lo):
+            calls.append(1)
+            return {"name": f"地名{len(calls)}", "district": "某区", "city": "某市"}
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda c, log_path=None: Fake()))
+    out = s.autoname_stops(budget_s=1e-9)
+    assert "还剩" in out and 0 < len(calls) < n
+    first = len(calls)
+    out2 = s.autoname_stops(budget_s=0)
+    assert "全部处理完了" in out2 and len(calls) == n and first < n
+    assert "没有需要重新起名" in s.autoname_stops()

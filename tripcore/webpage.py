@@ -755,7 +755,7 @@ async function send() {
           if (!line.startsWith('data:')) continue; const d = line.slice(5).trim(); if (d === '[DONE]') { done = true; continue; }
           try { const t = (JSON.parse(d).choices || [{}])[0].delta; if (t && t.content) { got += t.content; setMsg(out, got); msgs.scrollTop = msgs.scrollHeight; } } catch (e) {} } }
       if (!got) out.textContent = '（没有收到回复）';
-      if (!done) { const w = document.createElement('div'); w.className = 'm e'; w.textContent = '回复可能不完整（连接中断或超时）。agent 已经做完的操作不会撤销，请看看行程再决定。'; msgs.appendChild(w); }
+      if (!done) { const w = document.createElement('div'); w.className = 'm e'; w.textContent = '没有收到助手的结束信号（这一步耗时很长，或连接中断/超时）。已经做完的操作不会撤销；看右下角“助手”卡片：还在转就是还在做，等它结束再决定。'; msgs.appendChild(w); }
     }
   } catch (e) { out.className = 'm e'; out.textContent = '请求失败：' + e.message; }
   busy = false; $('csend').disabled = false; $('trip').disabled = false; await load();
