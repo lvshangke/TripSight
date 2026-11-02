@@ -140,6 +140,22 @@ def _text(v: Any) -> str:
     return v if isinstance(v, str) else ""
 
 
+def amap_key() -> str:
+    """高德 key：先看环境变量 AMAP_KEY；agent 没把配置里的 env 传给这个进程时，再读你本机 nanobot 配置里 tripcore 那一项的 env.AMAP_KEY
+    （只在本地读、不发给任何人、不写进别处）。都没有就返回空串。"""
+    key = os.environ.get("AMAP_KEY", "").strip()
+    if key:
+        return key
+    try:
+        import json
+        p = Path(os.environ.get("NANOBOT_CONFIG", "") or Path.home() / ".nanobot" / "config.json")
+        env = (((json.loads(p.read_text(encoding="utf-8")).get("tools") or {}).get("mcpServers") or {}).get("tripcore") or {}).get("env") or {}
+        v = str(env.get("AMAP_KEY") or "").strip()
+        return "" if v.startswith(("在这里", "可选")) else v
+    except Exception:
+        return ""
+
+
 class AmapClient:
     def __init__(self, key: str, timeout: int = 15, opener: Optional[Callable[[str], dict]] = None,
                  log_path: Optional[Path] = None):
@@ -153,7 +169,7 @@ class AmapClient:
 
     @classmethod
     def from_env(cls, log_path: Optional[Path] = None) -> Optional["AmapClient"]:
-        key = os.environ.get("AMAP_KEY", "").strip()
+        key = amap_key()
         return cls(key, log_path=log_path) if key else None
 
     def _audit(self, path: str, params: dict[str, Any], outcome: str) -> None:

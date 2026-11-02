@@ -424,3 +424,17 @@ def test_restore_auto_mode_is_set_by_page_and_seen_by_agent(tmp_path):
     web.restore_mode({"auto": False})
     assert "逐步确认" in s.restore_status()
     assert not any(t.__name__ == "set_restore_auto" for t in s.TOOLS)
+
+
+def test_amap_key_falls_back_to_nanobot_config_env(tmp_path, monkeypatch):
+    from tripcore.amap import amap_key
+    cfg = tmp_path / "nb.json"
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    monkeypatch.setenv("NANOBOT_CONFIG", str(cfg))
+    assert amap_key() == ""
+    cfg.write_text(json.dumps({"tools": {"mcpServers": {"tripcore": {"env": {"AMAP_KEY": "在这里填你自己的 key"}}}}}), encoding="utf-8")
+    assert amap_key() == ""
+    cfg.write_text(json.dumps({"tools": {"mcpServers": {"tripcore": {"env": {"AMAP_KEY": " k123 "}}}}}), encoding="utf-8")
+    assert amap_key() == "k123"
+    monkeypatch.setenv("AMAP_KEY", "fromenv")
+    assert amap_key() == "fromenv"

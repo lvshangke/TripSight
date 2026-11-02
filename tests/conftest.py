@@ -31,6 +31,7 @@ def beijing() -> Trip:
 def _isolated_state(tmp_path, monkeypatch):
     """所有测试都用临时目录保存行程/偏好，绝不碰真实的 ~/.tripcore。"""
     monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "trip.json"))
+    monkeypatch.setenv("NANOBOT_CONFIG", str(tmp_path / "no-nanobot.json"))        # 不读真实的 nanobot 配置（里面可能有真 key）
 
 
 @pytest.fixture(autouse=True)

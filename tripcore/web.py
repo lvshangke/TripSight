@@ -16,6 +16,7 @@ import secrets
 import signal
 import subprocess
 import sys
+from .amap import amap_key
 import threading
 import time
 import urllib.error
@@ -536,7 +537,7 @@ def share_preview(body: dict) -> dict[str, Any]:
     import importlib.util
     _BM_NOTE["text"] = ""
     html = _share_html(body)
-    return {"html": html, "bm_note": _BM_NOTE["text"], "key_ok": bool(os.environ.get("AMAP_KEY", "").strip()), "png_ok": importlib.util.find_spec("playwright") is not None,
+    return {"html": html, "bm_note": _BM_NOTE["text"], "key_ok": bool(amap_key()), "png_ok": importlib.util.find_spec("playwright") is not None,
             "photo_count": len(_ph.load(ms._photo_index())),
             "gif_ok": importlib.util.find_spec("playwright") is not None and importlib.util.find_spec("PIL") is not None,
             "themes": [{"id": k, "label": v["label"]} for k, v in _share.THEMES.items()]}

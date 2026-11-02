@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+from .amap import amap_key
 import re
 from typing import Optional
 
@@ -26,7 +27,7 @@ def guard_text(text: str) -> list[str]:
         bad.append("含有本机文件路径")
     if _KEY_RE.search(text):
         bad.append("含有 key/token 形式的参数")
-    secret = os.environ.get("AMAP_KEY", "").strip()
+    secret = amap_key()
     if len(secret) >= 8 and secret in text:
         bad.append("含有高德 key")
     return bad

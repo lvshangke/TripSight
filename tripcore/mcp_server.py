@@ -17,6 +17,7 @@ import json
 import re
 import time
 import os
+import sys
 import secrets
 from datetime import date
 from pathlib import Path
@@ -24,7 +25,7 @@ from typing import Any, Optional
 
 from pydantic import TypeAdapter, ValidationError
 
-from .amap import ROUTE_VERSION, AmapClient, AmapError
+from .amap import ROUTE_VERSION, AmapClient, AmapError, amap_key
 from .openmeteo import OpenMeteoClient, WeatherError
 from .weather import bad_weather, fmt_snap, weather_spots
 from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
@@ -1071,7 +1072,7 @@ def create_amap_map(day: Optional[int] = None, per_day: bool = True) -> dict[str
     默认 per_day=True：每天单独生成一个链接，因为实测高德 App 的专属地图一次只显示第一条行程；
     per_day=False 才把所有天放进同一张地图。
     链接是高德 App 的专用地址，要在装了高德的手机上打开。"""
-    key = os.environ.get("AMAP_KEY", "").strip()
+    key = amap_key()
     if not key:
         raise ToolError("没有配置高德 key（环境变量 AMAP_KEY）。")
     if day is not None or not per_day:
@@ -1557,7 +1558,7 @@ def _stop_names(keep: list) -> tuple[list[str], int]:
         client = None
     _NAME_ERR.clear()
     if client is None:
-        _NAME_ERR.append("tripcore 这个进程里读不到 AMAP_KEY（key 要配在 agent 里 tripcore 那一项的 env；改完要重启 agent）")
+        _NAME_ERR.append(f"这个 tripcore 进程（pid {os.getpid()}，{sys.executable}）的环境变量和 ~/.nanobot/config.json 里都读不到 AMAP_KEY；如果你用的不是 nanobot，要在你那个 agent 的 MCP 配置里给 tripcore 加 env AMAP_KEY，改完重启")
     names: list[str] = []
     found = 0
     fails = 0
