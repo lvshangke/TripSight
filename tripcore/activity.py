@@ -109,6 +109,15 @@ def read_since(path: Path, since: float = 0.0, limit: int = 40) -> list[dict]:
     return out[-limit:]
 
 
+_READONLY = {"restore_status", "list_trips", "show_trip", "list_photo_albums", "view_stop", "suggest_day_titles", "open_workbench", "tools_catalog"}
+
+
+def running(path: Path, within: float = 420.0) -> list[dict]:
+    """现在还在跑（只有开始、没有结束）的会改数据的调用。超过 within 秒还没结束的当作进程已经没了，不算。"""
+    now = time.time()
+    return [e for e in read_since(path, now - within, limit=200) if e.get("state") == "run" and e.get("name") not in _READONLY]
+
+
 class Tracked:
     """with Tracked(path, name, args) as t: ...; t.result = 返回值。出错自动记成失败并继续向外抛。"""
 

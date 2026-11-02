@@ -402,6 +402,7 @@ def trip_delete(body: dict) -> dict[str, Any]:
     """“删除”行程：移到 trips/_archive/（回收区），文件不会真正删掉，可以在回收区里恢复。删的是当前行程时先切到另一个同类行程。"""
     if ms._single_file_mode():
         raise HttpError(400, "当前是单文件模式，不能删除行程。")
+    _busy_guard("删除行程")
     root = ms._root_dir()
     slug = str(body.get("slug") or "")
     items = ws.list_trips(root)
@@ -419,6 +420,7 @@ def trip_delete(body: dict) -> dict[str, Any]:
 
 
 def trip_new_restore(body: dict) -> dict[str, Any]:
+    _busy_guard("新建行程")
     try:
         msg = ms.new_restore_trip(str(body.get("name") or ""))
     except ms.ToolError as e:
@@ -436,10 +438,23 @@ def trip_restore(body: dict) -> dict[str, Any]:
     return {"message": "已恢复行程。", "slug": dest.name}
 
 
+_IMPORTING = {"n": 0}
+
+
+def _busy_guard(what: str) -> None:
+    """助手（或页面）正在往当前行程里写东西时，不让切换/新建/删除行程：不然它后面的每一步都会落到别的行程里。"""
+    from . import activity as _ac
+    r = _ac.running(ms._activity_path())
+    if r or _IMPORTING["n"]:
+        doing = r[0].get("label") or r[0].get("name") if r else "读取照片"
+        raise HttpError(409, f"助手正在「{doing}」，先等它做完再{what}（现在切换会让它的后续操作改到别的行程里）。")
+
+
 def switch(body: dict) -> dict[str, Any]:
     """切换当前行程（只改 active.json，不动任何行程文件）。agent 和聊天栏之后也针对这个行程。"""
     if ms._single_file_mode():
         raise HttpError(400, "当前是单文件模式，不能切换行程。")
+    _busy_guard("切换行程")
     name = body.get("slug")
     if not isinstance(name, str) or not name.strip():
         raise HttpError(400, "缺少行程。")
@@ -711,12 +726,15 @@ def hb_import(body: dict) -> dict[str, Any]:
         radius = int(body.get("radius_m") or 300)
     except (TypeError, ValueError):
         raise HttpError(400, "半径要是数字。")
+    _IMPORTING["n"] += 1
     try:
         msg = ms.import_photo_trip(folder, radius_m=radius, min_photos=int(body.get("min_photos") or 3), album=album,
                                 track=str(body.get("track") or "").strip(), link_photos=bool(body.get("link_photos")),
                                 start_date=str(body.get("start_date") or ""), end_date=str(body.get("end_date") or ""))
     except ms.ToolError as e:
         raise HttpError(400, str(e))
+    finally:
+        _IMPORTING["n"] -= 1
     return {"message": msg}
 
 

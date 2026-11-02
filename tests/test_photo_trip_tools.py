@@ -438,3 +438,24 @@ def test_amap_key_falls_back_to_nanobot_config_env(tmp_path, monkeypatch):
     assert amap_key() == "k123"
     monkeypatch.setenv("AMAP_KEY", "fromenv")
     assert amap_key() == "fromenv"
+
+
+def test_switching_trips_is_blocked_while_the_assistant_is_working(tmp_path, monkeypatch):
+    from tripcore import web, activity as ac
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    s.new_trip(name="计划A", num_days=2)
+    s.new_restore_trip("旧手机")
+    web.switch({"slug": web.ws.active_slug(s._root_dir())})                       # 空闲时可以切
+    cid = ac.start(s._activity_path(), "import_photo_trip", {"album": "x"})
+    with pytest.raises(web.HttpError) as e:
+        web.switch({"slug": "whatever"})
+    assert e.value.status == 409 and "读取照片" in str(e.value) or "助手正在" in str(e.value)
+    with pytest.raises(web.HttpError):
+        web.trip_new_restore({"name": "b"})
+    ac.finish(s._activity_path(), cid, "import_photo_trip", True, "ok", 0.0)
+    web.trip_new_restore({"name": "b"})                                            # 做完就放行
+    web._IMPORTING["n"] = 1
+    with pytest.raises(web.HttpError):
+        web.switch({"slug": "x"})
+    web._IMPORTING["n"] = 0

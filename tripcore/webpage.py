@@ -286,8 +286,8 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="cin"><textarea id="ctext" rows="2" placeholder="对助手说点什么…（Enter 发送，Shift+Enter 换行）"></textarea><button id="csend" class="pri">发送</button></div></div></div>
 <div id="note"></div>
 <div id="home"><div class="hbox"><h2>今天想做什么？</h2><p>两种用法，随时可以在顶部切换。</p>
-<div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span></button>
-<button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span></button></div></div></div>
+<div class="hcards"><button class="hcard" id="home_plan"><b>🗺️ 计划行程</b><span>选景点、排每天的路线，查营业时间、天气和交通。</span><i style="display:block;font-style:normal;color:var(--acc);font-size:13px;margin-top:8px"></i></button>
+<button class="hcard" id="home_restore"><b>📷 恢复行程</b><span>把拍过的照片还原成走过的路线，配上文字，做成手册和笔记。</span><i style="display:block;font-style:normal;color:var(--acc);font-size:13px;margin-top:8px"></i></button></div></div></div>
 <div class="pg" id="rp"><aside id="rp_side"><div id="rp_gate"><div><b>先新建一个恢复行程</b><p>恢复的照片会读进这个行程里，不会改动你现有的行程。</p><button class="pri" id="rp_gate_btn">＋ 恢复新的行程</button></div></div><div class="rtop"><div id="rp_auto"><label class="sw"><input type="checkbox" id="rp_autoc"><span></span></label><b>自动执行</b><small id="rp_autot">逐步确认：助手每做一步改动前先问你</small></div><div class="steps" id="rp_steps"></div></div>
 <div id="rp_body" class="pgbody" data-s="1"></div><div class="rfoot"><button id="rp_prev">上一步</button><span class="tlnote" id="rp_msg"></span><button id="rp_next" class="pri">下一步</button></div></aside>
 <section id="rp_main"><div id="rmap"></div><div id="rmap_chip"></div><div id="rmap_empty">照片恢复出来的地点会出现在这里</div>
@@ -1013,9 +1013,15 @@ $('rp_next').onclick = () => {
   else if (RS.step === 4) rsGo(5);
 };
 document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
-function homeMaybe() { try { if (sessionStorage.getItem('tsHome')) return; } catch (e) {} if (S && !S.days.some(d => d.items.length) && !S.unscheduled.length) $('home').classList.add('on'); }
+function homeMaybe() {
+  try { if (sessionStorage.getItem('tsHome')) return; } catch (e) {}
+  const r = TRIPS_R;                                                    // 每次新打开页面都先选“计划”还是“恢复”，并写出各自会接着哪个行程
+  const hint = (id, k, empty) => { const t = r && !r.single ? lastTrip(r, k) : null; const el = $(id).querySelector('i'); if (el) el.textContent = t ? '接着上次：「' + t.name + '」' : empty; };
+  hint('home_plan', 'plan', '新建一个行程开始'); hint('home_restore', 'restore', '从照片还原走过的路线');
+  $('home').classList.add('on');
+}
 function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {} $('home').classList.remove('on'); }
-$('home_plan').onclick = homeDone; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
+$('home_plan').onclick = () => { homeDone(); pgShow('plan'); }; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
 let VD_ALBUM = '';
