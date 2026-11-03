@@ -776,7 +776,7 @@ def hb_edit(body: dict) -> dict[str, Any]:
 
 def hb_regions(body: dict) -> dict[str, Any]:
     try:
-        return {"message": ms.tag_regions()}
+        return {"message": ms.tag_regions(budget_s=0)}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 

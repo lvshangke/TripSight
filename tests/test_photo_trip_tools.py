@@ -481,3 +481,41 @@ def test_autoname_is_chunked_and_resumable(tmp_path, monkeypatch):
     out2 = s.autoname_stops(budget_s=0)
     assert "全部处理完了" in out2 and len(calls) == n and first < n
     assert "没有需要重新起名" in s.autoname_stops()
+
+
+def test_show_trip_pages_a_multi_year_photo_trip(tmp_path):
+    t0 = datetime(2022, 1, 5, 9, 0)
+    for k in range(7):
+        for i in range(3):
+            _jpg(tmp_path / f"d{k}_{i}.jpg", t0 + timedelta(days=k * 200, minutes=2 * i), 28 + k * 0.1, 121, color=(k, i, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False)
+    assert s._load().meta.num_days > 1000
+    out = s.show_trip(page=1, per_page=3)
+    assert "共 7 天有景点" in out and "第 1/3 页" in out and "page=2" in out and len(out) < 4000 and "（空）" not in out
+    last = s.show_trip(page=3, per_page=3)
+    assert "第 3/3 页" in last and "page=" not in last
+
+
+def test_tag_regions_is_chunked_saves_progress_and_skips_abroad(tmp_path, monkeypatch):
+    t0 = datetime(2026, 6, 19, 8, 0)
+    for k in range(12):
+        for i in range(3):
+            _jpg(tmp_path / f"r{k}_{i}.jpg", t0 + timedelta(hours=k, minutes=i), 28 + k * 0.05, 121 + k * 0.05, color=(k, i, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False)
+    calls = []
+
+    class Fake:
+        def regeo(self, la, lo):
+            calls.append((la, lo))
+            if len(calls) == 3:
+                raise s.AmapError("高德返回错误：INSUFFICIENT_ABROAD_PRIVILEGES")
+            return {"province": "浙江", "city": "台州", "district": f"区{len(calls) % 3}"}
+    monkeypatch.setattr(s, "_amap", lambda: Fake())
+    monkeypatch.setattr(s, "_is_google", lambda c: False)
+    out = s.tag_regions(budget_s=1e-9)
+    assert "还剩" in out and len(calls) == 1
+    out2 = s.tag_regions(budget_s=0)
+    assert "还剩" not in out2 and len(calls) == 12
+    n = len(calls)
+    s.tag_regions(budget_s=0)
+    assert len(calls) == n                                   # 查过的（含境外失败的）不再查

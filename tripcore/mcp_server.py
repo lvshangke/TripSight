@@ -2007,9 +2007,10 @@ def _chapter_labels() -> dict[str, str]:
     return chapter_labels(_load_json_file(_regions_path()))
 
 
-def tag_regions() -> str:
+def tag_regions(budget_s: float = 20.0) -> str:
     """给行程里每个景点标上所在的城市/区县，手册用它分章（比如临海、仙居、天台）。用高德坐标反查：只把每个点的坐标发给高德（用户自己的 key），
-    结果存在本机，已查过的不再查。没有 key 或某个点查不到就不标、不猜，手册照常按天排。调用前告诉用户会把各点坐标发给高德。"""
+    结果存在本机，已查过的不再查。没有 key 或某个点查不到就不标、不猜，手册照常按天排。调用前告诉用户会把各点坐标发给高德。
+    点多时一次只做约 budget_s 秒（默认 20，避免 agent 的工具超时），查到的随时保存；结果写“还剩 N 个”就再调一次接着做。"""
     from .regions import chapter_labels, order_of_appearance
     trip = _load()
     client = _amap()
@@ -2017,26 +2018,52 @@ def tag_regions() -> str:
         raise ToolError("没有可用的高德 key，不能反查城市/区县；手册会按天分，不会乱猜。key 要用户在自己的配置里设置，不要发给我。")
     ids = [it.place_id for d in (trip.plan.days if trip.plan else []) for it in d.items]
     cache = _load_json_file(_regions_path())
-    new = fail = 0
-    for pid in ids:
-        if pid in cache:
-            continue
+    new = fail = streak = 0
+    err = ""
+    stuck = False
+    failed_f = _regions_path().with_name("regions_failed.json")
+    failed = set(_load_json_file(failed_f).get("ids") or [])          # 查过但没结果的点（境外、海上等）：不反复查
+    t_end = time.time() + budget_s if budget_s and budget_s > 0 else None
+    todo = [pid for pid in ids if pid not in cache and pid not in failed]
+
+    def save() -> None:
+        try:
+            _regions_path().write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+            failed_f.write_text(json.dumps({"ids": sorted(failed)}), encoding="utf-8")
+        except OSError as e:
+            raise ToolError(f"保存失败：{e}")
+    done = 0
+    for pid in todo:
+        if done and t_end is not None and time.time() > t_end:
+            break
         pl = trip.place(pid)
+        done += 1
         try:
             r = client.regeo(pl.lat, pl.lon)
-        except AmapError:
-            fail += 1
+        except AmapError as ex:
+            fail += 1; streak += 1; err = err or str(ex)
+            if "ABROAD" in str(ex) or "境外" in str(ex):
+                failed.add(pid)                              # 高德不支持境外：不用再查
+                streak = 0
+            elif streak >= 3 and not new:                    # 一个都没成功还连着报错（key 不对、额度用完）：别再试了
+                stuck = True
+                break
             continue
+        streak = 0
         if r:
             cache[pid] = r
             new += 1
-    try:
-        _regions_path().write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-    except OSError as e:
-        raise ToolError(f"保存失败：{e}")
+        else:
+            failed.add(pid)
+        if done % 20 == 0:
+            save()                                           # 中途被打断也不丢已查到的
+    save()
     labels = chapter_labels(cache)
     chapters = order_of_appearance(ids, labels)
-    return (f"已标注 {new} 个点" + (f"，{fail} 个没查到" if fail else "") + "。" +
+    left = len([x for x in todo if x not in cache and x not in failed])
+    tail = (f"连续报错已停止，原因：{err}。" if stuck else
+            f"还剩 {left} 个没查，请再调用一次 tag_regions 接着做（每次只做约 {int(budget_s)} 秒，避免超时）。" if left > 0 else "")
+    return (f"已标注 {new} 个点" + (f"，{fail} 个没查到" if fail else "") + "。" + tail +
             ("章节：" + " → ".join(chapters) + "。" if chapters else "还没有可用的章节。"))
 
 
@@ -3147,9 +3174,21 @@ def undo() -> str:
     return f"已撤销，当前版本 {new.revision}。\n" + _render(new)
 
 
-def show_trip() -> str:
-    """查看当前行程：每天的景点、交通估算、未安排项、粗略费用。"""
-    return _render(_load())
+def show_trip(page: int = 1, per_page: int = 30) -> str:
+    """查看当前行程：每天的景点、交通估算、未安排项、粗略费用。
+    照片还原的行程可能跨好几年、有上百个有照片的日子：只列有景点的天，每页 per_page 天（默认 30），看下一页传 page=2、3……；
+    想一次看全貌用 restore_status，或者在 TripSight 页面里看。"""
+    trip = _load()
+    if _photo_trip_path().exists() and trip.plan is not None:
+        full = [d.index for d in trip.plan.days if d.items]
+        per = max(1, min(int(per_page), 60))
+        pages = max(1, -(-len(full) // per))
+        pg = max(1, min(int(page), pages))
+        sel = full[(pg - 1) * per: pg * per]
+        head = (f"（照片还原的行程：共 {len(full)} 天有景点、{len(trip.places)} 个点，没有照片的 {trip.meta.num_days - len(full)} 天不列出；"
+                f"现在显示第 {pg}/{pages} 页，第 {sel[0] + 1}–{sel[-1] + 1} 天" + ("，看下一页传 page=" + str(pg + 1) if pg < pages else "") + "）\n") if sel else ""
+        return head + _render(trip, only_days=set(sel))
+    return _render(trip)
 
 
 # ---------------------------------------------------------------------------
@@ -3182,7 +3221,7 @@ def _hours_line(p: Place, d: Optional[date]) -> str:
     return base
 
 
-def _render(trip: Trip) -> str:
+def _render(trip: Trip, only_days: Optional[set] = None) -> str:
     m = trip.meta
     if m.date_mode == DateMode.EXACT and m.start_date and m.end_date:
         when = f"{m.start_date.isoformat()} 至 {m.end_date.isoformat()}"
@@ -3215,6 +3254,8 @@ def _render(trip: Trip) -> str:
             out.append("还没有景点。")
         return "\n".join(out)
     for day in trip.plan.days:
+        if only_days is not None and day.index not in only_days:
+            continue
         st = day_stats(trip, day)
         d = trip.day_date(day.index)
         date_txt = f" {d.isoformat()}（{_WEEKDAYS[d.weekday()]}）" if d else ""
