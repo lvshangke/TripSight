@@ -1438,11 +1438,11 @@ def export_calendar(folder: str = "") -> str:
 
 
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
-                    show_spending: bool = False, spending_categories: Optional[list[str]] = None, card_photos: int = 3, thumb_pins: bool = False) -> str:
+                    show_spending: bool = False, spending_categories: Optional[list[str]] = None, card_photos: int = 3, thumb_pins: bool = False, card_size: float = 1.0) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
     只写本机 ~/Documents/TripSight/，不联网、不连账号，也不会替用户发布。时间只是估算，营业时间标了来源；酒店和花费不会出现。
     默认会放用户挂过的照片（含人像；已去掉定位）；用户说要不露脸、或要公开分享前不想带照片时传 show_photos=false；视频只用用户给的原文件：video_path 是视频路径，
-    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。style 是版式风格：手账（默认）/ 杂志 / 清新 / 胶片 / 海边，只换配色字体，网页、卡片图、PDF 都跟着变。show_spending=true 在手册最后加一页“后记：这一趟的花费”（只有总额和各类别金额，没有商户和明细；数据来自 import_bills 导入的账单，默认不放；放之前要问用户，花费属于隐私），spending_categories 可以只选某几类（门票/餐饮/交通/住宿/购物/其他）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。card_photos=1–5 是每张卡片图放几张照片（默认 3，轮流取这一天各站的照片；没那么多就放有的）。thumb_pins=true 让路线图上有照片的点用圆形缩略图当图钉（没照片的点仍是数字圆点，需要 show_photos）。已有导出不会被覆盖。"""
+    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。style 是版式风格：手账（默认）/ 杂志 / 清新 / 胶片 / 海边，只换配色字体，网页、卡片图、PDF 都跟着变。show_spending=true 在手册最后加一页“后记：这一趟的花费”（只有总额和各类别金额，没有商户和明细；数据来自 import_bills 导入的账单，默认不放；放之前要问用户，花费属于隐私），spending_categories 可以只选某几类（门票/餐饮/交通/住宿/购物/其他）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。card_size=0.6–1.5 是卡片上照片的大小（0.75 小 / 1 中 / 1.3 大，默认 1）；card_photos=1–5 是每张卡片图放几张照片（默认 3，轮流取这一天各站的照片；没那么多就放有的）。thumb_pins=true 让路线图上有照片的点用圆形缩略图当图钉（没照片的点仍是数字圆点，需要 show_photos）。已有导出不会被覆盖。"""
     trip = _load()
     if trip.plan is None or not trip.plan.days:
         raise ToolError("还没有分天，请先 schedule_days。")
@@ -1471,7 +1471,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
         spend = _bl.summarize(led, spending_categories or None)
     try:
         res = build_handbook(trip, export_root(), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins, card_photos=card_photos, day_titles=_day_titles())
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins, card_photos=card_photos, card_size=card_size, day_titles=_day_titles())
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     if basemap:
@@ -1586,6 +1586,47 @@ def _stop_names(keep: list, budget_s: float = 0.0) -> tuple[list[str], int]:
     return [f"{nm} {sp.start:%H:%M}" if cnt[nm] > 1 and found else nm for nm, sp in zip(names, keep)], found
 
 
+def _attach_photos(items: list, root: Path, stops: list, per: int, link: bool) -> tuple[int, int]:
+    """给每个点挂照片，按“每个点先 1 张，再每个点第 2 张……”轮着来：不管总量上限多少，前面的点不会把后面的点的名额占光。"""
+    from . import phototrip as _pt
+    ranked = [(pid, _pt.best_files(root, files, per)) for pid, files in stops]
+    attached = failed = 0
+    for r in range(per):
+        for pid, lst in ranked:
+            if r >= len(lst):
+                continue
+            if len(items) >= _ph.MAX_TOTAL:
+                return attached, failed
+            try:
+                (_ph.add_ref if link else _ph.add)(_photo_dir(), items, str(root / lst[r]), pid, None, "")
+                attached += 1
+            except _ph.PhotoError:
+                failed += 1
+    return attached, failed
+
+
+def fill_stop_photos(per_stop: int = 3, link_photos: bool = False) -> str:
+    """给照片还原行程里“还没有照片”的点补照片（从恢复时用的文件夹/相册里挑每个点最清晰的 per_stop 张，重新编码、去掉定位）。
+    早先的版本总共只放 200 张，点多时后面的点全是空的，用这个补上。已有照片的点不动；原文件被移走的会跳过并说明。"""
+    side = _load_json_file(_photo_trip_path())
+    if not side.get("stops"):
+        raise ToolError("当前行程不是照片还原出来的，没有可补的原照片。")
+    root = Path(side.get("folder") or "/")
+    if not root.is_dir():
+        raise ToolError(f"原照片文件夹不见了：{root}（外接硬盘没接上？）。")
+    trip = _load()
+    have_places = {p.id for p in trip.places}
+    items = _ph.load(_photo_index())
+    has = {x.get("place_id") for x in items}
+    todo = [(r["place_id"], r["files"]) for r in side["stops"] if r["place_id"] in have_places and r["place_id"] not in has and r.get("files")]
+    if not todo:
+        return "每个点都已经有照片了，没有要补的。"
+    attached, failed = _attach_photos(items, root, todo, max(1, min(int(per_stop), 6)), link_photos)
+    _ph.save(_photo_index(), items)
+    return (f"给 {len(todo)} 个没有照片的点补了 {attached} 张照片" + (f"（{failed} 张没挂上：原文件被移走或打不开）" if failed else "") +
+            f"；现在共 {len(items)} 张。重新导出手册就能看到。")
+
+
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
                       radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
                       track: str = "", tz_hours: float = 8.0, link_photos: bool = False, auto_name: bool = True,
@@ -1669,16 +1710,8 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         t.plan = Plan(days=days)
     _save(commit(_load(), mutate))
     items = _ph.load(_photo_index())
-    attached = failed = 0
-    for pid, sp in zip(ids, keep):
-        for f in _pt.best_files(root, sp.files, max(0, min(int(photos_per_stop), 6))):
-            if len(items) >= _ph.MAX_TOTAL:
-                break
-            try:
-                (_ph.add_ref if link_photos else _ph.add)(_photo_dir(), items, str(root / f), pid, None, "")
-                attached += 1
-            except _ph.PhotoError:
-                failed += 1
+    per = max(0, min(int(photos_per_stop), 6 if len(keep) <= 60 else 4 if len(keep) <= 120 else 3))      # 点多时每点少放几张，保证每个点都分到
+    attached, failed = _attach_photos(items, root, list(zip(ids, [sp.files for sp in keep])), per, link_photos)
     _ph.save(_photo_index(), items)
     vids = 0
     if album:
@@ -1796,6 +1829,8 @@ def restore_status() -> str:
         lines.append("如果用户说恢复这个：先确认，再 import_photo_trip(folder 或 album, radius_m)。预览里的点只是候选，没有名字。")
     else:
         lines.append("页面上还没有做过预览。")
+    if _job_line():
+        lines.append(_job_line())
     lines.append(AUTO_FLOW if restore_auto() else CONFIRM_FLOW)
     return "\n".join(lines)
 
@@ -1804,6 +1839,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
     """把同一天里几个从照片还原的停留点合并成一个（比如神仙居景区里的七仙女、神女峰、如意桥其实都在一个景区）。
     保留第一个，其余的照片、拍摄时段并进来，景点位置取各点的加权中心，其余景点从行程里移除。必须是同一天、都是照片还原出来的点；
     调用前先和用户确认合并哪几个。name 不填就沿用第一个的名字。"""
+    _job_guard()
     import datetime as _dt
     ids = list(dict.fromkeys(place_ids))
     if len(ids) < 2:
@@ -1869,6 +1905,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
 def delete_stop(place_id: str) -> str:
     """工作台用：从还原出来的行程里删掉一个停留点（景点、它的照片、拍摄记录、文字一并去掉；原照片文件不动）。
     不受“锁定”限制——锁定只是防止被自动改期，用户自己点删除就是要删。"""
+    _job_guard()
     trip = _load()
     try:
         place = trip.place(place_id)
@@ -1904,6 +1941,82 @@ def delete_stop(place_id: str) -> str:
     return f"已删除「{place.name}」（{n} 张照片的副本一并去掉；你相册里的原照片没动）。"
 
 
+def _job_path() -> Path:
+    return _root_dir() / "restore_job.json"
+
+
+def _job_write(**kw: Any) -> None:
+    """后台任务的进度（页面和助手都读这个文件）。写失败不影响任务。"""
+    try:
+        cur = _load_json_file(_job_path())
+        cur.update(kw)
+        cur["ts"] = time.time()
+        _job_path().write_text(json.dumps(cur, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _job_running() -> bool:
+    j = _load_json_file(_job_path())
+    return j.get("state") == "running" and time.time() - float(j.get("ts") or 0) < 180      # 3 分钟没动静当作进程已经没了
+
+
+def _job_guard() -> None:
+    if _job_running():
+        raise ToolError("后台正在" + str(_load_json_file(_job_path()).get("step") or "处理") + "，先别合并/删除点（会和它抢着改行程）。用 wait_restore_job 等它完成。")
+
+
+def _job_line() -> str:
+    j = _load_json_file(_job_path())
+    if not j:
+        return ""
+    if j.get("state") == "running" and _job_running():
+        return f"后台任务：正在{j.get('step')} {j.get('done', 0)}/{j.get('total', '?')}（用 wait_restore_job 等它，完成前不要合并/删除）。"
+    if j.get("state") == "done":
+        return "后台任务：起名和标注城市/区已完成：" + str(j.get("message") or "")
+    if j.get("state") == "err":
+        return "后台任务出错：" + str(j.get("message") or "")
+    return ""
+
+
+def _naming_worker() -> None:
+    from .activity import Tracked
+    try:
+        with Tracked(_activity_path(), "run_naming_job", {}) as t:
+            a = autoname_stops(budget_s=0)
+            _job_write(step="标注城市/区", done=0, total=0)
+            try:
+                b = tag_regions(budget_s=0)
+            except ToolError as e:
+                b = f"标注城市/区没做：{e}"
+            t.result = a + "\n" + b
+        _job_write(state="done", message=(a + " " + b)[:300])
+    except Exception as e:                                         # 后台线程里的任何错误都记下来，不能悄悄消失
+        _job_write(state="err", message=str(e)[:300])
+
+
+def run_naming_job() -> str:
+    """在后台把所有点的“查地名”和“标注城市/区”一次做完（调用马上返回，不会超时）：点多（上百个）时用这个，
+    不要自己一批一批地调 autoname_stops / tag_regions，也不用中途问用户。之后反复调 wait_restore_job（每次最多等 25 秒）直到它说完成。
+    只把各点坐标发给高德（用户自己的 key）；没有 key 会直接说明原因。后台运行期间不要合并/删除点。"""
+    if _job_running():
+        return "后台已经在做了：" + _job_line()
+    if not amap_key():
+        raise ToolError("没有可用的高德 key，没法查地名（这个 tripcore 进程的环境变量和 ~/.nanobot/config.json 里都读不到 AMAP_KEY）。不要改用其他服务反查。")
+    import threading
+    _job_write(state="running", step="查地名", done=0, total=0, message="", started=time.time())
+    threading.Thread(target=_naming_worker, daemon=True, name="tripcore-naming").start()
+    return "已在后台开始查地名并标注城市/区，调用不会超时。接着调 wait_restore_job，直到它说完成；中间不用问用户。"
+
+
+def wait_restore_job(max_wait_s: float = 25.0) -> str:
+    """等后台任务（run_naming_job）最多 max_wait_s 秒（上限 25，避免工具超时），返回当前进度；没做完就再调一次。"""
+    t_end = time.time() + max(1.0, min(float(max_wait_s), 25.0))
+    while time.time() < t_end and _job_running():
+        time.sleep(1.0)
+    return _job_line() or "没有后台任务在跑。"
+
+
 def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
     """给名字还是“…停留点”（旧版还原留下的）或“区县 · 时间”的还原点重新起名：高德反查（你自己的 key，只发坐标）。
     没有 key 或查不到就改成“区县 · 时间”，不猜。用户手动改过的名字不会动。
@@ -1925,6 +2038,7 @@ def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
     t_end = time.time() + budget_s if budget_s and budget_s > 0 else None
     done = found = 0
     _NAME_ERR.clear()
+    _job_write(step="查地名", done=0, total=len(pending))
     for i in range(0, len(pending), 10):
         if done and t_end is not None and time.time() > t_end:        # 至少做一批，再看时间
             break
@@ -1943,6 +2057,7 @@ def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
             tried |= set(mp)
             tried_f.write_text(json.dumps({"ids": sorted(tried)}), encoding="utf-8")
         done += len(chunk); found += f
+        _job_write(step="查地名", done=done, total=len(pending))
         if _NAME_ERR and not f:                      # 这一批一个都没查到而且有报错（key 不对、额度用完）：别再往下试了
             break
     left = len(pending) - done
@@ -2033,6 +2148,7 @@ def tag_regions(budget_s: float = 20.0) -> str:
         except OSError as e:
             raise ToolError(f"保存失败：{e}")
     done = 0
+    _job_write(step="标注城市/区", done=0, total=len(todo))
     for pid in todo:
         if done and t_end is not None and time.time() > t_end:
             break
@@ -2057,6 +2173,7 @@ def tag_regions(budget_s: float = 20.0) -> str:
             failed.add(pid)
         if done % 20 == 0:
             save()                                           # 中途被打断也不丢已查到的
+            _job_write(step="标注城市/区", done=done, total=len(todo))
     save()
     labels = chapter_labels(cache)
     chapters = order_of_appearance(ids, labels)
@@ -3623,7 +3740,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
 ]

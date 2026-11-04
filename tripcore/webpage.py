@@ -313,13 +313,13 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="可选：只恢复这一段；不填就是全部照片（跨几年也行）">只恢复这段日期 <input type="date" id="hb_d1"> – <input type="date" id="hb_d2"></label>
 <label>景点大小 <select id="hb_r"><option value="300">普通（300 米内算一处）</option><option value="1500">大景区（1500 米内算一处）</option></select></label>
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；照片会读进当前这个恢复行程，其他行程不受影响。</div></div>
-<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
+<div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_fp" title="有些点还没有照片（早先的版本总共只放 200 张）：从原文件夹/相册里给它们补上最清晰的几张">补照片</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <span class="hbimp" id="hb_vidline" style="display:none"><span id="hb_vidn"></span><button id="hb_tovid">去生成粗剪</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
-<label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
+<label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label title="小红书卡片上照片的大小">照片大小 <select id="hb_cs"><option value="0.75">小</option><option value="1" selected>中</option><option value="1.3">大</option></select></label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
 <label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre></div></div>
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="file" data-to="bl_path">选文件</button><button class="pk" data-pick="folder" data-to="bl_path">选文件夹</button><button id="bl_go" class="pri">导入</button>
@@ -882,11 +882,11 @@ function photoRow(row, pid) {
 let pvSeq = 0, pvTimer = null;
 async function hbStylePreview() {
   const my = ++pvSeq; $('hb_pvn').textContent = '正在生成预览…';
-  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, edit: true}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
+  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, edit: true}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
   catch (e) { if (my === pvSeq) $('hb_pvn').textContent = e.message; }
 }
 const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '5' || $('mo').classList.contains('on')) pvTimer = setTimeout(hbStylePreview, 250); };
-$('hb_style').onchange = hbPvSoon; $('hb_cp').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
+$('hb_style').onchange = hbPvSoon; $('hb_cp').onchange = hbPvSoon; $('hb_cs').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
 document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; });
 
 document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (!t) return; const r = t.getBoundingClientRect(), p = $('ptip'); p.textContent = t.dataset.tip; p.style.left = Math.max(8, r.left + r.width / 2 - p.offsetWidth / 2) + 'px'; p.style.top = (r.top - 34) + 'px'; p.className = 'on'; });
@@ -946,7 +946,7 @@ function rmapFromHb() {
 }
 // ---- 助手运行过程（轮询 activity）
 let ACT = {since: 0, evs: new Map(), timer: null, refreshT: null, boot: Date.now() / 1000};
-const ACT_CHANGES = new Set(['import_photo_trip', 'merge_stops', 'delete_stop', 'autoname_stops', 'update_place', 'tag_regions', 'save_stop_story', 'set_day_title', 'new_trip', 'switch_trip', 'undo', 'remove_place', 'add_place', 'add_photo', 'remove_photo']);
+const ACT_CHANGES = new Set(['import_photo_trip', 'run_naming_job', 'fill_stop_photos', 'merge_stops', 'delete_stop', 'autoname_stops', 'update_place', 'tag_regions', 'save_stop_story', 'set_day_title', 'new_trip', 'switch_trip', 'undo', 'remove_place', 'add_place', 'add_photo', 'remove_photo']);
 function actRender() {
   const list = [...ACT.evs.values()].sort((a, b) => a.t0 - b.t0).slice(-14).reverse();
   const running = list.some(e => e.state === 'run');
@@ -967,7 +967,7 @@ async function actPoll() {
 }
 // 助手操作时，左侧跟着走：工具 → 第几步，并把来源、半径填进去
 const ACT_STEP = {list_photo_albums: 1, restore_status: 1, new_restore_trip: 1, import_photo_trip: 3, export_handbook: 5, export_notes: 5, export_calendar: 5, scan_videos: 5, export_rough_cut: 5,
-  view_stop: 4, autoname_stops: 4, tag_regions: 4, merge_stops: 4, delete_stop: 4, update_place: 4, save_stop_story: 4, set_day_title: 4, suggest_day_titles: 4};
+  view_stop: 4, run_naming_job: 4, fill_stop_photos: 4, autoname_stops: 4, tag_regions: 4, merge_stops: 4, delete_stop: 4, update_place: 4, save_stop_story: 4, set_day_title: 4, suggest_day_titles: 4};
 function actFollow(e) {
   const n = ACT_STEP[e.name]; if (!n || PGCUR !== 'restore' || $('rp_gate').classList.contains('on')) return;
   if (e.state === 'run') {
@@ -1181,6 +1181,7 @@ window.addEventListener('message', async ev => {
 $('hb_tovid').onclick = async () => { const d = HB.data; await pgShow('vid'); if (!d) return; if (d.album) { VD_ALBUM = d.album; $('vd_path').value = '照片 App 相册：' + d.album; $('vd_scan').click(); } else if (d.folder) { VD_ALBUM = ''; $('vd_path').value = d.folder; $('vd_scan').click(); } };
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
+$('hb_fp').onclick = async () => { $('hb_fp').disabled = true; try { say('正在补照片…'); const r = await api('hb_fill_photos', {per_stop: 3}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); toast(e.message, true); } finally { $('hb_fp').disabled = false; } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
 $('hb_dirpick').onclick = async () => { try { const r = await api('pick_path', {kind: 'folder', prompt: '请选择导出文件夹'}); if (r.path) { const d = await dirLoad({path: r.path}); if (d) toast('导出文件夹已改为 ' + d.path); } } catch (e) { toast(e.message, true); } };
 $('hb_dirdef').onclick = async () => { const d = await dirLoad({path: ''}); if (d) toast('已恢复默认导出文件夹：' + d.path); };
@@ -1194,7 +1195,7 @@ $('hb_open').onclick = async () => { try { const r = await api('reveal_exports',
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ' + $('hb_dirp').textContent + ' 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
+  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ' + $('hb_dirp').textContent + ' 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
   $('hb_exp').disabled = false;
 };
 

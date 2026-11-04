@@ -177,7 +177,8 @@ def _fig(ph: dict, name: str, edit: bool) -> str:
     return f'<figure{_scale_attrs(ph, edit)}><img src="photos/{ph["file"]}" alt="{cap}" loading="lazy"></figure>'
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None, title="") -> str:
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None, title="", ps: float = 1.0) -> str:
+    ps = max(0.6, min(float(ps or 1.0), 1.5))                    # 卡片上照片整体放大/缩小（小 0.75 / 中 1 / 大 1.3）
     n_st = len(vs)
     many = n_st > 12                                   # 站点太多：照片拼贴让位，名字分两列排，字号随数量缩小，保证每一站都写得下
     rows_h = min(96, 640 // max(1, (n_st + 1) // 2 if many else n_st))
@@ -193,9 +194,9 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .rl{{max-width:540px}}.rl.two{{max-width:none;display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(var(--rows),var(--rh));column-gap:30px}}
 .r{{display:flex;align-items:center;gap:calc(var(--fs)*.4);font-size:var(--fs);height:var(--rh);margin:0;min-width:0}}.r b{{flex:none;width:calc(var(--fs)*1.25);height:calc(var(--fs)*1.25);border-radius:50%;border:3px solid var(--acc);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:calc(var(--fs)*.62)}}
 .r span{{flex:1;min-width:0;line-height:1.12;max-height:calc(var(--rh) - 4px);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}}.r i{{flex:none;font-style:normal;color:var(--sub);font-size:calc(var(--fs)*.72);width:calc(var(--fs)*2.1)}}
-.col{{position:absolute;right:56px;bottom:56px;width:430px;display:grid;gap:14px;grid-template-columns:1fr}}.ph{{background:#fff;padding:12px 12px 36px;box-shadow:0 10px 26px rgba(0,0,0,.2)}}.ph img{{width:100%;display:block;aspect-ratio:4/3;object-fit:cover;object-position:50% 22%}}
+.col{{position:absolute;right:56px;bottom:56px;width:{round(430 * ps)}px;display:grid;gap:14px;grid-template-columns:1fr}}.ph{{background:#fff;padding:12px 12px 36px;box-shadow:0 10px 26px rgba(0,0,0,.2)}}.ph img{{width:100%;display:block;aspect-ratio:4/3;object-fit:cover;object-position:50% 22%}}
 .col.n1 .ph{{transform:rotate(3deg)}}.col.n2 .ph:nth-child(1){{transform:rotate(-2deg)}}.col.n2 .ph:nth-child(2){{transform:rotate(2.5deg)}}
-.col.n2{{width:370px}}.col.n3,.col.n4,.col.n5{{grid-template-columns:1fr 1fr;width:420px}}.col.n3 .ph img,.col.n4 .ph img,.col.n5 .ph img{{aspect-ratio:3/2}}.col.n3 .ph:first-child,.col.n5 .ph:first-child{{grid-column:1/3}}.col.n3 .ph,.col.n4 .ph,.col.n5 .ph{{padding:8px 8px 22px}}
+.col.n2{{width:{round(370 * ps)}px}}.col.n3,.col.n4,.col.n5{{grid-template-columns:1fr 1fr;width:{round(420 * ps)}px}}.col.n3 .ph img,.col.n4 .ph img,.col.n5 .ph img{{aspect-ratio:3/2}}.col.n3 .ph:first-child,.col.n5 .ph:first-child{{grid-column:1/3}}.col.n3 .ph,.col.n4 .ph,.col.n5 .ph{{padding:8px 8px 22px}}
 .col.n3 .ph:nth-child(1){{transform:rotate(-1.5deg)}}.col.n3 .ph:nth-child(2){{transform:rotate(2deg)}}.col.n3 .ph:nth-child(3){{transform:rotate(-2deg)}}.col.n4 .ph:nth-child(odd),.col.n5 .ph:nth-child(odd){{transform:rotate(-1.5deg)}}.col.n4 .ph:nth-child(even),.col.n5 .ph:nth-child(even){{transform:rotate(2deg)}}
 .f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
 <div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t" style="font-size:{max(46, min(84, 840 // max(1, len(title)))) if title else 84}px">{e(title) if title else f"第 {idx + 1} 天"}</div><div class="s">{f"第 {idx + 1} 天 · " if title else ""}{date}{len(vs)} 站 · {km} km</div>
@@ -204,7 +205,7 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3, card_size: float = 1.0, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -325,7 +326,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
 
     if card_preview is not None and card_jobs:                  # 只要第一天卡片的 HTML 给预览用，不渲染图
         idx, d, vs, km, legs, pic = card_jobs[0]
-        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), "")))
+        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), ""), card_size))
     if cards:
         from . import share as _share
         try:
@@ -335,7 +336,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), "")), encoding="utf-8")
+                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), ""), card_size), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()

@@ -859,6 +859,13 @@ def hb_stop_delete(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
 
 
+def hb_fill_photos(body: dict) -> dict[str, Any]:
+    try:
+        return {"message": ms.fill_stop_photos(per_stop=int(body.get("per_stop") or 3))}
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
 def hb_autoname(body: dict) -> dict[str, Any]:
     try:
         return {"message": ms.autoname_stops(budget_s=0, retry_failed=bool(body.get("retry")))}
@@ -948,7 +955,7 @@ def hb_export(body: dict) -> dict[str, Any]:
     out: list[str] = []
     try:
         if fm & {"html", "cards", "pdf"}:
-            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), thumb_pins=bool(body.get("thumb_pins")), card_photos=max(1, min(int(body.get("card_photos") or 3), 5)), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
+            out.append(ms.export_handbook(show_photos=bool(body.get("photos", True)), cards="cards" in fm, basemap=bool(body.get("basemap")), thumb_pins=bool(body.get("thumb_pins")), card_photos=max(1, min(int(body.get("card_photos") or 3), 5)), card_size=float(body.get("card_size") or 1), pdf="pdf" in fm, style=str(body.get("style") or "手账"),
                                        show_spending=bool(body.get("spending")), spending_categories=[str(c) for c in (body.get("spending_cats") or [])] or None))
         if "obsidian" in fm:
             out.append(ms.export_notes(include_photos=bool(body.get("photos", True))))
@@ -997,7 +1004,7 @@ def hb_style_preview(body: dict) -> dict[str, Any]:
     try:
         with tempfile.TemporaryDirectory() as td:
             res = build_handbook(trip, Path(td), photos=items, photo_dir=ms._photo_dir(), show_photos=show, cards=False, stories=ms._load_json_file(ms._stories_path()),
-                                 style=style, regions=ms._chapter_labels(), card_preview=cards, card_photos=max(1, min(int(body.get("card_photos") or 3), 5)), day_titles=ms._day_titles(), edit=bool(body.get("edit")))
+                                 style=style, regions=ms._chapter_labels(), card_preview=cards, card_photos=max(1, min(int(body.get("card_photos") or 3), 5)), card_size=float(body.get("card_size") or 1), day_titles=ms._day_titles(), edit=bool(body.get("edit")))
             root = Path(res["folder"])
 
             def inline(m):
@@ -1283,7 +1290,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):

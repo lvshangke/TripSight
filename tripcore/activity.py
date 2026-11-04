@@ -15,7 +15,7 @@ _SECRET = re.compile(r"key|token|secret|password|passwd|data|uri", re.I)
 
 LABELS = {
     "import_photo_trip": "读取照片并还原行程", "list_photo_albums": "列出照片相册", "view_stop": "查看停留点的照片和候选地名",
-    "autoname_stops": "给停留点查地名", "merge_stops": "合并停留点", "delete_stop": "删除停留点", "tag_regions": "标注所在城市/区",
+    "autoname_stops": "给停留点查地名", "run_naming_job": "后台查地名和标注城市/区", "merge_stops": "合并停留点", "delete_stop": "删除停留点", "tag_regions": "标注所在城市/区",
     "save_stop_story": "保存介绍和感受", "set_day_title": "设置当天标题", "suggest_day_titles": "取出每天的地点，准备起标题",
     "export_handbook": "生成手册", "export_notes": "导出 Obsidian 笔记", "export_calendar": "导出日历", "update_place": "修改景点",
     "show_trip": "查看当前行程", "new_trip": "新建行程", "add_place": "添加景点", "schedule_days": "排每天的行程", "check_plan": "检查行程",

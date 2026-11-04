@@ -519,3 +519,51 @@ def test_tag_regions_is_chunked_saves_progress_and_skips_abroad(tmp_path, monkey
     n = len(calls)
     s.tag_regions(budget_s=0)
     assert len(calls) == n                                   # 查过的（含境外失败的）不再查
+
+
+def test_every_stop_gets_photos_even_beyond_the_old_200_cap_and_fill_repairs(tmp_path):
+    t0 = datetime(2026, 6, 19, 8, 0)
+    for k in range(70):                                         # 70 个点 × 6 张 = 420 > 旧上限 200
+        for i in range(6):
+            _jpg(tmp_path / f"q{k}_{i}.jpg", t0 + timedelta(hours=k * 3, minutes=i), 28 + k * 0.05, 121 + k * 0.05, color=(k, i * 9, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False)
+    ids = {p.id for p in s._load().places}
+    items = s._ph.load(s._photo_index())
+    assert len(ids) == 70 and {x["place_id"] for x in items} == ids         # 每个点都有照片
+    assert max(sum(1 for x in items if x["place_id"] == i) for i in ids) <= 4   # 点多时每点最多 4 张，轮流分配
+    keep = items[:5]                                                # 模拟旧版本：只有前几个点有照片
+    s._ph.save(s._photo_index(), keep)
+    out = s.fill_stop_photos(per_stop=2)
+    assert "补了" in out
+    assert {x["place_id"] for x in s._ph.load(s._photo_index())} == ids
+    assert "已经有照片" in s.fill_stop_photos()
+
+
+def test_naming_job_runs_in_background_and_blocks_merge_while_running(tmp_path, monkeypatch):
+    import time as _t
+    t0 = datetime(2026, 6, 19, 8, 0)
+    for k in range(6):
+        for i in range(3):
+            _jpg(tmp_path / f"j{k}_{i}.jpg", t0 + timedelta(hours=k, minutes=i), 28 + k * 0.05, 121 + k * 0.05, color=(k, i, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False)
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    with pytest.raises(s.ToolError):
+        s.run_naming_job()                                          # 没 key：直接说明，不悄悄失败
+    class Fake:
+        provider = "amap"
+        def where(self, la, lo):
+            _t.sleep(0.05); return {"name": "景点", "district": "区", "city": "市"}
+        def regeo(self, la, lo):
+            return {"province": "浙江", "city": "台州", "district": "区"}
+    monkeypatch.setenv("AMAP_KEY", "x")
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda c, log_path=None: Fake()))
+    monkeypatch.setattr(s, "_amap", lambda: Fake())
+    assert "后台" in s.run_naming_job()
+    assert "后台任务：正在" in s.restore_status() or "已完成" in s.restore_status()
+    for _ in range(100):
+        if "已完成" in s.wait_restore_job(2):
+            break
+    assert "已完成" in s.restore_status()
+    with pytest.raises(s.ToolError):
+        s._job_write(state="running"); s.merge_stops(["p1", "p2"])  # 后台在跑时不让合并
+    s._job_write(state="done")
