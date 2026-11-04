@@ -242,7 +242,8 @@ def _font(size: int):
 
 def _canvas(clips: list[Clip]) -> tuple[int, int]:
     portrait = sum(1 for c in clips if c.h > c.w)
-    return (1080, 1920) if portrait * 2 > len(clips) else (1920, 1080)
+    big, small = (1920, 1080) if all(max(c.w, c.h) >= 1500 for c in clips if c.w) else (1280, 720)
+    return (small, big) if portrait * 2 > len(clips) else (big, small)
 
 
 def card_png(seg: Seg, size: tuple[int, int], path: Path) -> None:
@@ -262,7 +263,10 @@ def card_png(seg: Seg, size: tuple[int, int], path: Path) -> None:
         for i, ((name, _, _), (x, y)) in enumerate(zip(seg.points, pts)):
             r = max(10, W // 120)
             d.ellipse((x - r, y - r, x + r, y + r), fill=(236, 180, 90), outline=(24, 28, 34), width=3)
-            d.text((x, y - r - 8), f"{i + 1} {name}", font=_font(int(H * 0.032)), fill=(240, 236, 226), anchor="ms")
+            # 文字放在点的左侧或右侧（靠哪边空间大放哪边），避免在竖屏里被画布边缘截断
+            right = x < W / 2
+            d.text((x + (r + 10 if right else -(r + 10)), y), f"{i + 1} {name}", font=_font(int(H * 0.03)),
+                   fill=(240, 236, 226), anchor="lm" if right else "rm")
     else:
         d.text((W // 2, H // 2 - int(H * 0.03)), seg.title, font=_font(int(H * 0.09)), fill=(240, 236, 226), anchor="mm")
         if seg.sub:
@@ -318,7 +322,7 @@ def render(segs: list[Seg], out: Path, work: Path, size: tuple[int, int]) -> Non
             if not c.audio:
                 cmd += ["-f", "lavfi", "-t", f"{sg.secs:.2f}", "-i", "anullsrc=r=44100:cl=stereo"]
             fc = f"[0:v]{vf}[b];[b][1:v]overlay=0:0:enable='lt(t,{LOWER_SECS})'[v]"
-            cmd += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a" if c.audio else "2:a", *enc,
+            cmd += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a:0" if c.audio else "2:a", *enc,
                     "-t", f"{sg.secs:.2f}", str(part)]
             _run(cmd)
         parts.append(part)

@@ -105,3 +105,41 @@ def test_jianying_draft_files(tmp_path):
     assert (Path(p) / "draft_content.json").is_file()
     with pytest.raises(v.VideoError):
         v.jianying_draft(segs, (1920, 1080), tmp_path / "不存在", "x", tmp_path / "w")
+
+
+def test_canvas_follows_source_resolution():
+    """720p 的竖屏素材不应被放大成 1080×1920（文件虚大、画质无提升）。"""
+    small = [v.Clip("a.mov", "a.mov", 5.0, None, None, None, 720, 1280, True)]
+    big = [v.Clip("b.mov", "b.mov", 5.0, None, None, None, 1080, 1920, True)]
+    wide = [v.Clip("c.mov", "c.mov", 5.0, None, None, None, 1920, 1080, True)]
+    assert v._canvas(small) == (720, 1280)
+    assert v._canvas(big) == (1080, 1920)
+    assert v._canvas(wide) == (1920, 1080)
+
+
+def test_route_card_labels_stay_inside_canvas(tmp_path):
+    """路线卡片的地名放在点的左/右侧，竖屏里不能被画布边缘截断（左右边缘各留 2% 以上的空白）。"""
+    from PIL import Image
+    seg = v.Seg("card", 2.0, title="第3天的路线", points=[("很长很长的景点名称甲乙丙", 29.2, 121.0), ("另一个很长的景点名称丁戊己", 29.3, 121.2)])
+    png = tmp_path / "c.png"
+    v.card_png(seg, (720, 1280), png)
+    im = Image.open(png).convert("RGB")
+    bg = im.getpixel((0, 0))
+    for x in (0, 1, 718, 719):
+        assert all(im.getpixel((x, y)) == bg for y in range(0, 1280, 4)), f"边缘列 {x} 有内容，文字被截断"
+
+
+@pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")
+def test_render_uses_only_first_audio_track(tmp_path):
+    """新款 iPhone 的 .mov 有第二条空间音频（apac）轨，ffmpeg 解不了；渲染只能取第一条音轨。"""
+    src = tmp_path / "two_audio.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=2", "-f", "lavfi", "-i", "sine=d=2",
+                    "-f", "lavfi", "-i", "sine=f=880:d=2", "-map", "0:v", "-map", "1:a", "-map", "2:a", "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", str(src)], check=True)
+    c = v.probe(src); c.stop = "p1"
+    segs = [s for s in v.plan([c], _order(), clip_max=2, cards=False) if s.kind == "clip"]
+    out = tmp_path / "o.mp4"
+    v.render(segs, out, tmp_path / "w", (320, 240))
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(out)],
+                       capture_output=True, text=True)
+    assert len(r.stdout.split()) == 1
