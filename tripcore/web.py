@@ -21,7 +21,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Optional
@@ -116,8 +116,64 @@ def _issues_block(trip: Trip) -> dict[str, Any]:
     return {"days": days, "places": places}
 
 
+WX_WINDOW_DAYS = 16          # 预报最远约这么多天（Open-Meteo）；再远的天临近了才会查到
+WX_RETRY_S = 3 * 3600
+_wx_running = threading.Event()
+
+
+def _wx_due(trip, today: Optional[date] = None) -> bool:
+    """有日期、且有落在预报范围内的天还没有今天的预报快照。过去的天和太远的天都不算（太远的临近后自然会进范围）。"""
+    if trip.plan is None:
+        return False
+    today = today or date.today()
+    for d in trip.plan.days:
+        dt = trip.day_date(d.index)
+        if dt is None or not (today <= dt <= today + timedelta(days=WX_WINDOW_DAYS)):
+            continue
+        w = trip.weather.get(dt.isoformat())
+        if w is None or w.fetched != today.isoformat():
+            return True
+    return False
+
+
+def maybe_auto_weather(trip) -> bool:
+    """行程在预报范围内且还没查/不是今天查的 → 后台查一次（每 3 小时最多试一次，查不到就静默等下次）。返回是否正在查。
+    只发地点/城市给天气服务，和用户手动 get_weather 一样；TRIPCORE_NO_AUTO_WEATHER=1 可关闭。"""
+    if os.environ.get("TRIPCORE_NO_AUTO_WEATHER"):
+        return False
+    if _wx_running.is_set():
+        return True
+    if not _wx_due(trip):
+        return False
+    mark = ms.trip_path().with_name("weather_auto.json")
+    try:
+        last = float(json.loads(mark.read_text(encoding="utf-8")).get("ts", 0))
+    except Exception:
+        last = 0.0
+    if time.time() - last < WX_RETRY_S:
+        return False
+    try:
+        mark.write_text(json.dumps({"ts": time.time()}), encoding="utf-8")
+    except OSError:
+        return False
+    _wx_running.set()
+
+    def work() -> None:
+        try:
+            with _lock:
+                ms.get_weather()
+        except Exception:
+            pass
+        finally:
+            _wx_running.clear()
+
+    threading.Thread(target=work, daemon=True).start()
+    return True
+
+
 def snapshot() -> dict[str, Any]:
     trip = ms._load()
+    wx_busy = maybe_auto_weather(trip)
     mp = build_map_data(trip)
     by_day = {d["index"]: d for d in mp["days"]}
     days, placed = [], set()
@@ -142,7 +198,7 @@ def snapshot() -> dict[str, Any]:
     orphan_meals = [{"id": m.id, "name": m.name, "after": names.get(m.after_place_id, m.after_place_id)}
                     for m in trip.meals if m.after_place_id not in placed]
     m = trip.meta
-    return {"title": m.name, "trip": _slug(), "issues": _issues_block(trip), "meal_gaps": {str(k): v for k, v in meal_gaps(trip).items()}, "link_sites": _links.templates(), **_daycard.build(trip, {d["index"]: d["timeline"] for d in mp["days"]}), "intros": {p.id: {"text": p.intro, "source": p.intro_source, "day": p.source_day} for p in trip.places if p.intro}, "city": (ms._load_context() or {}).get("city", ""), "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
+    return {"title": m.name, "trip": _slug(), "issues": _issues_block(trip), "meal_gaps": {str(k): v for k, v in meal_gaps(trip).items()}, "link_sites": _links.templates(), **_daycard.build(trip, {d["index"]: d["timeline"] for d in mp["days"]}), "intros": {p.id: {"text": p.intro, "source": p.intro_source, "day": p.source_day} for p in trip.places if p.intro}, "city": (ms._load_context() or {}).get("city", ""), "weather_busy": wx_busy, "revision": trip.revision, "can_undo": bool(trip.history), "days": days, "unscheduled": unscheduled,
             "orphan_meals": orphan_meals,
             "dates": {"start": m.start_date.isoformat() if m.start_date else None, "end": m.end_date.isoformat() if m.end_date else None,
                       "mode": m.date_mode.value, "num_days": m.num_days},

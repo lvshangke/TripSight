@@ -44,3 +44,16 @@ def test_day_route_map_is_per_day_and_excludes_night_hotel():
     from tripcore import share
     h = share.build_share_html(_trip(), show_lodging=True)
     assert h.count('class="dmap"') == 2 and "__dayInit" in h
+
+
+def test_auto_weather_due_only_within_forecast_window():
+    from datetime import date
+    from tripcore import web
+    t = _trip()                                     # 11-07 ~ 11-08
+    assert web._wx_due(t, today=date(2026, 11, 4))              # 在 16 天内且没查过
+    assert not web._wx_due(t, today=date(2026, 10, 1))          # 还太远：临近了才查
+    assert not web._wx_due(t, today=date(2026, 12, 1))          # 已经过去
+    from tripcore.models import WeatherSnap
+    w = {k: WeatherSnap(day_weather="晴", day_temp=20, fetched="2026-11-04") for k in ("2026-11-07", "2026-11-08")}
+    assert not web._wx_due(t.model_copy(update={"weather": w}), today=date(2026, 11, 4))    # 今天已查过
+    assert web._wx_due(t.model_copy(update={"weather": w}), today=date(2026, 11, 5))        # 隔天刷新

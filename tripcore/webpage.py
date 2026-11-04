@@ -383,6 +383,7 @@ async function api(path, body) {
 }
 async function load() {
   try { S = await api('state'); } catch (e) { say(e.message, true); return; }
+  if (S.weather_busy && !window.__wxT) { window.__wxT = setTimeout(() => { window.__wxT = 0; load(); }, 6000); }
   $('rev').textContent = '版本 ' + S.revision; $('undo').disabled = !S.can_undo;
   if (S.map.tiles && (!tileLayer || tileUrl !== S.map.tiles.url)) { if (tileLayer) map.removeLayer(tileLayer); tileUrl = S.map.tiles.url; tileLayer = L.tileLayer(tileUrl, {subdomains: S.map.tiles.sub, maxZoom: 18, minZoom: 3, attribution: S.map.tiles.attr}).addTo(map); $('note').textContent = S.map.tiles.note; }
   await loadTrips();
@@ -570,7 +571,7 @@ function dayHead(d) {
   const block = st.date ? '<small>' + esc(st.weekday) + '</small><b>' + Number(st.date.slice(8, 10)) + '</b><small>' + Number(st.date.slice(5, 7)) + '月</small>' : '<small>第</small><b>' + (d.index + 1) + '</b><small>天</small>';
   const chips = [];
   if (d.weather) chips.push('<span class="chip" title="' + esc(d.weather_full || '') + '">🌤 ' + esc(d.weather) + '</span>');
-  else if (st.date) chips.push('<span class="chip mute" title="还没查这天的天气；让助手“查一下行程这几天的天气”（只在约 16 天内有预报）">🌤 暂无预报</span>');
+  else if (st.date) chips.push('<span class="chip mute" title="' + (S.weather_busy ? '正在自动查天气…' : '预报只覆盖约 16 天内；临近出发时会自动查，不用你操作') + '">🌤 ' + (S.weather_busy ? '正在查天气…' : '暂无预报') + '</span>');
   if (st.places !== undefined) {
     chips.push('<span class="chip">📍 ' + st.places + ' 个景点</span>');
     chips.push('<span class="chip" title="' + (st.km_estimated ? '含估算路段，点“更新路线”后更准' : '真实路线') + '">🚶 ' + (st.km_estimated ? '约 ' : '') + st.km + ' km</span>');
