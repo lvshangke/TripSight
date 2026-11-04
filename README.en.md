@@ -2,20 +2,9 @@
 
 **Your all-in-one travel assistant: plan before you go, check on the road, and rebuild the trip from your photo album when you are back.**
 
-Plug it into your own chat assistant (MCP): **plan → check on the road → restore from photos → record footprints → share**, one line from start to finish.  
-The LLM only understands you and proposes changes; scheduling, opening hours, routes, versioning and undo are deterministic code.
-
-[中文](README.md) · [Setup](docs/SETUP.md) (Chinese) · [Design notes](DESIGN.md) (Chinese)
-
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-570%2B%20passing-brightgreen)
-![MCP tools](https://img.shields.io/badge/MCP%20tools-86-8A2BE2)
-
-<a href="docs/images/poster.png"><img src="docs/images/poster.png" alt="TripSight: plan, restore, record and share"></a>
-
-Plug it into your own chat assistant and plan a trip step by step.  
-**Open source · data stays on your machine · every step checkable and undoable**
+Plug it into your own chat assistant and follow the whole trip, from before departure to after you are back:  
+**plan** (real routes, opening hours, weather, arrival/departure transport, booking reminders) → **check on the road** (navigation, calendar, mobile map) → **restore the trip from your photos** (names, districts, day titles) → **handbook · cards · route animation · travel film** → **footprints and spending**.  
+**Open source · data stays on your machine · every step checkable and undoable · no booking, no payment**
 
 > **The LLM only proposes; scheduling, checking and undo are done by code.** Nothing changes until you confirm.
 
@@ -75,15 +64,31 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 
 **Restore: album → stay points → edit → export.** Every action of the assistant appears in the "Assistant" card.
 
-<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="Restore edit page"></a>
+<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="Restore edit page for the Taizhou trip"></a>
 
-**8 share themes, one click.** Hotels and costs are hidden by default.
+**There are many share formats; two of them in small** (click for full size): 8 share themes and the per-day route maps (plus a route-animation GIF per day). Hotels and costs are hidden by default.
 
-<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 share themes"></a>
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 share themes"></a><br><sub>8 share themes, one click</sub></td>
+<td width="50%" align="center"><a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="Route maps of day 2 and day 3"></a><br><sub>Per-day route maps (optional Amap basemap)</sub></td>
+</tr>
+</table>
 
-**Per-day route maps**, plus a route-animation GIF per day (a PDF cannot play animation).
+**More small features** (older recordings, older UI, still valid):
 
-<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="Route maps of day 2 and day 3"></a>
+<p>
+<img src="docs/images/demo.gif" width="23%" alt="Drag and check">&ensp;
+<img src="docs/images/feat-closed.gif" width="23%" alt="Closures and opening hours">&ensp;
+<img src="docs/images/feat-route.gif" width="23%" alt="Real routes">&ensp;
+<img src="docs/images/feat-weather.gif" width="23%" alt="Weather">
+</p>
+<p>
+<img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&ensp;
+<img src="docs/images/feat-tools.gif" width="23%" alt="Tools">&ensp;
+<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&ensp;
+<img src="docs/images/feat-travelogue.gif" width="23%" alt="Travelogue">
+</p>
 
 <sub>Screens use a demo Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap.</sub>
 

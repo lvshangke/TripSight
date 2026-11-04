@@ -19,14 +19,19 @@
 </p>
 
 <p>
-<a href="docs/images/poster.png">
-<img src="docs/images/poster.png" alt="TripSight：旅行全流程助手——计划行程、恢复行程、记录与分享" width=100%>
+<a href="docs/images/poster.jpg">
+<img src="docs/images/poster.jpg" alt="TripSight：旅行全流程助手——计划行程、恢复行程、记录与分享" width=100%>
 </a>
 </p>
 
 <p>
-接到你自己的聊天助手（MCP）里：<b>计划行程 → 路上提醒 → 恢复行程 → 记录足迹 → 分享</b>，一条线走完。<br>
-<b>开源 · 数据在本机 · 每一步可核对、可撤销</b>
+接到你自己的聊天助手（MCP）里，<b>从出发前到回来后，一条线走完</b>：<br>
+<b>排行程</b>（真实路线、营业时间、天气、大交通、预约提醒）→ <b>路上核对</b>（导航、日历、手机地图）→<br>
+<b>把相册还原成走过的路</b>（自动起名、标区县、起每天的标题）→ <b>手册 · 卡片 · 路线动画 · 旅行短片</b> → <b>足迹与花费</b>。
+</p>
+
+<p>
+<b>开源 · 数据在本机 · 每一步可核对、可撤销 · 不订票、不付款</b>
 </p>
 
 </div>
@@ -111,15 +116,31 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 **恢复行程：相册 → 停留点 → 编辑 → 导出。** 助手的每个动作都出现在左下角的“助手”卡片里。
 
-<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="恢复行程编辑页：停留点、照片、助手完成的 5 个动作"></a>
+<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="恢复行程编辑页：台州的停留点、照片和助手"></a>
 
-**导出与分享：8 种风格，一键切换。** 同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。
+**分享的种类很多，下面是其中两类的缩略展示**（点开看大图）：8 种分享风格，以及每天一张按当天范围放大的路线图（还能导出分天播放的路线动画 GIF）。酒店和花费默认不公开，勾选才带。
 
-<a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格"></a>
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格"></a><br><sub>8 种分享风格，一键切换</sub></td>
+<td width="50%" align="center"><a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="第 2 天、第 3 天的路线图"></a><br><sub>分天路线图（可带高德底图）</sub></td>
+</tr>
+</table>
 
-**路线图：每天一张按当天范围放大的路线图**，可导出分天播放的路线动画 GIF（PDF 本身不能播放动画）。
+**还有这些小功能**（早先录的演示，界面是旧版，功能仍然有效）：
 
-<a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="第 2 天、第 3 天的路线图"></a>
+<p>
+<img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;
+<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆与营业时间">&ensp;
+<img src="docs/images/feat-route.gif" width="23%" alt="真实路线">&ensp;
+<img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">
+</p>
+<p>
+<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转导航">&ensp;
+<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力">&ensp;
+<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;
+<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">
+</p>
 
 <sub>图中为演示用的苏州 3 日行程（天气为真实预报）和作者旧手机的海南相册（只选风景）；底图 © 高德地图。以上截图为演示重放生成。</sub>
 
