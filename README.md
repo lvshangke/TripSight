@@ -14,8 +14,8 @@
 <p>
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
-<img src="https://img.shields.io/badge/tests-452%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-60-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
+<img src="https://img.shields.io/badge/MCP%20tools-86-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -34,50 +34,48 @@
 
 
 
-## 核心功能
+## 看它怎么工作
 
-<!-- <p><b>核心功能</b></p> -->
+TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的“工作台面”**：Agent 只负责听懂你要什么、决定调用哪个工具；排程、检查、查路线、查天气、生成导出这些都由确定性的 MCP 工具完成，每一步都出现在左侧“助手”卡片里，可核对、可撤销。下面是两条完整流程的**演示重放**（完整视频在 [`docs/videos/`](docs/videos/)，点图片可看 mp4）：
 
+<table>
+<tr>
+<td width="50%" valign="top"><b>① 计划行程：说想去哪 → 助手排好、查实、串起路线</b><br><br>
+<a href="docs/videos/plan-flow.mp4"><img src="docs/images/plan-preview.gif" alt="计划行程演示重放：新建行程、聊天加景点、分天、提案确认、选餐厅、记住宿、换真实路线、自动查天气、导出"></a><br>
+<sub>Agent 做的事：把一句话拆成“查坐标→加景点→分 3 天→检查”；发现观前街太早到时<b>提出修改提案</b>，等你回“确认”才执行；找餐厅、记住宿（只记录不预订）；一句话把 11 段换成高德真实路线；工作台打开后<b>自动</b>补天气；最后导出分享页、PDF、日历。</sub></td>
+<td width="50%" valign="top"><b>② 恢复行程：从旧手机相册还原一次走过的旅行</b><br><br>
+<a href="docs/videos/restore-flow.mp4"><img src="docs/images/restore-preview.gif" alt="恢复行程演示重放：选相册、预览、选日期、自动执行、编辑、导出"></a><br>
+<sub>Agent 做的事：打开“自动执行”后，它连续完成<b>还原停留点 → 查地名 → 标注城市/区县 → 给每天起标题 → 补景点照片</b>，停在预览等你确认；耗时步骤在后台跑，不会因工具超时中断；之后可继续编辑，并导出手册、卡片、PDF、路线动画。</sub></td>
+</tr>
+</table>
 
-<p><b>规划与检查</b></p>
-<p><img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;<img src="docs/images/feat-route.gif" width="23%" alt="真实路线"></p>
+<sub>说明：这两段是**演示重放**——用真实引擎生成的数据（计划行程用作者的一次真实对话记录与行程快照；恢复行程用作者旧手机 2024 年 1 月海南三天的相册，只选了风景照片），在真实页面上按真实的步骤顺序回放，**不是**模型现场操作的录屏。地图为高德底图 © 高德地图。</sub>
 
-<p><b>出行前后随时可用</b></p>
-<p><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力"></p>
+### 两种用法，同一条原则
 
-<p><b>回程之后：一键分享发布</b></p>
-<p><img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片"></p>
+| | 计划行程（出发前） | 恢复行程（回来后） |
+|---|---|---|
+| 你说 | “去苏州 3 天，想逛拙政园、狮子林……” | “把我 1 月去海南的照片整理成行程” |
+| Agent 理解 | 景点、日期、节奏、偏好、要改什么 | 从哪个相册/文件夹、哪段日期、要不要自动执行 |
+| 工具确定性完成 | 分天排序、营业时间/闭馆/太赶检查、真实路线、天气、版本与撤销 | 按时间和位置聚类停留点、查地名、补照片、生成手册/卡片/PDF/路线动画 |
+| 你保留的权力 | 提案先看后确认；`undo` 连续撤销；不订票不付款 | 预览后再导出；照片可只引用不复制；AI 文字只写画面里看得到的并标注 |
 
+<details>
+<summary>更早的真实对话录屏（旧版界面，助手回复未改写）</summary>
 
-<!-- <div align="center">
+<table>
+<tr>
+<td width="50%" valign="top"><strong>聊天排行程</strong><br><br>
+<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="400" controls></video></td>
+<td width="50%" valign="top"><strong>粘贴攻略</strong><br><br>
+<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="400" controls></video></td>
+</tr>
+</table>
 
-<p><b>核心功能</b></p>
+<sub>模型使用 Qwen3.7-Max，Harness 使用 nanobot；攻略原文来自作者粘贴的小红书帖子。</sub>
+</details>
 
-<p><b>规划与检查</b></p>
-<p>
-<img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;
-<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆提示">&ensp;
-<img src="docs/images/feat-route.gif" width="23%" alt="真实路线">
-</p>
-
-<p><b>出行前后随时可用</b></p>
-<p>
-<img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&ensp;
-<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转">&ensp;
-<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力">
-</p>
-
-<p><b>回程之后：一键分享发布</b></p>
-<p>
-<img src="docs/images/feat-themes.gif" width="23%" alt="分享风格">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;
-<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">&ensp;
-<img src="docs/images/feat-photos.gif" width="23%" alt="上传照片">
-</p>
-
-</div> -->
-
-> 演示用北京、苏州示例行程和西安回民街；天气是真实预报，游记里的记录是演示用示例数据。真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。
+> 真实使用时有三栏：左侧行程、中间高德地图、右侧聊天助手。
 
 ## ✨ TripSight 是什么
 
@@ -101,23 +99,7 @@ TripSight 把它们拆开解决：
 
 ## 🖼️ 效果一览
 
-**聊天排行程。** 一句话让助手加景点、排成 3 天；改动先出提案，你说“确认”才执行；住宿只记录、不预订；最后一句话把每一段换成高德真实路线。行程栏、地图和聊天同步变化。
-
-**粘贴别人的攻略。** 把一篇小红书攻略贴给助手：已有的景点跳过，新的逐条核对并列成候选（不会直接加入），你挑选后它去高德核对真实店名和营业时间，确认后才加入并重排；放不下的会明说。
-<table>
-<tr>
-<td width="50%" valign="top"><strong>聊天排行程</strong><br><br>
-<video src="https://github.com/user-attachments/assets/a3eaa544-2bc0-4b2e-9973-f13a2541658b" width="400" controls></video></td>
-<td width="50%" valign="top"><strong>粘贴攻略</strong><br><br>
-<video src="https://github.com/user-attachments/assets/72cac7d6-9256-4123-ad7f-be13a17ab16a" width="400" controls></video></td>
-</tr>
-</table>
-
-<sub>以上对话和行程是真实运行的记录（助手的回复没有改写，模型使用Qwen3.7-Max,Harness使用nanobot），地图为高德底图 © 高德地图；攻略原文来自作者粘贴的小红书帖子。</sub>
-
-**自动还原旧照片。** 打开“恢复行程”里的“自动执行”，助手会连续完成：从相册还原停留点 → 查地名 → 标注城市/区县 → 给每天起标题 → 补齐景点照片，期间左侧页面跟着它的动作实时变化，最后停在预览，等你点导出。下面是**演示重放**：用作者旧手机相册里 2024 年 1 月海南三天的真实数据（只选了风景照片），按真实的步骤顺序在页面上重放，不是模型现场操作的录屏。
-
-<img src="docs/images/restore-auto.gif" width="80%" alt="自动还原流程演示重放：还原停留点、查地名、标注区县、起标题、补照片">
+**分享风格与路线图。** 同一份行程可切换 8 种分享风格；路线图叠在高德底图上，每天一张放大的小图，可导出分天播放的路线动画。
 
 <!-- **8 种分享风格，一键切换。** 同一份行程换个样子发给朋友或发布社交媒体；酒店和花费默认不公开，勾选才带。 -->
 
@@ -155,7 +137,7 @@ TripSight 把它们拆开解决：
 | **花费** | 导入微信 / 支付宝账单（本机解析，内容不交给模型），自动盯着文件夹（含 iCloud 云盘）导入，iPhone 快捷指令记 Apple Pay；按类别统计、可改类别并记住商户，可选放进手册后记 |
 | **视频与足迹** | 视频按拍摄时间和位置归到景点，按行程顺序粗剪成片（景点名、每天路线卡片，不加音乐特效），可同时生成剪映草稿；足迹汇总去过几趟、几个城市、大约多少公里，并画足迹地图 |
 | **长期记忆** | 记住你明说过的偏好（不爱走路、不吃辣、住宿预算），新行程自动套用；旅行后记录实际花费与评价，给出偏好建议 |
-| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、530 个自动化测试 |
+| **工程** | 多行程管理、版本历史与撤销、`tripcore doctor` 自检、Apache-2.0、570+ 个自动化测试 |
 
 ## 🔎 数据来源与验证程度
 

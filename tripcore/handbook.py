@@ -160,7 +160,7 @@ CSS = """
 .foot{margin-top:40px;text-align:center;color:var(--sub);font-size:13px}
 """
 JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previousElementSibling.firstElementChild;t.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})})document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';const m=document.createElement('img');m.src=i.src;o.appendChild(m);o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
+t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');box.querySelectorAll('[data-k]').forEach(el=>{el.style.display=el.dataset.k===b.dataset.k?'block':'none';if(el.tagName==='VIDEO'&&el.dataset.k!==b.dataset.k)el.pause()})})});document.querySelectorAll('.gal img,.polaroid img').forEach(i=>i.onclick=()=>{const o=document.createElement('div');o.className='lb';const m=document.createElement('img');m.src=i.src;o.appendChild(m);o.onclick=()=>o.remove();document.body.appendChild(o)})</script>"""
 
 
 def _scale_attrs(ph: dict, edit: bool) -> str:

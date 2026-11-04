@@ -19,7 +19,9 @@ LABELS = {
     "save_stop_story": "保存介绍和感受", "set_day_title": "设置当天标题", "suggest_day_titles": "取出每天的地点，准备起标题",
     "export_handbook": "生成手册", "export_notes": "导出 Obsidian 笔记", "export_calendar": "导出日历", "update_place": "修改景点",
     "show_trip": "查看当前行程", "new_trip": "新建行程", "add_place": "添加景点", "schedule_days": "排每天的行程", "check_plan": "检查行程",
-    "open_workbench": "打开 TripSight 页面", "undo": "撤销上一步", "list_trips": "列出行程", "switch_trip": "切换行程",
+    "lookup_coords": "查询地点坐标", "propose_change": "生成修改提案", "apply_proposal": "套用你确认的提案", "find_food": "按店名找餐厅", "choose_food": "记下选定的餐厅",
+    "suggest_lodging": "推荐住在哪一带", "add_lodging": "记录住宿", "refine_routes": "换成高德真实路线", "submit_candidates": "整理攻略里的候选地点", "adopt_candidates": "把选中的候选加进行程",
+    "get_weather": "查天气预报", "follow_source_days": "照搬游记的分天", "create_amap_map": "生成高德专属地图", "draft_travelogue": "整理游记事实骨架", "open_workbench": "打开 TripSight 页面", "undo": "撤销上一步", "list_trips": "列出行程", "switch_trip": "切换行程",
 }
 
 
@@ -60,7 +62,10 @@ def label_of(name: str) -> str:
         return LABELS[name]
     try:
         from .tools_catalog import CATALOG
-        return CATALOG[name][2].rstrip("。")[:22]
+        d = CATALOG[name][2]
+        for sep in ("，", "、", "（", "。", "；"):       # 取第一小句，不在句子中间截断
+            d = d.split(sep)[0]
+        return d[:22]
     except Exception:
         return name
 

@@ -57,3 +57,17 @@ def test_auto_weather_due_only_within_forecast_window():
     w = {k: WeatherSnap(day_weather="晴", day_temp=20, fetched="2026-11-04") for k in ("2026-11-07", "2026-11-08")}
     assert not web._wx_due(t.model_copy(update={"weather": w}), today=date(2026, 11, 4))    # 今天已查过
     assert web._wx_due(t.model_copy(update={"weather": w}), today=date(2026, 11, 5))        # 隔天刷新
+
+
+def test_handbook_scripts_are_valid_js(tmp_path):
+    """手册里内嵌的脚本曾少一个分号，整段脚本报错（照片点击放大、视频标签页都失效）。"""
+    import re, shutil, subprocess
+    from tripcore.handbook import JS
+    node = shutil.which("node")
+    if node is None:
+        return
+    code = "\n".join(re.findall(r"<script>(.*?)</script>", JS, re.S))
+    f = tmp_path / "hb.js"
+    f.write_text(code, encoding="utf-8")
+    r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
