@@ -1363,14 +1363,78 @@ def _film_meta(order: list[dict]) -> dict:
     return {"name": trip.meta.name, "range": rng, "stats": stats}
 
 
+def _film_basemap_fn():
+    """旅行短片路线卡用的高德底图：返回 (fn, 说明)。fn(points, (宽, 高)) → {img, stops, poly, sidx, note}。
+    只在用户明确打开时才用：国内行程 + 用户自己的 AMAP_KEY。发给高德的：底图中心点/缩放/图片大小，和相邻景点之间的起终点坐标（要驾车路径）；
+    景点名不发。路径是高德“驾车路径”示意，不是你实际走过的路。"""
+    import base64
+    import io
+    from PIL import Image
+    from .amap import AmapClient
+    from .basemap import Basemap, Projection, choose_view
+    from .coords import wgs84_to_gcj02
+    trip = _load()
+    if trip_region(trip) != "cn":
+        return None, "境外行程不支持高德底图，路线卡用简化线条图。"
+    client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+    if client is None:
+        return None, "没有 AMAP_KEY，路线卡用简化线条图。"
+    bm = Basemap(client, trip_path().with_name("share") / "basemap-cache")
+    cache_f = trip_path().with_name("share") / "film-route-cache.json"
+    cache = _load_json_file(cache_f) if cache_f.exists() else {}
+
+    def road(a, b):
+        k = f"{a[0]:.5f},{a[1]:.5f}>{b[0]:.5f},{b[1]:.5f}"
+        if k not in cache:
+            try:
+                cache[k] = [list(p) for p in client.route("drive", a[0], a[1], b[0], b[1]).path]
+            except Exception:
+                cache[k] = []
+            try:
+                cache_f.parent.mkdir(parents=True, exist_ok=True)
+                cache_f.write_text(json.dumps(cache), encoding="utf-8")
+            except OSError:
+                pass
+        return [tuple(p) for p in cache[k]]
+
+    def fn(points, dims):
+        bw, bh = dims
+        sc = min(1.0, 1000.0 / max(bw, bh))
+        vw, vh = max(64, int(bw * sc)), max(64, int(bh * sc))
+        stops = [wgs84_to_gcj02(la, lo) for _, la, lo in points]
+        polyg, sidx = [stops[0]], [0]
+        for i in range(len(points) - 1):
+            mid = [wgs84_to_gcj02(*p) for p in road((points[i][1], points[i][2]), (points[i + 1][1], points[i + 1][2]))]
+            polyg += mid + [stops[i + 1]]
+            sidx.append(len(polyg) - 1)
+        view = choose_view(polyg, vw, vh, max(36.0, 0.14 * min(vw, vh)))
+        uri = bm.fetch(view)
+        if not uri:
+            raise RuntimeError("; ".join(bm.failures) or "底图取不到")
+        img = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1]))).convert("RGB").resize((bw, bh), Image.LANCZOS)
+        pr = Projection(view)
+        q = lambda p: (pr.xy(p[0], p[1])[0] / sc, pr.xy(p[0], p[1])[1] / sc)
+        return {"img": img, "stops": [q(p) for p in stops], "poly": [q(p) for p in polyg], "sidx": sidx,
+                "note": "路线按高德驾车路径示意 · 地图 © 高德地图"}
+
+    return fn, ""
+
+
 def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True, intro_outro: bool = True,
-              style: str = "手账", jianying_dir: str = "", draft_name: str = "", album: str = "", progress=None) -> dict:
+              style: str = "手账", jianying_dir: str = "", draft_name: str = "", album: str = "", progress=None,
+              basemap: bool = False) -> dict:
     """export_rough_cut 的实现（网页也用它，可以传 progress(done, total) 回调）。返回 {message, mp4, segments}。"""
     _v, clips, bad, n, order = _video_scan(folder, album)
     try:
         segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards),
                        meta=_film_meta(order) if intro_outro else None, day_titles=_day_titles())
         size = _v._canvas(clips)
+        bm_note = ""
+        if basemap:
+            fn, bm_note = _film_basemap_fn()
+            for sg in segs:
+                if fn and sg.variant == "route":
+                    sg.extra["base_fn"] = fn
         out_dir = export_root() / "短片"
         out_dir.mkdir(parents=True, exist_ok=True)
         mp4 = out_dir / "旅行短片.mp4"
@@ -1399,18 +1463,23 @@ def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bo
         msg += f"\n另有 {len(clips) - n} 段没归到景点，没放进去。"
     if draft:
         msg += f"\n剪映草稿：{draft}"
+    if basemap:
+        msg += "\n" + (bm_note or "路线卡用了高德底图和驾车路径示意。")
     msg += "\n没有配乐和特效，需要的话在剪映里再加；视频若含人脸或路人，发布前提醒用户。"
     return {"message": msg, "mp4": str(mp4), "seconds": round(total), "clips": sum(1 for s in segs if s.kind == "clip")}
 
 
 def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
-                     jianying_dir: str = "", draft_name: str = "", album: str = "", style: str = "手账", intro_outro: bool = True) -> str:
+                     jianying_dir: str = "", draft_name: str = "", album: str = "", style: str = "手账", intro_outro: bool = True,
+                     basemap: bool = False) -> str:
     """把用户的视频素材按行程顺序剪成一条旅行短片：片头（行程名、日期、几天几处）→ 每天一张标题卡（有“每天的标题”就用它，并列出当天景点）和一张画线动画的当天路线卡 →
     景点视频（背景模糊填充、统一音量、景点名字幕条）→ 片尾；相邻段交叉淡化。每个景点取中间一段（最多 clip_max 秒）；target_seconds=0 表示不限长度，否则自动缩短每段、必要时每个景点删几段。
     style 是版式色调，和手册风格同名（手账/杂志/清新/胶片/海边）。输出到 ~/Documents/TripSight/短片/：旅行短片.mp4、封面.png、字幕 .srt、片段清单 .md。
     视频在照片 App 相册里时给 album=相册名（不复制）。jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；打不开就用 mp4+srt）。
+    basemap=true 让路线卡用高德底图和高德驾车路径（沿真实道路，仅国内、需要用户自己的 AMAP_KEY）：会联网，发给高德的是底图中心点/缩放/图片大小和相邻景点的坐标（不发景点名）；
+    路径只是“驾车路径示意”，不是用户实际走过的；默认关闭，用之前告诉用户并等他同意。
     不加配乐和特效；视频内容不会交给模型，只用拍摄时间、位置和时长。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
-    return make_film(folder, target_seconds, clip_max, cards, intro_outro, style, jianying_dir, draft_name, album)["message"]
+    return make_film(folder, target_seconds, clip_max, cards, intro_outro, style, jianying_dir, draft_name, album, basemap=basemap)["message"]
 
 
 def footprint(basemap: bool = False) -> str:

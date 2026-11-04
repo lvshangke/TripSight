@@ -142,3 +142,24 @@ def test_render_uses_only_first_audio_track(tmp_path):
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(out)],
                        capture_output=True, text=True)
     assert len(r.stdout.split()) == 1
+
+
+def test_route_card_with_basemap_uses_given_image_and_path():
+    """路线卡给了底图函数：底图被贴上，线沿给定路径画（不是站点间直线），点位按给定坐标。"""
+    from PIL import Image
+    from tripcore import video as v
+    pts = [("甲", 28.0, 120.0), ("乙", 28.1, 120.1)]
+    seg = v.Seg("card", 3.0, title="第1天的路线", points=pts, variant="route")
+    called = []
+
+    def fn(points, dims):
+        called.append(dims)
+        w, h = dims
+        return {"img": Image.new("RGB", (w, h), (10, 200, 10)), "stops": [(w * 0.2, h * 0.8), (w * 0.8, h * 0.2)],
+                "poly": [(w * 0.2, h * 0.8), (w * 0.2, h * 0.2), (w * 0.8, h * 0.2)], "sidx": [0, 2], "note": "示意"}
+    seg.extra["base_fn"] = fn
+    im = v._route_card(seg, (720, 1280), v._pal("手账"), 1.0)
+    assert called and im.getpixel((360, 700)) != v._bg((720, 1280), v._pal("手账")).getpixel((360, 700))
+    seg2 = v.Seg("card", 3.0, title="t", points=pts, variant="route")
+    seg2.extra["base_fn"] = lambda p, d: (_ for _ in ()).throw(RuntimeError("没网"))
+    assert v._route_card(seg2, (720, 1280), v._pal("手账"), 1.0).size == (720, 1280)     # 取不到底图退回线条图

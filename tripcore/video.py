@@ -378,39 +378,70 @@ def _project(points: list, size: tuple[int, int]) -> list[tuple[float, float]]:
 
 
 def _route_card(seg: "Seg", size: tuple[int, int], pal: dict, progress: float = 1.0):
-    """路线卡：路线按顺序一段段“画出来”，到达的点亮起并显示名字；progress 0~1。"""
+    """路线卡：路线按顺序一段段“画出来”，到达的点亮起并显示名字；progress 0~1。
+    seg.extra["base_fn"] 给了就把线画在真实地图底图上（fn 返回底图和已投影好的路线）；没有就是简化的等比线条图。"""
     import math
-    from PIL import ImageDraw
+    from PIL import Image, ImageDraw
     W, H = size
     im = _bg(size, pal)
     d = ImageDraw.Draw(im)
     ink, sub, acc = _rgb(pal["ink"]), _rgb(pal["sub"]), _rgb(pal["acc"])
     _tracked(d, W / 2, H * 0.115, "ROUTE", _font(int(H * 0.022)), acc, W * 0.012, center=True)
     d.text((W / 2, H * 0.165), seg.title, font=_font(int(H * 0.044)), fill=ink, anchor="ms", stroke_width=max(1, int(H * 0.001)), stroke_fill=ink)
-    pts = _project(seg.points, size)
-    seglen = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    box = (int(W * 0.06), int(H * 0.215), int(W * 0.94), int(H * 0.86))
+    base = None
+    fn = seg.extra.get("base_fn")
+    if fn:
+        if "_base" not in seg.extra:
+            try:
+                seg.extra["_base"] = fn(seg.points, (box[2] - box[0], box[3] - box[1]))
+            except Exception:
+                seg.extra["_base"] = None
+        base = seg.extra["_base"]
+    if base:
+        rad = int(H * 0.012)
+        mask = Image.new("L", base["img"].size, 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, mask.width - 1, mask.height - 1), radius=rad, fill=255)
+        im.paste(base["img"], box[:2], mask)
+        d.rounded_rectangle(box, radius=rad, outline=_rgb(pal["bg2"]), width=max(2, int(H * 0.003)))
+        pts = [(box[0] + x, box[1] + y) for x, y in base["stops"]]
+        poly = [(box[0] + x, box[1] + y) for x, y in base["poly"]]
+        sidx = base["sidx"]
+        bounds = box
+        if base.get("note"):
+            d.text((W / 2, box[3] + H * 0.03), base["note"], font=_font(int(H * 0.016)), fill=sub, anchor="mm")
+    else:
+        pts = _project(seg.points, size)
+        poly, sidx = pts, list(range(len(pts)))
+        bounds = (W * 0.05, H * 0.2, W * 0.95, H * 0.92)
+    seglen = [math.dist(poly[i], poly[i + 1]) for i in range(len(poly) - 1)]
     total = sum(seglen) or 1.0
     cum = [0.0]
     for L in seglen:
         cum.append(cum[-1] + L)
     reach = progress * total
     lw = max(4, int(H * 0.005))
+    casing = _rgb(pal["bg"])
+    drawn = []
     for i, L in enumerate(seglen):                                  # 已画出的线段（含正在画的那一段）
         if reach <= cum[i]:
             break
         t = min(1.0, (reach - cum[i]) / (L or 1))
-        a, b = pts[i], pts[i + 1]
-        e = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+        a, b = poly[i], poly[i + 1]
+        drawn.append((a, (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)))
+    if base:                                                        # 底图上加一圈浅色描边，线更清楚
+        for a, e in drawn:
+            d.line([a, e], fill=casing, width=lw + max(4, int(H * 0.004)), joint="curve")
+    for a, e in drawn:
         d.line([a, e], fill=acc, width=lw)
         d.ellipse((e[0] - lw / 2, e[1] - lw / 2, e[0] + lw / 2, e[1] + lw / 2), fill=acc)
     f = _font(int(H * 0.03))
     r = max(12, int(H * 0.012))
-    margin = W * 0.05
     placed: list[tuple] = []
     for i, ((name, _, _), (x, y)) in enumerate(zip(seg.points, pts)):
-        if reach + 1e-6 < cum[i]:
+        if reach + 1e-6 < cum[sidx[i]]:
             continue
-        d.ellipse((x - r * 1.5, y - r * 1.5, x + r * 1.5, y + r * 1.5), fill=_rgb(pal["bg"]), outline=acc, width=max(3, r // 4))
+        d.ellipse((x - r * 1.5, y - r * 1.5, x + r * 1.5, y + r * 1.5), fill=casing, outline=acc, width=max(3, r // 4))
         d.text((x, y), str(i + 1), font=_font(int(r * 1.5)), fill=acc, anchor="mm")
         label = name if d.textlength(name, font=f) < W * 0.62 else name[:12] + "…"
         w = d.textlength(label, font=f); gap = r * 1.5 + 12; hh = f.size * 0.62
@@ -419,14 +450,15 @@ def _route_card(seg: "Seg", size: tuple[int, int], pal: dict, progress: float = 
         pick = None
         for cx, cy in cands:
             rect = (cx, cy - hh, cx + w, cy + hh)
-            if rect[0] < margin or rect[2] > W - margin or rect[1] < H * 0.2 or rect[3] > H * 0.92:
+            if rect[0] < bounds[0] + 8 or rect[2] > bounds[2] - 8 or rect[1] < bounds[1] or rect[3] > bounds[3]:
                 continue
             if any(not (rect[2] < q[0] or rect[0] > q[2] or rect[3] < q[1] or rect[1] > q[3]) for q in placed):
                 continue
             hit = False
-            for (ax, ay), (bx, by) in zip(pts, pts[1:]):
-                for t in range(0, 41):
-                    px, py = ax + (bx - ax) * t / 40, ay + (by - ay) * t / 40
+            for (ax, ay), (bx, by) in zip(poly, poly[1:]):
+                n = max(1, int(math.dist((ax, ay), (bx, by)) / 6))
+                for t in range(0, n + 1):
+                    px, py = ax + (bx - ax) * t / n, ay + (by - ay) * t / n
                     if rect[0] - 6 <= px <= rect[2] + 6 and rect[1] - 6 <= py <= rect[3] + 6:
                         hit = True
                         break
@@ -436,10 +468,13 @@ def _route_card(seg: "Seg", size: tuple[int, int], pal: dict, progress: float = 
                 pick = (cx, cy, rect)
                 break
         if pick is None:
-            cx = max(margin, min(x - w / 2, W - margin - w)); cy = y - gap - hh
+            cx = max(bounds[0] + 8, min(x - w / 2, bounds[2] - 8 - w)); cy = y - gap - hh
             pick = (cx, cy, (cx, cy - hh, cx + w, cy + hh))
         tx, ty, rect = pick
         placed.append(rect)
+        if base:                                                    # 地图上文字加底色块，避免被街道和注记盖住
+            pad = int(H * 0.007)
+            d.rounded_rectangle((rect[0] - pad, rect[1] - pad, rect[2] + pad, rect[3] + pad), radius=pad, fill=casing)
         d.text((tx, ty), label, font=f, fill=ink, anchor="lm")
     _footer(d, W, H, pal)
     return im
