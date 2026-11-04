@@ -14,8 +14,9 @@ from tripcore.webpage import page_html
 
 def test_page_has_new_entries():
     PAGE = page_html()
-    for k in ('data-pg="vid"', 'data-pg="fp"', 'id="sh_cal"', 'id="vd_cut"', 'id="fp_frame"'):
+    for k in ('data-pg="fp"', 'id="sh_cal"', 'id="hv_go"', 'id="fp_frame"'):
         assert k in PAGE, k
+    assert 'data-pg="vid"' not in PAGE and 'id="pane_vid"' not in PAGE
 
 
 def test_calendar_export_needs_dates_then_writes_ics(server, tmp_path):
@@ -164,9 +165,9 @@ def test_new_restore_trip_is_an_empty_restore_shell_and_import_fills_it(tmp_path
     assert web.hb_state()["name"] == "台州周末"
 
 
-def test_video_page_has_groups_and_preview_slots():
+def test_restore_has_film_option_with_groups_and_preview():
     PAGE = page_html()
-    for k in ('id="vd_groups"', 'id="vd_prev"', "vdRender", "r.video"):
+    for k in ('id="hb_vid"', 'id="hv_groups"', 'id="hv_prev"', "hvRender", "video_status"):
         assert k in PAGE, k
 
 
@@ -187,7 +188,29 @@ def test_video_scan_groups_cut_preview_and_range(server, tmp_path):
     assert code == 200 and r["total"] == 2 and r["assigned"] == 1
     assert r["groups"][0]["clips"][0]["file"] == "a.mov" and r["lost"][0]["file"] == "c.mov"
     code, r = call(server, "/tok/api/video_cut", {"folder": str(vids), "target_seconds": 10, "clip_max": 2})
-    assert code == 200 and r["video"].startswith("video/rough-cut.mp4")
-    req = urllib.request.Request(server + "/tok/" + r["video"], headers={"Range": "bytes=0-99"})
+    assert code == 200 and r["started"] is True
+    import time
+    from tripcore.web import video_status as web_status
+    for _ in range(300):
+        j = web_status()
+        if j["state"] != "run":
+            break
+        time.sleep(0.5)
+    assert j["state"] == "ok", j
+    assert j["video"].startswith("video/film.mp4")
+    req = urllib.request.Request(server + "/tok/" + j["video"], headers={"Range": "bytes=0-99"})
     with urllib.request.urlopen(req, timeout=5) as resp:
         assert resp.status == 206 and len(resp.read()) == 100 and resp.headers["Content-Range"].startswith("bytes 0-99/")
+
+
+def test_page_scripts_are_valid_javascript(tmp_path):
+    """整页脚本语法要对（改页面时多一个括号会让整页不能用，其它测试发现不了）。"""
+    import re
+    import shutil
+    import subprocess
+    if not shutil.which("node"):
+        pytest.skip("需要 node")
+    for i, code in enumerate(re.findall(r"<script[^>]*>(.*?)</script>", page_html(), re.S)):
+        f = tmp_path / f"p{i}.js"; f.write_text(code, encoding="utf-8")
+        r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr[:400]

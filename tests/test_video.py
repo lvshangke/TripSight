@@ -89,9 +89,9 @@ def test_mcp_tools_end_to_end(tmp_path):
     with pytest.raises(s.ToolError):
         s.scan_videos(str(tmp_path / "没有"))
     res = s.export_rough_cut(str(vids), target_seconds=20, clip_max=2)
-    mp4 = Path(res.split("已粗剪：")[1].split("（")[0])
-    assert mp4.is_file() and (mp4.parent / "粗剪.srt").is_file() and "另有 1 段没归到景点" in res
-    assert "没有音乐" in res
+    mp4 = Path(res.split("已生成旅行短片：")[1].split("（")[0])
+    assert mp4.is_file() and (mp4.parent / "旅行短片.srt").is_file() and "另有 1 段没归到景点" in res
+    assert "没有配乐" in res
 
 
 @pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")
@@ -124,9 +124,8 @@ def test_route_card_labels_stay_inside_canvas(tmp_path):
     png = tmp_path / "c.png"
     v.card_png(seg, (720, 1280), png)
     im = Image.open(png).convert("RGB")
-    bg = im.getpixel((0, 0))
-    for x in (0, 1, 718, 719):
-        assert all(im.getpixel((x, y)) == bg for y in range(0, 1280, 4)), f"边缘列 {x} 有内容，文字被截断"
+    for x, ref in ((0, 10), (1, 10), (718, 710), (719, 710)):            # 底是渐变：边缘列应和靠内几像素的同一行背景一致
+        assert all(im.getpixel((x, y)) == im.getpixel((ref, y)) for y in range(0, 1280, 4)), f"边缘列 {x} 有内容，文字被截断"
 
 
 @pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")

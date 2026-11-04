@@ -8,7 +8,7 @@ TEMPLATE = r"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TripSight 工作台</title>
-<style>__CSS__.vdsum{margin:10px 0 6px}.vdg{background:#fffdf8;border:1px solid #eadfcb;border-radius:12px;padding:10px 14px;margin:8px 0}.vdh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.vdd{background:#c4553a;color:#fff;border-radius:99px;padding:1px 10px;font-size:12px}.vdn{color:#7a7468;font-size:12px;margin-left:auto}.vdc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.vdc span{background:#f3ead9;border-radius:99px;padding:2px 10px;font-size:12px}.vdlost{border-style:dashed}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
+<style>__CSS__.hbvid{width:100%;margin-top:14px;padding:14px;border:1px solid #eadfcb;border-radius:14px;background:#fffdf8}.hvh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.hvrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0}.hvbar{width:120px;height:6px;border-radius:99px;background:#eadfcb;overflow:hidden}.hvbar i{display:block;height:100%;width:0;background:#c4553a;transition:width .4s}.hvjy{margin-top:8px}.vdsum{margin:10px 0 6px}.vdg{background:#fffdf8;border:1px solid #eadfcb;border-radius:12px;padding:10px 14px;margin:8px 0}.vdh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.vdd{background:#c4553a;color:#fff;border-radius:99px;padding:1px 10px;font-size:12px}.vdn{color:#7a7468;font-size:12px;margin-left:auto}.vdc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.vdc span{background:#f3ead9;border-radius:99px;padding:2px 10px;font-size:12px}.vdlost{border-style:dashed}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
 </style>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
@@ -270,7 +270,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .nbtn{font-size:13px!important;padding:5px 12px!important;border:1px solid var(--line)!important}#bin{position:absolute;right:16px;top:50px;width:340px;max-height:60vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px;display:none}#bin.on{display:block}#bin .br{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dotted var(--line);font-size:13px}#bin .br span{flex:1}
 </style></head><body>
 <div id="toast"></div><div id="ptip"></div>
-<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
+<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
 <div id="app"><div id="side">
 <header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="refine" title="给还没查过的路段查真实路线（会联网查高德，用你自己的 key）">更新路线</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
@@ -295,7 +295,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="rp_act"><div class="ah"><span class="dot" id="act_dot"></span><b id="act_title">助手</b><span class="tlnote" id="act_sub">空闲</span><button id="act_fold" title="收起/展开">▾</button></div><div id="act_list"></div></div>
 <button id="rp_ctog" title="显示/隐藏助手对话">💬</button></section>
 <aside id="rp_chat"></aside></div>
-<div class="pg" id="pg_bill"><div class="pgbody" id="pgb_bill"></div></div><div class="pg" id="pg_fp"><div class="pgbody" id="pgb_fp"></div></div><div class="pg" id="pg_vid"><div class="pgbody" id="pgb_vid"></div></div>
+<div class="pg" id="pg_bill"><div class="pgbody" id="pgb_bill"></div></div><div class="pg" id="pg_fp"><div class="pgbody" id="pgb_fp"></div></div>
 <div id="mo"><div class="box"><div class="top"><div class="tabs"><button data-t="share" class="on">分享</button><button data-t="hb">手册</button><button data-t="tools">能力</button></div><button id="mo_close">关闭</button></div>
 <div class="pane on" id="pane_share"><div class="ctl"><b>可分享的行程图</b>
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
@@ -316,12 +316,18 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label title="预览地图加高德底图：只把地图中心点、缩放级别发给高德，不发照片和每个点的位置"><input type="checkbox" id="hb_pvbm" checked> 预览地图带底图（联网）</label><button id="hb_pv">先预览</button><button id="hb_go" class="pri">读取照片</button><div id="hb_pvo" style="width:100%"></div><div class="tlnote">只读取这台电脑上的这个文件夹，不联网；照片会读进当前这个恢复行程，其他行程不受影响。</div></div>
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_fp" title="有些点还没有照片（早先的版本总共只放 200 张）：从原文件夹/相册里给它们补上最清晰的几张">补照片</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
-<div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span> <span class="hbimp" id="hb_vidline" style="display:none"><span id="hb_vidn"></span><button id="hb_tovid">去生成粗剪</button></span> <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
+<div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span>  <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label title="小红书卡片上照片的大小">照片大小 <select id="hb_cs"><option value="0.75">小</option><option value="1" selected>中</option><option value="1.3">大</option></select></label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
-<label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre></div></div>
+<label><input type="checkbox" id="hb_sp"> 最后加一页“花费”（只有总额和各类别，没有商户）</label><span id="hb_spc" style="display:none"><label><input type="checkbox" class="hbsc" value="门票" checked> 门票</label><label><input type="checkbox" class="hbsc" value="餐饮" checked> 餐饮</label><label><input type="checkbox" class="hbsc" value="交通" checked> 交通</label><label><input type="checkbox" class="hbsc" value="住宿" checked> 住宿</label><label><input type="checkbox" class="hbsc" value="购物" checked> 购物</label><label><input type="checkbox" class="hbsc" value="其他" checked> 其他</label></span><button id="hb_exp" class="pri">导出</button> <button id="hb_open" title="导出的东西都在 ~/Documents/TripSight/ 下，每个行程一个文件夹">打开导出文件夹</button><pre id="hb_out"></pre><div id="hb_vid" class="hbvid" style="display:none"><div class="hvh"><b>旅行短片</b><span class="tlnote" id="hb_vidn"></span></div>
+<div class="hvrow"><label>长度 <select id="hv_t"><option value="30">约 30 秒</option><option value="60" selected>约 1 分钟</option><option value="90">约 1.5 分钟</option><option value="0">不限</option></select></label><label title="每个视频片段最多取这么多秒">每段最长 <select id="hv_m"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option><option value="12">12</option></select> 秒</label><label><input type="checkbox" id="hv_io" checked> 片头片尾</label><label title="每天一张标题卡（用你给每天起的标题）和一张画线动画的当天路线卡"><input type="checkbox" id="hv_c" checked> 每天标题卡和路线</label></div>
+<div class="tlnote">版式和色调跟上面选的「风格」一致；景点名、每天的标题用你在恢复行程里改好的。视频只读拍摄时间、位置和时长，不看画面，不上传；没有配乐。</div>
+<div class="hvrow"><button id="hv_scan">看看视频怎么归类</button><button id="hv_go" class="pri">生成短片</button><span id="hv_bar" class="hvbar" style="display:none"><i></i></span><span class="tlnote" id="hv_st"></span></div>
+<div id="hv_groups"></div><div id="hv_prev"></div><pre id="hv_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
+<details class="hvjy"><summary>也生成剪映草稿（可选）</summary><div class="hvrow"><input id="hv_jy" placeholder="剪映草稿文件夹的完整路径" style="flex:1;min-width:200px"><button class="pk" data-pick="folder" data-to="hv_jy">选文件夹</button></div></details></div>
+</div></div>
 <div class="pane" id="pane_bill">
 <div class="hbimp"><b>导入账单</b><input id="bl_path" placeholder="微信/支付宝账单文件或文件夹的完整路径（不填就看“下载”文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="file" data-to="bl_path">选文件</button><button class="pk" data-pick="folder" data-to="bl_path">选文件夹</button><button id="bl_go" class="pri">导入</button>
 <div class="tlnote">只在这台电脑上解析，账单内容不会发给助手或模型；只记行程日期范围内的消费。支付宝账单也可以是 .numbers，微信是 .xlsx / .csv。</div><div id="bl_msg" class="msgbox"></div></div>
@@ -331,15 +337,6 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <button id="bl_wsave">保存</button> <button id="bl_scan" class="pri">立即扫描</button> <span class="tlnote" id="bl_wmsg"></span>
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_rep"></div><div id="bl_mode"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
-<div class="pane" id="pane_vid">
-<div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_path">选文件夹</button><button id="vd_scan">整理归类</button>
-<div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
-<div id="vd_groups"></div><pre id="vd_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0;display:none"></pre>
-<div class="hbimp"><b>粗剪</b><label>目标时长（秒，0 = 不限）<input id="vd_t" type="number" value="60" min="0" style="width:70px"></label><label>每段最长（秒）<input id="vd_m" type="number" value="8" min="2" max="30" style="width:60px"></label>
-<label><input type="checkbox" id="vd_c" checked> 每天前加“第N天”和路线卡片</label>
-<input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_jy">选文件夹</button><button id="vd_cut" class="pri">生成粗剪</button>
-<div class="tlnote" style="width:100%">输出到 ~/Documents/TripSight/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
-<div id="vd_prev"></div><pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
 <div class="pane" id="pane_fp">
 <div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
 <div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程，和复盘里标了“去了”的景点；纯计划不算。公里数是直线距离累加，只是下限。城市来自“标城市”，没标的不猜。</div></div>
@@ -995,12 +992,12 @@ function autoUi(on) { $('rp_autoc').checked = on; $('rp_auto').classList.toggle(
 async function autoLoad() { try { autoUi((await api('restore_mode', {})).auto); } catch (e) {} }
 $('rp_autoc').onchange = async () => { const on = $('rp_autoc').checked; autoUi(on); try { await api('restore_mode', {auto: on}); toast(on ? '已打开自动执行：助手会直接做完，导出前停下' : '已改回逐步确认'); } catch (e) { autoUi(!on); toast(e.message, true); } };
 window.addEventListener('resize', () => { if (PGCUR === 'restore' && RMAP) RMAP.invalidateSize(); });
-const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp'], vid: ['pgb_vid', 'vid']};
+const PG_MAP = {restore: ['rp_body', 'hb'], bill: ['pgb_bill', 'bill'], fp: ['pgb_fp', 'fp']};
 async function pgShow(name, step) {
   PGCUR = name; await ensureKind(name); fillTripSel(); moClose(); $('home').classList.remove('on');
   chatPlace(name === 'restore' ? 'restore' : 'plan'); if (name === 'restore') { actStart(); autoLoad(); } else actStop(); rpGate();
   document.querySelectorAll('.pg').forEach(x => x.classList.remove('on'));
-  ['hb', 'bill', 'fp', 'vid'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
+  ['hb', 'bill', 'fp'].forEach(k => { const pn = $('pane_' + k); pn.classList.remove('on'); $('mo').querySelector('.box').appendChild(pn); });
   document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === name));
   HB.mode = name === 'restore' ? 'restore' : 'plan';
   if (name === 'plan') { setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 50); return; }
@@ -1029,23 +1026,31 @@ function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {
 $('home_plan').onclick = () => { homeDone(); pgShow('plan'); }; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message + '（点右边“打开文件夹”就能找到）'; } catch (e) { $('sh_err').textContent = e.message; } };
-let VD_ALBUM = '';
-const vdSrc = () => VD_ALBUM ? {album: VD_ALBUM} : {folder: $('vd_path').value};
-$('vd_path').oninput = () => { VD_ALBUM = ''; };
-const vdFmt = d => d >= 60 ? Math.floor(d / 60) + ' 分 ' + Math.round(d % 60) + ' 秒' : Math.round(d) + ' 秒';
-function vdRender(r) {
+const hvFmt = d => d >= 60 ? Math.floor(d / 60) + ' 分 ' + Math.round(d % 60) + ' 秒' : Math.round(d) + ' 秒';
+function hvRender(r) {
   const g = r.groups || [];
   let h = '<div class="vdsum"><b>' + r.total + '</b> 段视频，共 ' + r.minutes + ' 分钟，归到景点 <b>' + r.assigned + '</b> 段' + (r.bad ? '，另有 ' + r.bad + ' 个读不了' : '') + '</div>';
-  h += g.map(x => '<div class="vdg"><div class="vdh"><span class="vdd">第 ' + x.day + ' 天</span><b>' + esc(x.name) + '</b><span class="vdn">' + x.clips.length + ' 段 · ' + vdFmt(x.clips.reduce((a, c) => a + c.dur, 0)) + '</span></div><div class="vdc">'
-    + x.clips.map(c => '<span title="' + esc(c.file) + '">' + esc(c.file) + ' · ' + vdFmt(c.dur) + '</span>').join('') + '</div></div>').join('');
-  if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上，不会放进粗剪）</span></div><div class="vdc">' + r.lost.map(c => '<span>' + esc(c.file) + ' · ' + vdFmt(c.dur) + '</span>').join('') + '</div></div>';
-  $('vd_groups').innerHTML = h;
+  h += g.map(x => '<div class="vdg"><div class="vdh"><span class="vdd">第 ' + x.day + ' 天</span><b>' + esc(x.name) + '</b><span class="vdn">' + x.clips.length + ' 段 · ' + hvFmt(x.clips.reduce((a, c) => a + c.dur, 0)) + '</span></div><div class="vdc">'
+    + x.clips.map(c => '<span title="' + esc(c.file) + '">' + esc(c.file) + ' · ' + hvFmt(c.dur) + '</span>').join('') + '</div></div>').join('');
+  if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上，不会放进短片）</span></div><div class="vdc">' + r.lost.map(c => '<span>' + esc(c.file) + ' · ' + hvFmt(c.dur) + '</span>').join('') + '</div></div>';
+  $('hv_groups').innerHTML = h;
 }
-$('vd_scan').onclick = async () => { $('vd_msg').style.display = 'none'; $('vd_groups').innerHTML = '<div class="tlnote">正在读取视频信息…</div>'; try { const r = await api('video_scan', vdSrc()); vdRender(r); } catch (e) { $('vd_groups').innerHTML = ''; $('vd_msg').style.display = ''; $('vd_msg').textContent = e.message; } };
-$('vd_cut').onclick = async () => {
-  $('vd_prev').innerHTML = ''; $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
-  try { const r = await api('video_cut', {...vdSrc(), target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; $('vd_prev').innerHTML = r.video ? '<video controls preload="metadata" src="' + r.video + '" class="vdvid"></video><div class="tlnote">这是刚生成的粗剪成片，可以直接在这里看；文件在上面写的位置。含人脸或路人的画面，发布前请自己确认。</div>' : ''; }
-  catch (e) { $('vd_out').textContent = e.message; } finally { $('vd_cut').disabled = false; }
+$('hv_scan').onclick = async () => { $('hv_out').textContent = ''; $('hv_groups').innerHTML = '<div class="tlnote">正在读取视频信息…</div>'; try { hvRender(await api('video_scan', {})); } catch (e) { $('hv_groups').innerHTML = ''; $('hv_out').textContent = e.message; } };
+let hvTimer = null;
+function hvPoll() {
+  clearTimeout(hvTimer);
+  hvTimer = setTimeout(async () => {
+    let j; try { j = await api('video_status'); } catch (e) { return hvPoll(); }
+    if (j.state === 'run') { $('hv_bar').firstChild.style.width = Math.round(100 * (j.done || 0) / (j.total || 1)) + '%'; $('hv_st').textContent = '正在生成（' + (j.done || 0) + '/' + (j.total || 1) + '），请不要关闭页面…'; return hvPoll(); }
+    $('hv_bar').style.display = 'none'; $('hv_go').disabled = false; $('hv_st').textContent = '';
+    if (j.state === 'ok') { $('hv_out').textContent = j.message; $('hv_prev').innerHTML = '<video controls preload="metadata" src="' + j.video + '" class="vdvid"></video><div class="tlnote">这是刚生成的短片，可以直接在这里看；文件在上面写的位置。含人脸或路人的画面，发布前请自己确认。</div>'; }
+    else if (j.state === 'err') $('hv_out').textContent = j.message;
+  }, 1200);
+}
+$('hv_go').onclick = async () => {
+  $('hv_prev').innerHTML = ''; $('hv_out').textContent = ''; $('hv_go').disabled = true; $('hv_bar').style.display = 'inline-block'; $('hv_bar').firstChild.style.width = '2%'; $('hv_st').textContent = '开始生成…';
+  try { await api('video_cut', {target_seconds: +$('hv_t').value, clip_max: +$('hv_m').value, cards: $('hv_c').checked, intro_outro: $('hv_io').checked, style: $('hb_style').value, jianying_dir: $('hv_jy').value}); hvPoll(); }
+  catch (e) { $('hv_out').textContent = e.message; $('hv_go').disabled = false; $('hv_bar').style.display = 'none'; $('hv_st').textContent = ''; }
 };
 async function fpLoad(withBm) {
   $('fp_msg').textContent = '正在汇总…';
@@ -1067,7 +1072,7 @@ async function hbLoad() {
 function hbRender() {
   const d = HB.data, restore = HB.mode === 'restore';
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
-  $('hb_vidline').style.display = restore && d.videos ? 'inline-flex' : 'none'; $('hb_vidn').textContent = (d.album_videos ? '照片 App 相册里有 ' : '照片文件夹里有 ') + d.videos + ' 段视频，可以做粗剪（只用于粗剪）';
+  $('hb_vid').style.display = restore && d.videos ? 'block' : 'none'; $('hb_vidn').textContent = (d.album_videos ? '照片 App 相册里有 ' : '照片文件夹里有 ') + d.videos + ' 段视频，可以剪成一条旅行短片';
   $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
@@ -1170,7 +1175,7 @@ $('hb_pv').onclick = async () => {
     $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
       (r.span_days > 30 ? '<div class="tlnote">这些照片从 ' + esc(r.first) + ' 到 ' + esc(r.last) + '，跨了 ' + r.span_days + ' 天：会按拍摄日期分成一天天，没照片的日子不显示。只想恢复其中一段？在上面选“只恢复这段日期”，或点照片多的月份：' +
         r.months.slice().sort((a, b) => b.n - a.n).slice(0, 12).map(m => '<button class="pk hbm" data-m="' + m.m + '">' + m.m + '（' + m.n + '）</button>').join(' ') + '</div>' : '') +
-      (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后可以直接生成粗剪；视频只用于粗剪，不会放进手册。</div>' : '') +
+      (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后，在导出那一步可以剪成一条旅行短片；视频不会放进手册。</div>' : '') +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('.hbm').forEach(b => b.onclick = () => { const [y, m] = b.dataset.m.split('-'); $('hb_d1').value = b.dataset.m + '-01'; $('hb_d2').value = b.dataset.m + '-' + String(new Date(+y, +m, 0).getDate()).padStart(2, '0'); $('hb_pv').click(); });
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
@@ -1192,7 +1197,6 @@ window.addEventListener('message', async ev => {
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
-$('hb_tovid').onclick = async () => { const d = HB.data; await pgShow('vid'); if (!d) return; if (d.album) { VD_ALBUM = d.album; $('vd_path').value = '照片 App 相册：' + d.album; $('vd_scan').click(); } else if (d.folder) { VD_ALBUM = ''; $('vd_path').value = d.folder; $('vd_scan').click(); } };
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_fp').onclick = async () => { $('hb_fp').disabled = true; try { say('正在补照片…'); const r = await api('hb_fill_photos', {per_stop: 3}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); toast(e.message, true); } finally { $('hb_fp').disabled = false; } };

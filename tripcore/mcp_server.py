@@ -1346,24 +1346,39 @@ def scan_videos(folder: str = "", album: str = "") -> str:
     return "\n".join(lines)
 
 
-def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
-                     jianying_dir: str = "", draft_name: str = "", album: str = "") -> str:
-    """把用户的视频素材按行程顺序粗剪成一条片子：每个景点取中间一段（最多 clip_max 秒），景点开头显示地名，每天前插一张“第N天”卡片和一张当天真实路线的小卡片。
-    target_seconds=0 表示不限长度，否则自动按素材量缩短每段、必要时每个景点删几段。输出到 ~/Documents/TripSight/粗剪/：粗剪.mp4、字幕 .srt、片段清单 .md。
-    jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；草稿格式随剪映版本变，打不开就用 mp4+srt）。
-    不自带音乐、不加特效，创意部分留给用户在剪映里做；视频内容不会交给模型。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
-    import datetime as _dt
+def _film_meta(order: list[dict]) -> dict:
+    """片头用的信息：行程名、日期范围、几天几处约多少公里（都来自行程本身）。"""
+    from .phototrip import haversine_m
+    trip = _load()
+    nd = len(trip.plan.days) if trip.plan else 0
+    d0, d1 = (trip.day_date(0), trip.day_date(nd - 1)) if nd else (None, None)
+    rng = ""
+    if d0 and d1:
+        rng = d0.strftime("%Y.%m.%d") + ("" if d0 == d1 else " – " + (d1.strftime("%m.%d") if d0.year == d1.year else d1.strftime("%Y.%m.%d")))
+    km = 0.0
+    for d in range(nd):
+        pts = [(o["lat"], o["lon"]) for o in order if o["day"] == d]
+        km += sum(haversine_m(a, b) for a, b in zip(pts, pts[1:])) / 1000
+    stats = f"{nd} 天 · {len(order)} 处" + (f" · 约 {km:.0f} km" if km >= 1 else "")
+    return {"name": trip.meta.name, "range": rng, "stats": stats}
+
+
+def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True, intro_outro: bool = True,
+              style: str = "手账", jianying_dir: str = "", draft_name: str = "", album: str = "", progress=None) -> dict:
+    """export_rough_cut 的实现（网页也用它，可以传 progress(done, total) 回调）。返回 {message, mp4, segments}。"""
     _v, clips, bad, n, order = _video_scan(folder, album)
     try:
-        segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards))
+        segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards),
+                       meta=_film_meta(order) if intro_outro else None, day_titles=_day_titles())
         size = _v._canvas(clips)
-        out_dir = export_root() / "粗剪"
+        out_dir = export_root() / "短片"
         out_dir.mkdir(parents=True, exist_ok=True)
-        mp4 = out_dir / "粗剪.mp4"
-        _v.render(segs, mp4, out_dir / "_work", size)
-        (out_dir / "粗剪.srt").write_text(_v.srt(segs), encoding="utf-8")
-        total = sum(s.secs for s in segs)
-        rows = [f"# 粗剪片段清单（共 {total:.0f} 秒）", ""] + [
+        mp4 = out_dir / "旅行短片.mp4"
+        _v.render(segs, mp4, out_dir / "_work", size, style=style, progress=progress)
+        T = _v.overlap_for(segs)
+        (out_dir / "旅行短片.srt").write_text(_v.srt(segs, T), encoding="utf-8")
+        total = sum(s.secs for s in segs) - T * (len(segs) - 1)
+        rows = [f"# 旅行短片片段清单（共 {total:.0f} 秒）", ""] + [
             f"- 第{s.day + 1}天 {s.lower}：{s.clip.file} 从 {s.offset:.0f}s 取 {s.secs:.1f}s" for s in segs if s.kind == "clip"]
         (out_dir / "片段清单.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
         draft = ""
@@ -1372,19 +1387,30 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
             if not jd.is_dir():
                 raise ToolError(f"剪映草稿文件夹不存在：{jianying_dir}（请让用户确认路径）。")
             try:
-                draft = _v.jianying_draft(segs, size, jd, draft_name or f"{_load().meta.name}-粗剪", out_dir / "_work")
+                draft = _v.jianying_draft(segs, size, jd, draft_name or f"{_load().meta.name}-短片", out_dir / "_work")
             except _v.VideoError as e:
                 draft = f"（没生成剪映草稿：{e}）"
     except _v.VideoError as e:
         raise ToolError(str(e))
     except OSError as e:
         raise ToolError(f"写入失败：{e}")
-    msg = f"已粗剪：{mp4}（{total:.0f} 秒，{size[0]}×{size[1]}，用了 {sum(1 for s in segs if s.kind == 'clip')} 段）\n字幕 {out_dir / '粗剪.srt'}，清单 {out_dir / '片段清单.md'}。"
+    msg = f"已生成旅行短片：{mp4}（{total:.0f} 秒，{size[0]}×{size[1]}，用了 {sum(1 for s in segs if s.kind == 'clip')} 段）\n字幕 {out_dir / '旅行短片.srt'}，清单 {out_dir / '片段清单.md'}。"
     if n < len(clips):
         msg += f"\n另有 {len(clips) - n} 段没归到景点，没放进去。"
     if draft:
         msg += f"\n剪映草稿：{draft}"
-    return msg + "\n这是粗剪，没有音乐和特效，剪映里再调；视频若含人脸或路人，发布前提醒用户。"
+    msg += "\n没有配乐和特效，需要的话在剪映里再加；视频若含人脸或路人，发布前提醒用户。"
+    return {"message": msg, "mp4": str(mp4), "seconds": round(total), "clips": sum(1 for s in segs if s.kind == "clip")}
+
+
+def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
+                     jianying_dir: str = "", draft_name: str = "", album: str = "", style: str = "手账", intro_outro: bool = True) -> str:
+    """把用户的视频素材按行程顺序剪成一条旅行短片：片头（行程名、日期、几天几处）→ 每天一张标题卡（有“每天的标题”就用它，并列出当天景点）和一张画线动画的当天路线卡 →
+    景点视频（背景模糊填充、统一音量、景点名字幕条）→ 片尾；相邻段交叉淡化。每个景点取中间一段（最多 clip_max 秒）；target_seconds=0 表示不限长度，否则自动缩短每段、必要时每个景点删几段。
+    style 是版式色调，和手册风格同名（手账/杂志/清新/胶片/海边）。输出到 ~/Documents/TripSight/短片/：旅行短片.mp4、封面.png、字幕 .srt、片段清单 .md。
+    视频在照片 App 相册里时给 album=相册名（不复制）。jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；打不开就用 mp4+srt）。
+    不加配乐和特效；视频内容不会交给模型，只用拍摄时间、位置和时长。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
+    return make_film(folder, target_seconds, clip_max, cards, intro_outro, style, jianying_dir, draft_name, album)["message"]
 
 
 def footprint(basemap: bool = False) -> str:

@@ -28,7 +28,7 @@ TripSight is an **all-in-one travel assistant**. It is not a "one-click guide ge
 | **Before · Plan** | build a reliable itinerary | Stops can come from an LLM, someone else's guide or your own wishes; all are scheduled together. Opening hours, closed days, over-packed days, weather, big transport, hotels and meals are all checked. Changes are proposals you confirm; `undo` works repeatedly |
 | **On the road · Check** | know how to get there, whether it rains | Real routes for every leg (transit / walk / taxi), per-day weather (fetched automatically in the background), departure days ordered realistically (last stop → station → leave → hotel in the destination city); calendar .ics, mobile map, WeChat text, GPX |
 | **After · Restore** | turn an album into the trip you walked | Rebuild stay points from a photo folder or the Mac Photos app; with "auto mode" the assistant names stops, tags city/district, titles each day and fills in photos, then stops at the preview for you |
-| **Record & share** | keep it, post it | 8 share themes, web handbook, 3:4 cards, clickable PDF, per-day route animation, Obsidian notes; videos are matched to stops by time and place and rough-cut, with an optional Jianying draft |
+| **Record & share** | keep it, post it | 8 share themes, web handbook, 3:4 cards, clickable PDF, per-day route animation, Obsidian notes; an optional travel film in the restore export step — clips matched to stops by time and place, with intro/outro, day title cards and animated route cards, plus an optional Jianying draft |
 | **Long term** | where I went, what I spent | Footprint summary and map; WeChat/Alipay bill import for spending stats; remembered preferences |
 
 **The agent's role** (and the design principle of the whole project):
@@ -53,10 +53,10 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 </tr>
 </table>
 
-<p><b>3. Record & share: video sorting and rough cut</b> (a real test with 7 iPhone clips from a Taizhou trip, stops named via Amap)<br>
-<a href="docs/videos/video-flow.mp4"><img src="docs/images/video-preview.gif" width="48%" alt="Video rough-cut replay"></a>&ensp;
-<a href="docs/videos/rough-cut-sample.mp4"><b>▶ Watch the rough-cut sample (42 s)</b></a><br>
-<sub>The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and cuts in itinerary order with day cards, route cards and place captions. No music or effects — creativity is left to you in Jianying.</sub></p>
+<p><b>3. Restore → Export: the optional "Travel film"</b> (a real test with 7 iPhone clips from a Taizhou trip, stops named via Amap)<br>
+<a href="docs/videos/film-flow.mp4"><img src="docs/images/film-preview.gif" width="48%" alt="Travel film option replay"></a>&ensp;
+<a href="docs/videos/travel-film-sample.mp4"><b>▶ Watch the generated film (51 s)</b></a><br>
+<sub>When the album/folder contains videos, the export step shows an optional "Travel film" block: preview how clips group by stop, then generate. The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and builds an intro (trip name, dates, days/places/km), a title card per day (your titles), animated route cards, place captions, cross-dissolves and normalised loudness, all in the handbook style you picked. No music; a Jianying draft is optional.</sub></p>
 
 <sub>These are **demo replays**: data from the real engine or real runs, played back on the real page in the real step order — **not** a live model session. Plan flow = the author's real chat transcript and trip snapshots; restore flow = the author's old-phone album (Hainan, Jan 2024, scenery only). Basemap © Amap.</sub>
 

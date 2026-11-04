@@ -19,8 +19,11 @@ from typing import Optional
 from .phototrip import haversine_m
 
 VIDEO_EXT = {".mov", ".mp4", ".m4v"}
-CARD_SECS = 2.0
-LOWER_SECS = 2.5
+CARD_SECS = 2.4                    # 每天标题卡
+ROUTE_SECS = 3.4                   # 每天路线卡（画线动画）
+INTRO_SECS = 3.0                   # 片头
+OUTRO_SECS = 2.4                   # 片尾
+LOWER_SECS = 2.8
 
 
 class VideoError(Exception):
@@ -175,12 +178,17 @@ class Seg:
     stop: str = ""
     day: int = 0
     points: list = field(default_factory=list)   # 路线卡：[(name, lat, lon)]
+    variant: str = ""            # 卡片种类："intro" | "day" | "route" | "outro"
+    extra: dict = field(default_factory=dict)    # 卡片附加内容：day_title / stops / stats
 
 
 def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: float = 8, clip_min: float = 1.5,
-         cards: bool = True) -> list[Seg]:
+         cards: bool = True, meta: Optional[dict] = None, day_titles: Optional[dict] = None) -> list[Seg]:
     """order: 按行程顺序 [{id, name, day(0起), date, lat, lon}]。target_s=0 表示不限，每段取 clip_max 秒以内。
-    总长超过目标时先按比例缩短每段（不短于 clip_min），还超就每个景点轻轻删几段。"""
+    总长超过目标时先按比例缩短每段（不短于 clip_min），还超就每个景点轻轻删几段。
+    meta 给了（{"name", "range", "stats"}）就加片头和片尾；day_titles = {"1": "天涯海角", ...}（第几天从 1 起）用在每天的标题卡上。
+    相邻两段会交叉淡化 XFADE 秒，所以实际成片比各段相加短一点。"""
+    day_titles = day_titles or {}
     by_stop: dict[str, list[Clip]] = {}
     for c in clips:
         if c.stop:
@@ -192,7 +200,9 @@ def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: fl
     if not chosen:
         raise VideoError("没有视频归到行程里的景点，粗剪不出东西。可以先检查拍摄时间/位置，或者确认行程日期。")
     days = sorted({s["day"] for s, _, _ in chosen})
-    overhead = (len(days) * 2 * CARD_SECS) if cards else 0
+    overhead = (len(days) * (CARD_SECS + ROUTE_SECS)) if cards else 0
+    if meta:
+        overhead += INTRO_SECS + OUTRO_SECS
     if target_s and target_s > overhead:
         budget = target_s - overhead
         total = sum(L for _, _, L in chosen)
@@ -209,24 +219,50 @@ def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: fl
                 idx = [i for i, (s, _, _) in enumerate(chosen) if s["id"] == top]
                 del chosen[idx[len(idx) // 2]]
     segs: list[Seg] = []
+    if meta:
+        segs.append(Seg("card", INTRO_SECS, title=meta.get("name", ""), sub=meta.get("range", ""), variant="intro",
+                        extra={"stats": meta.get("stats", "")}))
     cur_day = None
     for s, c, L in chosen:
         if cards and s["day"] != cur_day:
             cur_day = s["day"]
             pts = [(o["name"], o["lat"], o["lon"]) for o in order if o["day"] == cur_day and any(x[0]["id"] == o["id"] for x in chosen)]
-            segs.append(Seg("card", CARD_SECS, title=f"第{cur_day + 1}天", sub=s.get("date") or "", day=cur_day))
+            segs.append(Seg("card", CARD_SECS, title=f"第{cur_day + 1}天", sub=(s.get("date") or "") + (f" · {len(pts)} 处" if pts else ""),
+                            day=cur_day, variant="day", extra={"day_title": day_titles.get(str(cur_day + 1), ""), "stops": [p[0] for p in pts]}))
             if len(pts) >= 2:
-                segs.append(Seg("card", CARD_SECS, title=f"第{cur_day + 1}天的路线", day=cur_day, points=pts))
+                segs.append(Seg("card", ROUTE_SECS, title=f"第{cur_day + 1}天的路线", day=cur_day, points=pts, variant="route"))
         off = max(0.0, (c.dur - L) / 2)
         segs.append(Seg("clip", L, clip=c, offset=off, lower=s["name"], stop=s["id"], day=s["day"]))
+    if meta:
+        segs.append(Seg("card", OUTRO_SECS, title=meta.get("name", ""), sub=meta.get("range", ""), variant="outro"))
     return segs
 
 
-# ---------- 字体与卡片 ----------
+# ---------- 版式与卡片 ----------
+
+# 与手册的 5 种风格同色系（手账是工作台的暖米色），短片里的标题卡、路线卡、字幕条都用它
+PALETTES = {
+    "手账": {"bg": "#f5f0e6", "bg2": "#e9e0cd", "ink": "#2b2823", "sub": "#7a7468", "acc": "#c4553a"},
+    "杂志": {"bg": "#ffffff", "bg2": "#eeeeee", "ink": "#111111", "sub": "#6b6b6b", "acc": "#d62828"},
+    "清新": {"bg": "#eef6f1", "bg2": "#d9eae0", "ink": "#25403a", "sub": "#6b8a80", "acc": "#2e9c7f"},
+    "胶片": {"bg": "#e9e0d0", "bg2": "#d9ccb4", "ink": "#3b2f25", "sub": "#8a7a68", "acc": "#a4531f"},
+    "海边": {"bg": "#eaf3f9", "bg2": "#d3e5f2", "ink": "#1f3b52", "sub": "#6b8aa3", "acc": "#1f7fbf"},
+}
+_SS = 2                                                           # 卡片按 2 倍画布绘制再缩小，边缘更平滑
+
+
+def _pal(style: str = "手账") -> dict:
+    return PALETTES.get(style) or PALETTES["手账"]
+
+
+def _rgb(h: str) -> tuple:
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
 
 _FONTS = ["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Medium.ttc", "/Library/Fonts/Arial Unicode.ttf",
-          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc",
-          "C:/Windows/Fonts/msyh.ttc"]
+          "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc", "C:/Windows/Fonts/msyhbd.ttc", "C:/Windows/Fonts/msyh.ttc"]
 
 
 def _font(size: int):
@@ -246,51 +282,203 @@ def _canvas(clips: list[Clip]) -> tuple[int, int]:
     return (small, big) if portrait * 2 > len(clips) else (big, small)
 
 
-def card_png(seg: Seg, size: tuple[int, int], path: Path) -> None:
-    from PIL import Image, ImageDraw
-    W, H = size
-    im = Image.new("RGB", size, (24, 28, 34))
-    d = ImageDraw.Draw(im)
-    if seg.points:
-        d.text((W // 2, int(H * 0.09)), seg.title, font=_font(int(H * 0.05)), fill=(240, 236, 226), anchor="mm")
-        lats = [p[1] for p in seg.points]; lons = [p[2] for p in seg.points]
-        mx, my = W * 0.14, H * 0.2
-        sx = (W - 2 * mx) / (max(lons) - min(lons) or 1e-6)
-        sy = (H - my - H * 0.12) / (max(lats) - min(lats) or 1e-6)
-        k = min(sx, sy * 1.0)                                    # 经纬度近似等比例
-        pts = [(mx + (lo - min(lons)) * k, my + (max(lats) - la) * k) for _, la, lo in seg.points]
-        d.line(pts, fill=(236, 180, 90), width=max(4, W // 300), joint="curve")
-        for i, ((name, _, _), (x, y)) in enumerate(zip(seg.points, pts)):
-            r = max(10, W // 120)
-            d.ellipse((x - r, y - r, x + r, y + r), fill=(236, 180, 90), outline=(24, 28, 34), width=3)
-            # 文字放在点的右侧（放不下就放左侧），再夹在画布内，名字再长也不会被边缘截断
-            f = _font(int(H * 0.03)); label = f"{i + 1} {name}"
-            w = d.textlength(label, font=f); gap = r + 10; margin = W * 0.04
-            tx = x + gap if x + gap + w <= W - margin else x - gap - w
-            ty = y
-            if tx < margin or tx + w > W - margin:                   # 两侧都放不下：夹进画布，并挪到点的上方，不压住线和点
-                tx = max(margin, min(tx, W - margin - w)); ty = y - r - int(H * 0.025)
-            d.text((tx, ty), label, font=f, fill=(240, 236, 226), anchor="lm")
-    else:
-        d.text((W // 2, H // 2 - int(H * 0.03)), seg.title, font=_font(int(H * 0.09)), fill=(240, 236, 226), anchor="mm")
-        if seg.sub:
-            d.text((W // 2, H // 2 + int(H * 0.06)), seg.sub, font=_font(int(H * 0.04)), fill=(170, 166, 156), anchor="mm")
-    im.save(path, "PNG")
+def _bg(size: tuple[int, int], pal: dict):
+    from PIL import Image
+    mask = Image.linear_gradient("L").resize(size)
+    return Image.composite(Image.new("RGB", size, _rgb(pal["bg2"])), Image.new("RGB", size, _rgb(pal["bg"])), mask)
 
 
-def lower_png(text: str, size: tuple[int, int], path: Path) -> None:
-    from PIL import Image, ImageDraw
+def _tracked(d, x: float, y: float, s: str, font, fill, track: float, center: bool = False) -> None:
+    ws = [d.textlength(ch, font=font) for ch in s]
+    x0 = x - (sum(ws) + track * (len(s) - 1)) / 2 if center else x
+    for ch, w in zip(s, ws):
+        d.text((x0, y), ch, font=font, fill=fill, anchor="ls")
+        x0 += w + track
+
+
+def _fit(d, s: str, size: int, maxw: float, floor: int = 24):
+    f = _font(size)
+    while size > floor and d.textlength(s, font=f) > maxw:
+        size -= 2
+        f = _font(size)
+    return f
+
+
+def _wrap(d, s: str, font, maxw: float) -> list[str]:
+    lines, cur = [], ""
+    for ch in s:
+        if d.textlength(cur + ch, font=font) > maxw and cur:
+            lines.append(cur)
+            cur = ch
+        else:
+            cur += ch
+    return lines + ([cur] if cur else [])
+
+
+def _stroke_text(d, xy, s, font, fill, anchor="ms", w=0):
+    d.text(xy, s, font=font, fill=fill, anchor=anchor, stroke_width=w, stroke_fill=fill)
+
+
+def _footer(d, W: int, H: int, pal: dict) -> None:
+    d.text((W // 2, int(H * 0.955)), "TripSight · 旅行短片", font=_font(int(H * 0.017)), fill=_rgb(pal["sub"]), anchor="ms")
+
+
+def _text_card(seg: "Seg", size: tuple[int, int], pal: dict):
+    """片头 / 每天标题 / 片尾：渐变底 + 色块细线 + 大标题；每天卡片列出当天的景点。"""
+    from PIL import ImageDraw
     W, H = size
-    im = Image.new("RGBA", size, (0, 0, 0, 0))
+    im = _bg(size, pal)
     d = ImageDraw.Draw(im)
-    f = _font(int(H * 0.042))
+    ink, sub, acc = _rgb(pal["ink"]), _rgb(pal["sub"]), _rgb(pal["acc"])
+    if seg.variant == "day":
+        _tracked(d, W / 2, H * 0.30, f"DAY {seg.day + 1:02d}", _font(int(H * 0.026)), acc, W * 0.012, center=True)
+        d.rectangle((W / 2 - W * 0.05, H * 0.325, W / 2 + W * 0.05, H * 0.325 + max(3, H * 0.003)), fill=acc)
+        head = seg.extra.get("day_title") or seg.title
+        f = _fit(d, head, int(H * 0.075), W * 0.8)
+        lines = _wrap(d, head, f, W * 0.8)
+        y = H * 0.44
+        for ln in lines[:3]:
+            _stroke_text(d, (W / 2, y), ln, f, ink, "ms", max(1, int(H * 0.0012)))
+            y += f.size * 1.25
+        meta = " · ".join(x for x in ([seg.title] if seg.extra.get("day_title") else []) + [seg.sub] if x)
+        d.text((W / 2, y + H * 0.01), meta, font=_font(int(H * 0.026)), fill=sub, anchor="ms")
+        names = seg.extra.get("stops") or []
+        y += H * 0.07
+        for n in names[:5]:
+            d.text((W / 2, y), "·  " + n[:18], font=_font(int(H * 0.024)), fill=ink, anchor="ms")
+            y += H * 0.042
+    else:                                                          # intro / outro
+        top = seg.variant == "intro"
+        _tracked(d, W / 2, H * 0.36, "TRAVEL FILM" if top else "THE END", _font(int(H * 0.024)), acc, W * 0.012, center=True)
+        d.rectangle((W / 2 - W * 0.05, H * 0.385, W / 2 + W * 0.05, H * 0.385 + max(3, H * 0.003)), fill=acc)
+        f = _fit(d, seg.title, int(H * 0.085), W * 0.8)
+        y = H * 0.48
+        for ln in _wrap(d, seg.title, f, W * 0.8)[:3]:
+            _stroke_text(d, (W / 2, y), ln, f, ink, "ms", max(1, int(H * 0.0014)))
+            y += f.size * 1.25
+        for ln in [x for x in (seg.sub, seg.extra.get("stats")) if x]:
+            d.text((W / 2, y + H * 0.012), ln, font=_font(int(H * 0.027)), fill=sub, anchor="ms")
+            y += H * 0.045
+    _footer(d, W, H, pal)
+    return im
+
+
+def _project(points: list, size: tuple[int, int]) -> list[tuple[float, float]]:
+    """经纬度 → 画布坐标（按纬度修正经度比例，等比放进中间的矩形）。"""
+    import math
+    W, H = size
+    lats = [p[1] for p in points]; lons = [p[2] for p in points]
+    k = math.cos(math.radians(sum(lats) / len(lats)))
+    xs = [(lo - min(lons)) * k for lo in lons]; ys = [max(lats) - la for la in lats]
+    box = (W * 0.2, H * 0.24, W * 0.8, H * 0.82)
+    sx = (box[2] - box[0]) / (max(xs) or 1e-9); sy = (box[3] - box[1]) / (max(ys) or 1e-9)
+    s = min(sx, sy)
+    ox = (box[0] + box[2]) / 2 - (max(xs) * s) / 2; oy = (box[1] + box[3]) / 2 - (max(ys) * s) / 2
+    return [(ox + x * s, oy + y * s) for x, y in zip(xs, ys)]
+
+
+def _route_card(seg: "Seg", size: tuple[int, int], pal: dict, progress: float = 1.0):
+    """路线卡：路线按顺序一段段“画出来”，到达的点亮起并显示名字；progress 0~1。"""
+    import math
+    from PIL import ImageDraw
+    W, H = size
+    im = _bg(size, pal)
+    d = ImageDraw.Draw(im)
+    ink, sub, acc = _rgb(pal["ink"]), _rgb(pal["sub"]), _rgb(pal["acc"])
+    _tracked(d, W / 2, H * 0.115, "ROUTE", _font(int(H * 0.022)), acc, W * 0.012, center=True)
+    d.text((W / 2, H * 0.165), seg.title, font=_font(int(H * 0.044)), fill=ink, anchor="ms", stroke_width=max(1, int(H * 0.001)), stroke_fill=ink)
+    pts = _project(seg.points, size)
+    seglen = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    total = sum(seglen) or 1.0
+    cum = [0.0]
+    for L in seglen:
+        cum.append(cum[-1] + L)
+    reach = progress * total
+    lw = max(4, int(H * 0.005))
+    for i, L in enumerate(seglen):                                  # 已画出的线段（含正在画的那一段）
+        if reach <= cum[i]:
+            break
+        t = min(1.0, (reach - cum[i]) / (L or 1))
+        a, b = pts[i], pts[i + 1]
+        e = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+        d.line([a, e], fill=acc, width=lw)
+        d.ellipse((e[0] - lw / 2, e[1] - lw / 2, e[0] + lw / 2, e[1] + lw / 2), fill=acc)
+    f = _font(int(H * 0.03))
+    r = max(12, int(H * 0.012))
+    margin = W * 0.05
+    placed: list[tuple] = []
+    for i, ((name, _, _), (x, y)) in enumerate(zip(seg.points, pts)):
+        if reach + 1e-6 < cum[i]:
+            continue
+        d.ellipse((x - r * 1.5, y - r * 1.5, x + r * 1.5, y + r * 1.5), fill=_rgb(pal["bg"]), outline=acc, width=max(3, r // 4))
+        d.text((x, y), str(i + 1), font=_font(int(r * 1.5)), fill=acc, anchor="mm")
+        label = name if d.textlength(name, font=f) < W * 0.62 else name[:12] + "…"
+        w = d.textlength(label, font=f); gap = r * 1.5 + 12; hh = f.size * 0.62
+        # 候选位置：右、左、上、下（居中），选第一个不出画布、不压线、不压已有标签的；都不行就夹进画布放上方
+        cands = [(x + gap, y), (x - gap - w, y), (x - w / 2, y - gap - hh), (x - w / 2, y + gap + hh)]
+        pick = None
+        for cx, cy in cands:
+            rect = (cx, cy - hh, cx + w, cy + hh)
+            if rect[0] < margin or rect[2] > W - margin or rect[1] < H * 0.2 or rect[3] > H * 0.92:
+                continue
+            if any(not (rect[2] < q[0] or rect[0] > q[2] or rect[3] < q[1] or rect[1] > q[3]) for q in placed):
+                continue
+            hit = False
+            for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+                for t in range(0, 41):
+                    px, py = ax + (bx - ax) * t / 40, ay + (by - ay) * t / 40
+                    if rect[0] - 6 <= px <= rect[2] + 6 and rect[1] - 6 <= py <= rect[3] + 6:
+                        hit = True
+                        break
+                if hit:
+                    break
+            if not hit:
+                pick = (cx, cy, rect)
+                break
+        if pick is None:
+            cx = max(margin, min(x - w / 2, W - margin - w)); cy = y - gap - hh
+            pick = (cx, cy, (cx, cy - hh, cx + w, cy + hh))
+        tx, ty, rect = pick
+        placed.append(rect)
+        d.text((tx, ty), label, font=f, fill=ink, anchor="lm")
+    _footer(d, W, H, pal)
+    return im
+
+
+def _downscale(im, size):
+    from PIL import Image
+    return im.resize(size, Image.LANCZOS)
+
+
+def card_png(seg: "Seg", size: tuple[int, int], path: Path, pal: Optional[dict] = None, progress: float = 1.0) -> None:
+    pal = pal or _pal()
+    big = (size[0] * _SS, size[1] * _SS)
+    im = _route_card(seg, big, pal, progress) if seg.points else _text_card(seg, big, pal)
+    _downscale(im, size).save(path, "PNG")
+
+
+def lower_png(text: str, size: tuple[int, int], path: Path, pal: Optional[dict] = None, tag: str = "") -> None:
+    """片段开头的景点名字幕条：深色半透明圆角底 + 左侧色条，上面一行小的 DAY 标签。"""
+    from PIL import Image, ImageDraw
+    pal = pal or _pal()
+    W, H = size[0] * _SS, size[1] * _SS
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    f = _font(int(H * 0.036)); ft = _font(int(H * 0.017))
     box = d.textbbox((0, 0), text, font=f)
     tw, th = box[2] - box[0], box[3] - box[1]
-    pad = int(H * 0.018)
-    x0, y1 = int(W * 0.05), int(H * 0.9)
-    d.rounded_rectangle((x0, y1 - th - 2 * pad, x0 + tw + 2 * pad, y1), radius=pad, fill=(0, 0, 0, 130))
-    d.text((x0 + pad - box[0], y1 - th - pad - box[1]), text, font=f, fill=(255, 255, 255, 255))
-    im.save(path, "PNG")
+    padx, pady = int(H * 0.022), int(H * 0.016)
+    tagh = int(H * 0.026) if tag else 0
+    x0, y1 = int(W * 0.06), int(H * 0.9)
+    y0 = y1 - th - 2 * pady - tagh
+    rad = int(H * 0.012)
+    d.rounded_rectangle((x0, y0, x0 + tw + 2 * padx + int(W * 0.012), y1), radius=rad, fill=(14, 14, 14, 150))
+    d.rounded_rectangle((x0, y0, x0 + int(W * 0.012), y1), radius=rad, fill=_rgb(pal["acc"]) + (255,))
+    tx = x0 + int(W * 0.012) + padx
+    if tag:
+        _tracked(d, tx, y0 + pady + int(H * 0.018), tag, ft, (255, 255, 255, 190), W * 0.004)
+    d.text((tx - box[0], y1 - pady - th - box[1]), text, font=f, fill=(255, 255, 255, 255))
+    _downscale(im, size).save(path, "PNG")
 
 
 # ---------- 渲染 ----------
@@ -302,51 +490,131 @@ def _run(cmd: list[str]) -> None:
         raise VideoError("ffmpeg 出错：" + (lines[-1][:300] if lines else "未知错误"))
 
 
-def render(segs: list[Seg], out: Path, work: Path, size: tuple[int, int]) -> None:
+XFADE = 0.5                                                      # 相邻两段交叉淡化的时长（秒）
+
+
+def timeline(segs: list["Seg"], overlap: float = 0.0) -> list[float]:
+    """每一段在成片里的开始时间（相邻段有 overlap 秒重叠）。"""
+    out, t = [], 0.0
+    for sg in segs:
+        out.append(t)
+        t += sg.secs - overlap
+    return out
+
+
+def overlap_for(segs: list["Seg"]) -> float:
+    return min(XFADE, min((s.secs for s in segs), default=XFADE) / 3) if len(segs) > 1 else 0.0
+
+
+_ENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "17", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2"]
+
+
+def _render_part(i: int, sg: "Seg", size: tuple[int, int], work: Path, pal: dict, trip_hint: str = "") -> Path:
+    W, H = size
+    part = work / f"seg{i:03d}.mp4"
+    silent = ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+    if sg.kind == "card" and sg.points:                            # 路线卡：画线动画（先画 70% 的时长，最后停一停）
+        fps = 24
+        n = max(2, int(round(sg.secs * fps)))
+        fdir = work / f"route{i:03d}"
+        fdir.mkdir(exist_ok=True)
+        big = (W * _SS, H * _SS)
+        draw_n = int(n * 0.7)
+        for k in range(n):
+            p = min(1.0, (k + 1) / draw_n)
+            p = 1 - (1 - p) ** 2                                   # 缓出
+            _downscale(_route_card(sg, big, pal, p), size).save(fdir / f"f{k:04d}.png")
+        _run(["ffmpeg", "-y", "-framerate", str(fps), "-i", str(fdir / "f%04d.png"), *silent, "-t", f"{sg.secs:.2f}",
+              "-vf", "fps=30,format=yuv420p", *_ENC, "-shortest", str(part)])
+    elif sg.kind == "card":
+        png = work / f"card{i:03d}.png"
+        card_png(sg, size, png, pal)
+        _run(["ffmpeg", "-y", "-loop", "1", "-t", f"{sg.secs:.2f}", "-i", str(png), *silent, "-t", f"{sg.secs:.2f}", *_ENC, "-shortest", str(part)])
+    else:
+        c = sg.clip
+        ov = work / f"low{i:03d}.png"
+        lower_png(sg.lower, size, ov, pal, tag=f"DAY {sg.day + 1}")
+        cmd = ["ffmpeg", "-y", "-ss", f"{sg.offset:.2f}", "-t", f"{sg.secs:.2f}", "-i", c.path,
+               "-loop", "1", "-framerate", "30", "-t", f"{sg.secs:.2f}", "-i", str(ov)]
+        if not c.audio:
+            cmd += silent[:2] + ["-t", f"{sg.secs:.2f}"] + silent[2:]
+        same_ar = c.w and c.h and abs(c.w / c.h - W / H) < 0.02
+        fit = f"scale={W}:{H}:force_original_aspect_ratio=decrease"
+        if same_ar:
+            base = f"[0:v]{fit},setsar=1,fps=30[fg]"
+            comp = "[fg]"
+        else:                                                      # 比例不一样：用放大模糊的同一画面铺底，而不是黑边
+            base = (f"[0:v]split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+                    f"scale={W // 8}:{H // 8},boxblur=3:2,scale={W}:{H},eq=brightness=-0.08[bg];[b]{fit},setsar=1[fg0];"
+                    f"[bg][fg0]overlay=(W-w)/2:(H-h)/2,fps=30[fg]")
+            comp = "[fg]"
+        t_out = max(0.8, min(LOWER_SECS, sg.secs - 0.5))
+        fc = (f"{base};{comp}eq=contrast=1.03:saturation=1.08[g];"
+              f"[1:v]format=rgba,fade=t=in:st=0.35:d=0.35:alpha=1,fade=t=out:st={t_out:.2f}:d=0.35:alpha=1[ov];[g][ov]overlay=0:0,format=yuv420p[v]")
+        if c.audio:
+            fc += ";[0:a:0]loudnorm=I=-18:TP=-2:LRA=11,aresample=44100,aformat=channel_layouts=stereo[a]"
+            amap = "[a]"
+        else:
+            amap = "2:a"
+        cmd += ["-filter_complex", fc, "-map", "[v]", "-map", amap, *_ENC, "-t", f"{sg.secs:.2f}", str(part)]
+        _run(cmd)
+    return part
+
+
+def render(segs: list["Seg"], out: Path, work: Path, size: tuple[int, int], style: str = "手账", progress=None) -> None:
     need_ffmpeg()
     work.mkdir(parents=True, exist_ok=True)
-    W, H = size
+    pal = _pal(style)
     parts: list[Path] = []
-    enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-r", "30",
-           "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2"]
-    vf = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30"
+    n = len(segs)
     for i, sg in enumerate(segs):
-        part = work / f"seg{i:03d}.mp4"
-        if sg.kind == "card":
-            png = work / f"card{i:03d}.png"
-            card_png(sg, size, png)
-            _run(["ffmpeg", "-y", "-loop", "1", "-t", f"{sg.secs:.2f}", "-i", str(png), "-f", "lavfi", "-i",
-                  "anullsrc=r=44100:cl=stereo", "-t", f"{sg.secs:.2f}", *enc, "-shortest", str(part)])
-        else:
-            c = sg.clip
-            ov = work / f"low{i:03d}.png"
-            lower_png(sg.lower, size, ov)
-            cmd = ["ffmpeg", "-y", "-ss", f"{sg.offset:.2f}", "-t", f"{sg.secs:.2f}", "-i", c.path,
-                   "-loop", "1", "-t", f"{sg.secs:.2f}", "-i", str(ov)]
-            if not c.audio:
-                cmd += ["-f", "lavfi", "-t", f"{sg.secs:.2f}", "-i", "anullsrc=r=44100:cl=stereo"]
-            fc = f"[0:v]{vf}[b];[b][1:v]overlay=0:0:enable='lt(t,{LOWER_SECS})'[v]"
-            cmd += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a:0" if c.audio else "2:a", *enc,
-                    "-t", f"{sg.secs:.2f}", str(part)]
-            _run(cmd)
-        parts.append(part)
-    lst = work / "list.txt"
-    lst.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
-    _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(out)])
+        parts.append(_render_part(i, sg, size, work, pal))
+        if progress:
+            progress(i + 1, n + 1)
+    T = overlap_for(segs)
+    if len(parts) == 1 or T <= 0:
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+        _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(out)])
+    else:
+        vf, af, acc = [], [], 0.0
+        prev_v, prev_a = "[0:v]", "[0:a]"
+        for k in range(1, len(parts)):
+            acc += segs[k - 1].secs - T
+            v, a = f"[v{k}]", f"[a{k}]"
+            vf.append(f"{prev_v}[{k}:v]xfade=transition=fade:duration={T:.3f}:offset={acc:.3f}{v}")
+            af.append(f"{prev_a}[{k}:a]acrossfade=d={T:.3f}:c1=tri:c2=tri{a}")
+            prev_v, prev_a = v, a
+        script = work / "graph.txt"
+        script.write_text(";\n".join(vf + af), encoding="utf-8")
+        cmd = ["ffmpeg", "-y"]
+        for p in parts:
+            cmd += ["-i", str(p)]
+        cmd += ["-filter_complex_script", str(script), "-map", prev_v, "-map", prev_a, "-c:v", "libx264", "-preset", "medium", "-crf", "22",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)]
+        _run(cmd)
+    if progress:
+        progress(n + 1, n + 1)
+    try:                                                          # 封面：第一张卡片
+        first = next((i for i, s in enumerate(segs) if s.kind == "card" and not s.points), None)
+        if first is not None:
+            card_png(segs[first], size, out.with_name("封面.png"), pal)
+    except OSError:
+        pass
 
 
-def srt(segs: list[Seg]) -> str:
-    """每个景点开头一条字幕（景点名），可以导进剪映或播放器。"""
+def srt(segs: list[Seg], overlap: float = 0.0) -> str:
+    """每个景点开头一条字幕（景点名），可以导进剪映或播放器；overlap 是成片里相邻段交叉淡化的秒数。"""
     def ts(t: float) -> str:
         ms = int(round(t * 1000))
         return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
-    out, t, n, last = [], 0.0, 0, None
-    for sg in segs:
+    out, n, last = [], 0, None
+    for sg, t in zip(segs, timeline(segs, overlap)):
         if sg.kind == "clip" and sg.stop != last:
             n += 1
-            out.append(f"{n}\n{ts(t)} --> {ts(t + min(LOWER_SECS, sg.secs))}\n{sg.lower}\n")
+            out.append(f"{n}\n{ts(t + 0.35)} --> {ts(t + min(LOWER_SECS, sg.secs))}\n{sg.lower}\n")
             last = sg.stop
-        t += sg.secs
     return "\n".join(out)
 
 

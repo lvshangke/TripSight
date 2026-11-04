@@ -742,7 +742,7 @@ def _album_video_count(album: str) -> int:
 
 
 def _video_count(folder: str) -> int:
-    """文件夹这一层有几段视频（和视频页的“整理/粗剪”读取范围一致，不含子文件夹）。"""
+    """文件夹这一层有几段视频（和恢复行程里“旅行短片”的读取范围一致，不含子文件夹）。"""
     from .video import VIDEO_EXT
     try:
         return sum(1 for p in Path(folder).expanduser().iterdir() if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in VIDEO_EXT)
@@ -1316,37 +1316,67 @@ def cal_export(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
 
 
-def video_scan(body: dict) -> dict[str, Any]:
+def _video_src(body: dict) -> tuple[str, str]:
+    """视频来源：页面给了路径/相册就用它；没给就沿用“恢复行程”读照片的那个相册或文件夹。"""
     folder = str(body.get("folder") or "").strip()
-    if not folder and not str(body.get("album") or "").strip():
-        raise HttpError(400, "先填视频文件夹的完整路径。")
+    album = str(body.get("album") or "").strip()
+    if not folder and not album:
+        side = ms._load_json_file(ms._photo_trip_path())
+        album, folder = str(side.get("album") or ""), str(side.get("folder") or "")
+    if not folder and not album:
+        raise HttpError(400, "还不知道视频在哪：先用“恢复行程”读一次照片，或填视频文件夹。")
+    return folder, album
+
+
+def video_scan(body: dict) -> dict[str, Any]:
+    folder, album = _video_src(body)
     try:
-        album = str(body.get("album") or "").strip()
         return {"message": ms.scan_videos(folder, album), **ms.video_groups(folder, album)}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
 
 def _cut_file() -> Path:
-    return ms.export_root() / "粗剪" / "粗剪.mp4"
+    return ms.export_root() / "短片" / "旅行短片.mp4"
+
+
+_VJOB: dict[str, Any] = {"state": "idle"}
+
+
+def _video_job(kw: dict) -> None:
+    def prog(done: int, total: int) -> None:
+        _VJOB.update(done=done, total=total)
+    try:
+        r = ms.make_film(progress=prog, **kw)
+        f = _cut_file()
+        _VJOB.update(state="ok", message=r["message"], video=f"video/film.mp4?t={int(f.stat().st_mtime)}" if f.is_file() else "", seconds=r["seconds"])
+    except ms.ToolError as e:
+        _VJOB.update(state="err", message=str(e))
+    except Exception as e:                                          # 后台线程里不能让异常悄悄消失
+        _VJOB.update(state="err", message=f"生成失败：{e}")
 
 
 def video_cut(body: dict) -> dict[str, Any]:
-    folder = str(body.get("folder") or "").strip()
-    if not folder and not str(body.get("album") or "").strip():
-        raise HttpError(400, "先填视频文件夹的完整路径。")
+    """开始生成旅行短片（后台线程，页面轮询 video_status）。"""
+    folder, album = _video_src(body)
     try:
         target = int(body.get("target_seconds") or 0)
         clip_max = int(body.get("clip_max") or 8)
     except (TypeError, ValueError):
         raise HttpError(400, "时长要填数字。")
-    try:
-        msg = ms.export_rough_cut(folder, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
-                                  jianying_dir=str(body.get("jianying_dir") or "").strip(), album=str(body.get("album") or "").strip())
-        f = _cut_file()
-        return {"message": msg, "video": f"video/rough-cut.mp4?t={int(f.stat().st_mtime)}" if f.is_file() else ""}
-    except ms.ToolError as e:
-        raise HttpError(400, str(e))
+    if _VJOB.get("state") == "run":
+        raise HttpError(409, "上一条短片还在生成，等它完成。")
+    kw = dict(folder=folder, album=album, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
+              intro_outro=body.get("intro_outro", True) is not False, style=str(body.get("style") or "手账"),
+              jianying_dir=str(body.get("jianying_dir") or "").strip())
+    _VJOB.clear()
+    _VJOB.update(state="run", done=0, total=1, message="")
+    threading.Thread(target=_video_job, args=(kw,), daemon=True).start()
+    return {"started": True}
+
+
+def video_status() -> dict[str, Any]:
+    return dict(_VJOB)
 
 
 def fp_build(body: dict) -> dict[str, Any]:
@@ -1362,7 +1392,7 @@ def fp_build(body: dict) -> dict[str, Any]:
     return {"message": msg, "html": html}
 
 
-ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state, "fp_state": lambda: fp_build({})}
+ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "video_status": video_status, "trips": trips, "chat_status": chat_status, "chat_history": chat_history, "version": lambda: {"version": CODE_VERSION}, "tools": tools, "photos": photos_list, "hb_state": hb_state, "bills_state": bills_state, "fp_state": lambda: fp_build({})}
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_pdf": share_pdf, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
@@ -1414,18 +1444,18 @@ def make_handler(token: str, state: dict):
                 self._send(200, page_html().encode("utf-8"), "text/html; charset=utf-8")
             elif rest.startswith("api/") and rest[4:] in ROUTES_GET:
                 self._run(ROUTES_GET[rest[4:]])
-            elif urlparse(self.path).path.endswith("/video/rough-cut.mp4"):
+            elif urlparse(self.path).path.endswith("/video/film.mp4"):
                 self._send_cut()
             else:
                 self._json(404, {"error": "not found"})
 
         def _send_cut(self) -> None:
-            """只提供最近一次粗剪成片（固定文件，不接受路径参数），支持 Range，网页里的播放器才能拖动进度。"""
+            """只提供最近一次旅行短片（固定文件，不接受路径参数），支持 Range，网页里的播放器才能拖动进度。"""
             f = _cut_file()
             try:
                 size = f.stat().st_size
             except OSError:
-                self._json(404, {"error": "还没有粗剪成片"})
+                self._json(404, {"error": "还没有生成旅行短片"})
                 return
             a, b = 0, size - 1
             rng = self.headers.get("Range") or ""
