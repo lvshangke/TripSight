@@ -58,9 +58,20 @@ def departure_day(trip: Trip) -> Optional[int]:
     return day_index_of(trip, trip.departure.dep_time, trip.meta.num_days - 1) if trip.departure else None
 
 
+def _from_stop(trip: Trip) -> bool:
+    idx = departure_day(trip)
+    return bool(idx is not None and trip.has_lodging and trip.lodging_for_day(idx) and trip.morning_lodging(idx)
+                and trip.lodging_for_day(idx).id != trip.morning_lodging(idx).id and trip.plan and idx < len(trip.plan.days)
+                and trip.plan.days[idx].items)
+
+
 def transfer_target(trip: Trip, which: str):
     """机场/车站要往返的那一头：选了酒店就是酒店；否则到达日第一个景点 / 离开日最后一个景点。"""
     idx = arrival_day(trip) if which == "arrival" else departure_day(trip)
+    if which == "departure" and idx is not None and trip.has_lodging and trip.plan and idx < len(trip.plan.days):
+        night, morning = trip.lodging_for_day(idx), trip.morning_lodging(idx)
+        if night and morning and night.id != morning.id and trip.plan.days[idx].items:   # 当晚住在别处：行李随身，直接从最后一个景点去车站
+            return exit_(trip.place(trip.plan.days[idx].items[-1].place_id))
     if idx is not None and trip.has_lodging:
         lod = trip.lodging_for_day(idx) if which == "arrival" else trip.morning_lodging(idx)
         if lod is not None:
@@ -124,7 +135,7 @@ def day_window(trip: Trip, day_index: int) -> tuple[int, int, list[str]]:
         mins, src = transfer_minutes(trip, "departure")
         end = min(end, _minute_of_day(lv) if lv.date() == trip.departure.dep_time.date() else 0)
         why.append(f"{trip.departure.dep_time:%H:%M} 离开，要提前 {LEAD_BUFFER[trip.departure.kind]} 分钟到场 + 去机场/车站路上约 {mins} 分钟（{src}），"
-                   f"最晚 {_minute_of_day(lv) // 60:02d}:{_minute_of_day(lv) % 60:02d} 就要从酒店出发")
+                   f"最晚 {_minute_of_day(lv) // 60:02d}:{_minute_of_day(lv) % 60:02d} 就要从{'最后一个景点' if _from_stop(trip) else '酒店'}出发")
     return start, max(start, end), why
 
 

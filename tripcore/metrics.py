@@ -78,19 +78,21 @@ def legs_between_stops(trip: Trip, places: list[Place]) -> list[Leg]:
 def lodging_legs(trip: Trip, places: list[Place], day_index: Optional[int] = None) -> tuple[Optional[Leg], Optional[Leg]]:
     """住宿 → 当天第一个景点、当天最后一个景点 → 住宿。没选住宿或当天没景点则为 None。
     给了 day_index 且设置了分段住宿时：早上从前一晚的酒店出发，晚上回今晚的酒店。"""
+    skip_back = False
     if day_index is None:
         morning = night = trip.chosen_lodging
     else:
         morning, night = trip.morning_lodging(day_index), trip.lodging_for_day(day_index)
-        from .connections import departure_day          # 离开日：先回早上的酒店取行李再去车站，当晚的酒店要到站之后才入住
+        from .connections import departure_day          # 离开日：当晚住在别处（到站后才入住）→ 行李随身，不回酒店
         if trip.departure and departure_day(trip) == day_index:
+            skip_back = night is not None and morning is not None and night.id != morning.id
             night = morning
     if morning is None or night is None or not places:
         return None, None
     first, last = places[0], places[-1]
     e, x = entry(first), exit_(last)
     out = _leg(trip, morning.id, morning.lat, morning.lon, e.id, e.lat, e.lon)
-    back = _leg(trip, x.id, x.lat, x.lon, night.id, night.lat, night.lon)
+    back = None if skip_back else _leg(trip, x.id, x.lat, x.lon, night.id, night.lat, night.lon)
     return out, back
 
 

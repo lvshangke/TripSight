@@ -16,12 +16,11 @@ def test_night_hotel_after_departure():
     tl = build_map_data(_trip())["days"][-1]["timeline"]
     roles = [(e["type"], e.get("role")) for e in tl if e["type"] in ("hotel", "term")]
     assert roles[-2:] == [("term", "离开"), ("hotel", "入住")]
-    back = [e for e in tl if e["type"] == "hotel" and e["role"] == "返回"]
-    assert len(back) == 1 and "维也纳" in back[0]["name"]       # 回早上的酒店，不是深圳那家
+    assert not [e for e in tl if e["type"] == "hotel" and e["role"] == "返回"]     # 行李随身，不回酒店
     assert "汉庭" in tl[-1]["name"] and tl[-1]["time"] == "20:40"
 
 
-def test_no_long_leg_to_night_hotel():
+def test_no_return_leg_on_departure_day():
     t = _trip()
     st = day_stats(t, t.plan.days[-1])
-    assert st.lodging_back is not None and st.lodging_back.to_id == "l1" and st.lodging_back.distance_km < 100
+    assert st.lodging_back is None
