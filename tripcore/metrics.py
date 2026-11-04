@@ -82,6 +82,9 @@ def lodging_legs(trip: Trip, places: list[Place], day_index: Optional[int] = Non
         morning = night = trip.chosen_lodging
     else:
         morning, night = trip.morning_lodging(day_index), trip.lodging_for_day(day_index)
+        from .connections import departure_day          # 离开日：先回早上的酒店取行李再去车站，当晚的酒店要到站之后才入住
+        if trip.departure and departure_day(trip) == day_index:
+            night = morning
     if morning is None or night is None or not places:
         return None, None
     first, last = places[0], places[-1]

@@ -164,6 +164,10 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
             d = trip.day_date(day.index)
             lodging = trip.lodging_for_day(day.index)         # 今晚住的（返回、到达日去的）
             lod_m = trip.morning_lodging(day.index)           # 早上出发的（换酒店当天是旧的）
+            leaving = bool(trip.departure and departure_day(trip) == day.index)
+            night_after = lodging if leaving and lodging and lod_m and lodging.id != lod_m.id else None   # 离开日：到站后才入住的那家
+            if leaving:
+                lodging = lod_m                                # 去车站前回的是早上那家（取行李）
             timeline: list[dict[str, Any]] = []
             w_start, w_end, w_why = day_window(trip, day.index)
             t = float(w_start)
@@ -225,6 +229,11 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                                          "name": lod_m.name, "pos": _gcj(lod_m.lat, lod_m.lon)})
                     timeline.append(_leg_entry(tl, tg.name, tg, tp.name, tp, region))
                     timeline.append(_term_entry(trip.departure, "离开", trip.departure.dep_time, tp))
+            if night_after is not None:
+                c = trip.departure
+                timeline.append({"type": "hotel", "role": "入住", "time": c.arr_time.strftime("%H:%M"), "name": night_after.name,
+                                 "pos": _gcj(night_after.lat, night_after.lon),
+                                 "lines": [f"到站 {c.to_name} 后前往；住宿可在“住宿”里改"]})
             if w_why and t > w_end:
                 timeline.append({"type": "conn", "text": f"⚠ 约 {_hm(t)} 才结束，超过了可用时间（{_hm(w_end)}），需要减少安排"})
             # 标记错开显示（酒店起终点是同一个点，只画一次）
