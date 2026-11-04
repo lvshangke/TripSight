@@ -8,7 +8,8 @@ TEMPLATE = r"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TripSight 工作台</title>
-<style>__CSS__</style>
+<style>__CSS__.vdsum{margin:10px 0 6px}.vdg{background:#fffdf8;border:1px solid #eadfcb;border-radius:12px;padding:10px 14px;margin:8px 0}.vdh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.vdd{background:#c4553a;color:#fff;border-radius:99px;padding:1px 10px;font-size:12px}.vdn{color:#7a7468;font-size:12px;margin-left:auto}.vdc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.vdc span{background:#f3ead9;border-radius:99px;padding:2px 10px;font-size:12px}.vdlost{border-style:dashed}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
+</style>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
 #app{display:flex;height:calc(100% - 48px);margin-top:48px}
@@ -333,12 +334,12 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div class="pane" id="pane_vid">
 <div class="hbimp"><b>视频素材整理 + 粗剪</b><input id="vd_path" placeholder="视频文件夹的完整路径（.mov / .mp4 / .m4v，不含子文件夹）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_path">选文件夹</button><button id="vd_scan">整理归类</button>
 <div class="tlnote" style="width:100%">只读视频的拍摄时间、位置和时长，按时间和位置归到行程里的各个景点；不看画面内容，不上传。需要本机装好 ffmpeg（Mac：brew install ffmpeg）。</div></div>
-<pre id="vd_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
+<div id="vd_groups"></div><pre id="vd_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0;display:none"></pre>
 <div class="hbimp"><b>粗剪</b><label>目标时长（秒，0 = 不限）<input id="vd_t" type="number" value="60" min="0" style="width:70px"></label><label>每段最长（秒）<input id="vd_m" type="number" value="8" min="2" max="30" style="width:60px"></label>
 <label><input type="checkbox" id="vd_c" checked> 每天前加“第N天”和路线卡片</label>
 <input id="vd_jy" placeholder="可选：剪映草稿文件夹的完整路径（给了就同时生成剪映草稿）" style="flex:1;min-width:260px"><button class="pk" data-pick="folder" data-to="vd_jy">选文件夹</button><button id="vd_cut" class="pri">生成粗剪</button>
 <div class="tlnote" style="width:100%">输出到 ~/Documents/TripSight/粗剪/（成片、字幕、片段清单）。不带音乐、不加特效，创意部分在剪映里做。素材多时要跑一会儿，请等它完成。含人脸或路人的视频发布前请自己确认。</div></div>
-<pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
+<div id="vd_prev"></div><pre id="vd_out" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
 <div class="pane" id="pane_fp">
 <div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
 <div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程，和复盘里标了“去了”的景点；纯计划不算。公里数是直线距离累加，只是下限。城市来自“标城市”，没标的不猜。</div></div>
@@ -1031,10 +1032,19 @@ $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…';
 let VD_ALBUM = '';
 const vdSrc = () => VD_ALBUM ? {album: VD_ALBUM} : {folder: $('vd_path').value};
 $('vd_path').oninput = () => { VD_ALBUM = ''; };
-$('vd_scan').onclick = async () => { $('vd_msg').textContent = '正在读取视频信息…'; try { const r = await api('video_scan', vdSrc()); $('vd_msg').textContent = r.message; } catch (e) { $('vd_msg').textContent = e.message; } };
+const vdFmt = d => d >= 60 ? Math.floor(d / 60) + ' 分 ' + Math.round(d % 60) + ' 秒' : Math.round(d) + ' 秒';
+function vdRender(r) {
+  const g = r.groups || [];
+  let h = '<div class="vdsum"><b>' + r.total + '</b> 段视频，共 ' + r.minutes + ' 分钟，归到景点 <b>' + r.assigned + '</b> 段' + (r.bad ? '，另有 ' + r.bad + ' 个读不了' : '') + '</div>';
+  h += g.map(x => '<div class="vdg"><div class="vdh"><span class="vdd">第 ' + x.day + ' 天</span><b>' + esc(x.name) + '</b><span class="vdn">' + x.clips.length + ' 段 · ' + vdFmt(x.clips.reduce((a, c) => a + c.dur, 0)) + '</span></div><div class="vdc">'
+    + x.clips.map(c => '<span title="' + esc(c.file) + '">' + esc(c.file) + ' · ' + vdFmt(c.dur) + '</span>').join('') + '</div></div>').join('');
+  if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上，不会放进粗剪）</span></div><div class="vdc">' + r.lost.map(c => '<span>' + esc(c.file) + ' · ' + vdFmt(c.dur) + '</span>').join('') + '</div></div>';
+  $('vd_groups').innerHTML = h;
+}
+$('vd_scan').onclick = async () => { $('vd_msg').style.display = 'none'; $('vd_groups').innerHTML = '<div class="tlnote">正在读取视频信息…</div>'; try { const r = await api('video_scan', vdSrc()); vdRender(r); } catch (e) { $('vd_groups').innerHTML = ''; $('vd_msg').style.display = ''; $('vd_msg').textContent = e.message; } };
 $('vd_cut').onclick = async () => {
-  $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
-  try { const r = await api('video_cut', {...vdSrc(), target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; }
+  $('vd_prev').innerHTML = ''; $('vd_out').textContent = '正在粗剪，素材多时要几分钟，请不要关闭页面…'; $('vd_cut').disabled = true;
+  try { const r = await api('video_cut', {...vdSrc(), target_seconds: +$('vd_t').value, clip_max: +$('vd_m').value, cards: $('vd_c').checked, jianying_dir: $('vd_jy').value}); $('vd_out').textContent = r.message; $('vd_prev').innerHTML = r.video ? '<video controls preload="metadata" src="' + r.video + '" class="vdvid"></video><div class="tlnote">这是刚生成的粗剪成片，可以直接在这里看；文件在上面写的位置。含人脸或路人的画面，发布前请自己确认。</div>' : ''; }
   catch (e) { $('vd_out').textContent = e.message; } finally { $('vd_cut').disabled = false; }
 };
 async function fpLoad(withBm) {

@@ -53,9 +53,9 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 </tr>
 </table>
 
-<p><b>3. Record & share: video sorting and rough cut</b> (a real test with 8 iPhone clips from a Taizhou trip)<br>
+<p><b>3. Record & share: video sorting and rough cut</b> (a real test with 7 iPhone clips from a Taizhou trip, stops named via Amap)<br>
 <a href="docs/videos/video-flow.mp4"><img src="docs/images/video-preview.gif" width="48%" alt="Video rough-cut replay"></a>&ensp;
-<a href="docs/videos/rough-cut-sample.mp4"><b>▶ Watch the rough-cut sample (43 s)</b></a><br>
+<a href="docs/videos/rough-cut-sample.mp4"><b>▶ Watch the rough-cut sample (42 s)</b></a><br>
 <sub>The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and cuts in itinerary order with day cards, route cards and place captions. No music or effects — creativity is left to you in Jianying.</sub></p>
 
 <sub>These are **demo replays**: data from the real engine or real runs, played back on the real page in the real step order — **not** a live model session. Plan flow = the author's real chat transcript and trip snapshots; restore flow = the author's old-phone album (Hainan, Jan 2024, scenery only). Basemap © Amap.</sub>

@@ -1313,6 +1313,18 @@ def _video_scan(folder: str, album: str = ""):
     return _v, clips, bad, n, order
 
 
+def video_groups(folder: str = "", album: str = "") -> dict:
+    """scan_videos 的结构化版本（给网页用）：按景点分组的片段、归不上的片段、读不了的个数。"""
+    _v, clips, bad, n, order = _video_scan(folder, album)
+    per: dict[str, list] = {}
+    for c in clips:
+        per.setdefault(c.stop or "", []).append(c)
+    groups = [{"day": o["day"] + 1, "id": o["id"], "name": o["name"],
+               "clips": [{"file": c.file, "dur": round(c.dur, 1)} for c in per[o["id"]]]} for o in order if per.get(o["id"])]
+    return {"total": len(clips), "minutes": round(sum(c.dur for c in clips) / 60, 1), "bad": bad, "assigned": n, "groups": groups,
+            "lost": [{"file": c.file, "dur": round(c.dur, 1)} for c in per.get("", [])]}
+
+
 def scan_videos(folder: str = "", album: str = "") -> str:
     """整理用户的视频素材：扫描 folder（用户给的文件夹，不递归）里的 .mov/.mp4/.m4v，读拍摄时间、位置（iPhone 视频自带）、时长，
     按拍摄时间和位置归到行程里的各个景点，返回每个景点有几段、多长，以及归不上的。只读元数据，不看画面内容；需要本机装好 ffmpeg。

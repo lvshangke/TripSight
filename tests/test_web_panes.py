@@ -162,3 +162,32 @@ def test_new_restore_trip_is_an_empty_restore_shell_and_import_fills_it(tmp_path
     web.trip_new_restore({"name": "台州周末"})
     web.hb_import({"folder": str(ph)})
     assert web.hb_state()["name"] == "台州周末"
+
+
+def test_video_page_has_groups_and_preview_slots():
+    PAGE = page_html()
+    for k in ('id="vd_groups"', 'id="vd_prev"', "vdRender", "r.video"):
+        assert k in PAGE, k
+
+
+def test_video_scan_groups_cut_preview_and_range(server, tmp_path):
+    """视频页：整理归类返回按景点分组的片段；粗剪后成片可在页面里播放（固定文件、支持 Range）。"""
+    import shutil
+    import urllib.request
+    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+        pytest.skip("需要 ffmpeg")
+    from tests.test_photo_trip_tools import _album
+    from tests.test_video import _mk
+    photos = tmp_path / "ph"; photos.mkdir(); _album(photos)
+    s.import_photo_trip(str(photos))
+    vids = tmp_path / "vid"; vids.mkdir()
+    _mk(vids / "a.mov", "2026-06-19T02:03:00Z")
+    _mk(vids / "c.mov", "2026-06-19T14:00:00Z")                       # 归不上
+    code, r = call(server, "/tok/api/video_scan", {"folder": str(vids)})
+    assert code == 200 and r["total"] == 2 and r["assigned"] == 1
+    assert r["groups"][0]["clips"][0]["file"] == "a.mov" and r["lost"][0]["file"] == "c.mov"
+    code, r = call(server, "/tok/api/video_cut", {"folder": str(vids), "target_seconds": 10, "clip_max": 2})
+    assert code == 200 and r["video"].startswith("video/rough-cut.mp4")
+    req = urllib.request.Request(server + "/tok/" + r["video"], headers={"Range": "bytes=0-99"})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status == 206 and len(resp.read()) == 100 and resp.headers["Content-Range"].startswith("bytes 0-99/")

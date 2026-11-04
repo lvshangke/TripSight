@@ -8,10 +8,10 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import http.client
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
@@ -1321,9 +1321,14 @@ def video_scan(body: dict) -> dict[str, Any]:
     if not folder and not str(body.get("album") or "").strip():
         raise HttpError(400, "先填视频文件夹的完整路径。")
     try:
-        return {"message": ms.scan_videos(folder, str(body.get("album") or "").strip())}
+        album = str(body.get("album") or "").strip()
+        return {"message": ms.scan_videos(folder, album), **ms.video_groups(folder, album)}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
+
+
+def _cut_file() -> Path:
+    return ms.export_root() / "粗剪" / "粗剪.mp4"
 
 
 def video_cut(body: dict) -> dict[str, Any]:
@@ -1336,8 +1341,10 @@ def video_cut(body: dict) -> dict[str, Any]:
     except (TypeError, ValueError):
         raise HttpError(400, "时长要填数字。")
     try:
-        return {"message": ms.export_rough_cut(folder, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
-                                               jianying_dir=str(body.get("jianying_dir") or "").strip(), album=str(body.get("album") or "").strip())}
+        msg = ms.export_rough_cut(folder, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
+                                  jianying_dir=str(body.get("jianying_dir") or "").strip(), album=str(body.get("album") or "").strip())
+        f = _cut_file()
+        return {"message": msg, "video": f"video/rough-cut.mp4?t={int(f.stat().st_mtime)}" if f.is_file() else ""}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
@@ -1407,8 +1414,46 @@ def make_handler(token: str, state: dict):
                 self._send(200, page_html().encode("utf-8"), "text/html; charset=utf-8")
             elif rest.startswith("api/") and rest[4:] in ROUTES_GET:
                 self._run(ROUTES_GET[rest[4:]])
+            elif urlparse(self.path).path.endswith("/video/rough-cut.mp4"):
+                self._send_cut()
             else:
                 self._json(404, {"error": "not found"})
+
+        def _send_cut(self) -> None:
+            """只提供最近一次粗剪成片（固定文件，不接受路径参数），支持 Range，网页里的播放器才能拖动进度。"""
+            f = _cut_file()
+            try:
+                size = f.stat().st_size
+            except OSError:
+                self._json(404, {"error": "还没有粗剪成片"})
+                return
+            a, b = 0, size - 1
+            rng = self.headers.get("Range") or ""
+            m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+            if m and (m.group(1) or m.group(2)):
+                if m.group(1):
+                    a = int(m.group(1)); b = int(m.group(2)) if m.group(2) else b
+                else:
+                    a = max(0, size - int(m.group(2)))
+                b = min(b, size - 1)
+                if a > b:
+                    self.send_response(416); self.send_header("Content-Range", f"bytes */{size}"); self.end_headers(); return
+            self.send_response(206 if m else 200)
+            self.send_header("Content-Type", "video/mp4"); self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(b - a + 1)); self.send_header("Cache-Control", "no-store")
+            if m:
+                self.send_header("Content-Range", f"bytes {a}-{b}/{size}")
+            self.end_headers()
+            try:
+                with open(f, "rb") as fh:
+                    fh.seek(a); left = b - a + 1
+                    while left > 0:
+                        chunk = fh.read(min(1 << 20, left))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk); left -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
         def do_POST(self) -> None:
             rest = self._guard()

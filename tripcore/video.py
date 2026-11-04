@@ -263,10 +263,14 @@ def card_png(seg: Seg, size: tuple[int, int], path: Path) -> None:
         for i, ((name, _, _), (x, y)) in enumerate(zip(seg.points, pts)):
             r = max(10, W // 120)
             d.ellipse((x - r, y - r, x + r, y + r), fill=(236, 180, 90), outline=(24, 28, 34), width=3)
-            # 文字放在点的左侧或右侧（靠哪边空间大放哪边），避免在竖屏里被画布边缘截断
-            right = x < W / 2
-            d.text((x + (r + 10 if right else -(r + 10)), y), f"{i + 1} {name}", font=_font(int(H * 0.03)),
-                   fill=(240, 236, 226), anchor="lm" if right else "rm")
+            # 文字放在点的右侧（放不下就放左侧），再夹在画布内，名字再长也不会被边缘截断
+            f = _font(int(H * 0.03)); label = f"{i + 1} {name}"
+            w = d.textlength(label, font=f); gap = r + 10; margin = W * 0.04
+            tx = x + gap if x + gap + w <= W - margin else x - gap - w
+            ty = y
+            if tx < margin or tx + w > W - margin:                   # 两侧都放不下：夹进画布，并挪到点的上方，不压住线和点
+                tx = max(margin, min(tx, W - margin - w)); ty = y - r - int(H * 0.025)
+            d.text((tx, ty), label, font=f, fill=(240, 236, 226), anchor="lm")
     else:
         d.text((W // 2, H // 2 - int(H * 0.03)), seg.title, font=_font(int(H * 0.09)), fill=(240, 236, 226), anchor="mm")
         if seg.sub:
