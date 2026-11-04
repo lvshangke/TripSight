@@ -1,11 +1,12 @@
-__pycache__/
 *.pyc
+*.tmp
+.geocode_cache.json
 .pytest_cache/
 .venv/
-.geocode_cache.json
-*.tmp
-tripsight.egg-info/
-_page_rp.html
+__pycache__/
 _card_*.html
+_demo/
 _gt.html
+_page_rp.html
 _pkg.tar
+tripsight.egg-info/
