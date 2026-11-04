@@ -300,6 +300,13 @@ def render_pdf(html_path: Path, pdf_path: Path, width: int = 430) -> Optional[st
     return None
 
 
+def _pad(im, size):
+    from PIL import Image
+    bg = Image.new("RGB", size, (255, 255, 255))
+    bg.paste(im, ((size[0] - im.width) // 2, (size[1] - im.height) // 2))
+    return bg
+
+
 def render_gif(html_path: Path, gif_path: Path, width: int = 430, frames: int = 36) -> Optional[str]:
     """把路线图的“按天画出来”动画录成 GIF（逐帧调用页面里的 __seek 截图，所以每次结果一样）。成功返回 None，失败返回原因。"""
     try:
@@ -319,15 +326,35 @@ def render_gif(html_path: Path, gif_path: Path, width: int = 430, frames: int = 
             if not pg.evaluate("!!window.__rm_ready"):
                 b.close()
                 return "这个分享页里没有路线图，没法录动画"
-            pg.evaluate("document.querySelector('#rm_b').style.visibility='hidden'")
-            box = pg.locator("section.rmap")
-            ims = []
-            for i in range(frames + 1):
-                pg.evaluate(f"window.__seek({i / frames})")
-                ims.append(Image.open(io.BytesIO(box.screenshot())).convert("RGB").quantize(128, method=Image.Quantize.MEDIANCUT))
+            pg.evaluate("document.querySelectorAll('.dpl,#rm_b').forEach(function(x){x.style.visibility='hidden'})")
+            n_days = pg.evaluate("(window.__days||[]).length")
+            ims, dur = [], []
+
+            def snap(loc):
+                return Image.open(io.BytesIO(loc.screenshot())).convert("RGB")
+
+            if n_days:      # 分天：每天用自己的范围放大，一天一天依次画（两天的景点挤在一张总图里会太小）
+                per = max(12, frames // 2)
+                for di in range(n_days):
+                    loc = pg.locator(".dmap").nth(di)
+                    loc.scroll_into_view_if_needed()
+                    for i in range(per + 1):
+                        pg.evaluate(f"window.__seekDay({di},{i / per})")
+                        ims.append(snap(loc))
+                        dur.append(1500 if i == per else (300 if i == 0 else 70))
+                    pg.evaluate(f"window.__clearDay({di})")
+                size = (max(im.width for im in ims), max(im.height for im in ims))
+                ims = [im if im.size == size else _pad(im, size) for im in ims]
+            else:
+                box = pg.locator("section.rmap")
+                pg.evaluate("document.querySelector('#rm_b').style.visibility='hidden'")
+                for i in range(frames + 1):
+                    pg.evaluate(f"window.__seek({i / frames})")
+                    ims.append(snap(box))
+                dur = [350] + [70] * (len(ims) - 2) + [1800]
+            ims = [im.quantize(128, method=Image.Quantize.MEDIANCUT) for im in ims]
             b.close()
     except Exception as e:
         return f"录制失败：{type(e).__name__}"
-    dur = [350] + [70] * (len(ims) - 2) + [1800]
     ims[0].save(str(gif_path), save_all=True, append_images=ims[1:], duration=dur, loop=0, optimize=True, disposal=2)
     return None

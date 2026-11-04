@@ -7,3 +7,5 @@ __pycache__/
 tripsight.egg-info/
 _page_rp.html
 _card_*.html
+_gt.html
+_pkg.tar

@@ -74,6 +74,9 @@ def build_ics(trip: Trip) -> str:
                 desc.append(f"营业时间：{p.opening_hours}（来源：{p.hours_source or '未标注'}，以现场为准）")
             else:
                 desc.append("营业时间：未核实")
+            wx = (trip.weather or {}).get(d.isoformat())
+            if wx is not None and getattr(wx, "day_weather", ""):
+                desc.append(f"当天天气预报：{wx.day_weather}" + (f" {wx.day_temp:.0f}°C" if wx.day_temp is not None else "") + "（预报，非实况）")
             L += ["BEGIN:VEVENT", f"UID:{p.id}-d{day.index}-{k}@tripsight", f"DTSTAMP:{stamp}",
                   f"DTSTART:{s:%Y%m%dT%H%M%S}", f"DTEND:{e:%Y%m%dT%H%M%S}",
                   _fold("SUMMARY:" + _esc(p.name)), _fold("LOCATION:" + _esc(p.name)),

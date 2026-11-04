@@ -24,3 +24,23 @@ def test_no_return_leg_on_departure_day():
     t = _trip()
     st = day_stats(t, t.plan.days[-1])
     assert st.lodging_back is None
+
+
+def _with_weather():
+    from tripcore.models import WeatherSnap
+    t = _trip()
+    return t.model_copy(update={"weather": {"2026-11-07": WeatherSnap(day_weather="多云", day_temp=24, fetched="2026-11-04")}})
+
+
+def test_day_weather_in_map_data_and_calendar():
+    from tripcore.export_notes import build_ics
+    t = _with_weather()
+    days = build_map_data(t)["days"]
+    assert days[0]["weather"] == "多云 24°C" and days[1]["weather"] == ""
+    assert "当天天气预报：多云 24°C" in build_ics(t).replace("\r\n ", "")
+
+
+def test_day_route_map_is_per_day_and_excludes_night_hotel():
+    from tripcore import share
+    h = share.build_share_html(_trip(), show_lodging=True)
+    assert h.count('class="dmap"') == 2 and "__dayInit" in h

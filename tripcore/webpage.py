@@ -569,6 +569,8 @@ function dayHead(d) {
   const st = (S.day_stats || {})[String(d.index)] || {};
   const block = st.date ? '<small>' + esc(st.weekday) + '</small><b>' + Number(st.date.slice(8, 10)) + '</b><small>' + Number(st.date.slice(5, 7)) + '月</small>' : '<small>第</small><b>' + (d.index + 1) + '</b><small>天</small>';
   const chips = [];
+  if (d.weather) chips.push('<span class="chip" title="' + esc(d.weather_full || '') + '">🌤 ' + esc(d.weather) + '</span>');
+  else if (st.date) chips.push('<span class="chip mute" title="还没查这天的天气；让助手“查一下行程这几天的天气”（只在约 16 天内有预报）">🌤 暂无预报</span>');
   if (st.places !== undefined) {
     chips.push('<span class="chip">📍 ' + st.places + ' 个景点</span>');
     chips.push('<span class="chip" title="' + (st.km_estimated ? '含估算路段，点“更新路线”后更准' : '真实路线') + '">🚶 ' + (st.km_estimated ? '约 ' : '') + st.km + ' km</span>');

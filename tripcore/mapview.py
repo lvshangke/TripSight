@@ -19,6 +19,7 @@ from .connections import day_window, leave_by, terminal_leg, terminal_point, tra
 from .metrics import day_stats
 from .hours import hours_window
 from .models import Trip
+from .weather import fmt_snap
 from .routeplace import entry, exit_
 
 _ASSETS = Path(__file__).with_name("assets")
@@ -152,6 +153,14 @@ def _term_entry(c, role: str, when, tp) -> dict[str, Any]:
                                                   f"{c.dep_time:%m-%d %H:%M} → {c.arr_time:%m-%d %H:%M}"]}
 
 
+def _wx_short(trip: Trip, d) -> str:
+    """一天预报的短写法（如“多云 24°C”）；没查过或没有就是空串。只来自已存的预报快照。"""
+    w = trip.weather.get(d.isoformat()) if d else None
+    if not w or not getattr(w, "day_weather", ""):
+        return ""
+    return w.day_weather + (f" {w.day_temp:.0f}°C" if w.day_temp is not None else "")
+
+
 def build_map_data(trip: Trip) -> dict[str, Any]:
     region = trip_region(trip)
     days: list[dict[str, Any]] = []
@@ -244,6 +253,7 @@ def build_map_data(trip: Trip) -> dict[str, Any]:
                 e["show"] = pos
             days.append({"index": day.index, "label": f"第{day.index + 1}天" + (f" {d.isoformat()}" if d else ""),
                          "color": _COLORS[day.index % len(_COLORS)], "timeline": timeline,
+                         "weather": _wx_short(trip, d), "weather_full": (fmt_snap(trip.weather[d.isoformat()]) if d and d.isoformat() in trip.weather else ""),
                          "closed_loop": bool(lod_m and lodging and lod_m.id == lodging.id and st.places)})
     if region == "abroad":       # 境外：高德底图没有数据，用 OpenStreetMap；坐标本来就是 WGS84（_gcj 在境外不转换）
         tiles = {"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "sub": "abc", "attr": "© OpenStreetMap",
