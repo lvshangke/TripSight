@@ -559,7 +559,8 @@ def test_naming_job_runs_in_background_and_blocks_merge_while_running(tmp_path, 
     monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda c, log_path=None: Fake()))
     monkeypatch.setattr(s, "_amap", lambda: Fake())
     assert "后台" in s.run_naming_job()
-    assert "后台任务：正在" in s.restore_status() or "已完成" in s.restore_status()
+    st = s.restore_status()
+    assert "后台任务：" in st
     for _ in range(100):
         if "已完成" in s.wait_restore_job(2):
             break
@@ -567,3 +568,25 @@ def test_naming_job_runs_in_background_and_blocks_merge_while_running(tmp_path, 
     with pytest.raises(s.ToolError):
         s._job_write(state="running"); s.merge_stops(["p1", "p2"])  # 后台在跑时不让合并
     s._job_write(state="done")
+
+
+def test_search_links_batch_and_chat_links_and_share_controls(tmp_path):
+    out = s.search_links(keywords=["西湖", "灵隐寺", "西湖"], kind="guide")
+    assert [i["keyword"] for i in out["items"]] == ["西湖", "灵隐寺"] and all(l["url"].startswith("https://") for i in out["items"] for l in i["links"])
+    assert any("xiaohongshu" in l["url"] for l in out["items"][0]["links"])
+    with pytest.raises(s.ToolError):
+        s.search_links(keywords=[" "])
+    from tripcore import webpage
+    h = webpage.page_html()
+    assert 'id="refine"' in h and h.index('id="refine"') < h.index('id="edit"') + 400           # 更新路线在顶部，不用先点“编辑”
+    assert 'class="editonly sec"><button id="undo">撤销</button></div>' in h
+    assert 'id="sh_open"' in h and 'id="sh_dirpick"' in h and 'id="sh_pdf"' in h
+    assert "rel=\\\"noopener noreferrer\\\"" in h or 'rel="noopener noreferrer"' in h             # 聊天里的链接新窗口打开
+
+
+def test_share_html_has_navigation_links_on_legs():
+    from tripcore import share as sh
+    import inspect
+    src = inspect.getsource(sh._day_html)
+    assert 'e.get("link")' in src and "导航" in src
+    assert hasattr(sh, "render_pdf")

@@ -1829,8 +1829,9 @@ def restore_status() -> str:
         lines.append("如果用户说恢复这个：先确认，再 import_photo_trip(folder 或 album, radius_m)。预览里的点只是候选，没有名字。")
     else:
         lines.append("页面上还没有做过预览。")
-    if _job_line():
-        lines.append(_job_line())
+    job = _job_line()
+    if job:
+        lines.append(job)
     lines.append(AUTO_FLOW if restore_auto() else CONFIRM_FLOW)
     return "\n".join(lines)
 
@@ -3174,11 +3175,12 @@ def set_provider(provider: str) -> str:
     return msg
 
 
-def search_links(keyword: str, kind: str = "guide", sites: Optional[list[str]] = None) -> dict[str, Any]:
+def search_links(keyword: str = "", kind: str = "guide", sites: Optional[list[str]] = None, keywords: Optional[list[str]] = None) -> dict[str, Any]:
     """生成“去别的平台看别人攻略/点评”的搜索链接（小红书、大众点评、马蜂窝、百度、Google），由用户自己点开、用自己的账号登录。
     keyword 是景点名或想查的内容（会自动补上行程的目的地城市）；kind：guide 看攻略/游记，food 看美食点评，hotel 看酒店价格和口碑（携程、大众点评、小红书；酒店价格和日期、房型有关，链接不带日期，用户要自己选日期）；
     sites 可选，指定平台 id（xiaohongshu / dianping / mafengwo / baidu / google）。
     不抓取、不读取这些平台的内容，也不碰任何账号；用户看到合适的攻略后，把正文复制回聊天，再走 submit_candidates 流程。
+    keywords：一次给多个景点/餐厅各生成一组链接（最多 12 个）——你向用户推荐一批景点、美食时，用它给每个推荐都附上小红书等的搜索链接，用 markdown 链接写给用户。
     链接格式没有用真实账号逐一验证，打不开或搜不准时如实告诉用户。"""
     if kind not in (_links.GUIDE, _links.FOOD, _links.HOTEL):
         raise ToolError("kind 只能是 guide、food 或 hotel。")
@@ -3186,6 +3188,11 @@ def search_links(keyword: str, kind: str = "guide", sites: Optional[list[str]] =
         city = _load_context().get("city")
     except Exception:
         city = None
+    if keywords:
+        try:
+            return {"items": _links.search_links_many(list(keywords), city, kind, sites), "note": "这些是搜索链接，不是某个景点的真实页面；请用户自己点开并登录自己的账号。"}
+        except ValueError as e:
+            raise ToolError(str(e))
     try:
         res = _links.search_links(keyword, city, kind, sites)
     except ValueError as e:

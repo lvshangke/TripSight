@@ -271,9 +271,9 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="toast"></div><div id="ptip"></div>
 <nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><button data-pg="vid">视频</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
 <div id="app"><div id="side">
-<header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
+<header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="refine" title="给还没查过的路段查真实路线（会联网查高德，用你自己的 key）">更新路线</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
-<div class="editonly sec"><button id="undo">撤销</button> <button id="refine" title="给还没查过的路段查真实路线">更新路线</button></div>
+<div class="editonly sec"><button id="undo">撤销</button></div>
 <div id="tabs"></div>
 <div id="scroll"><details class="editonly sec" id="datedet"><summary>日期：<span id="dstate"></span></summary>
 <div id="cal"></div><div id="calinfo"></div>
@@ -300,7 +300,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <label>风格 <select id="sh_t"></select></label><div class="sm">只换配色和字体，都是浅色底</div><label><input type="checkbox" id="sh_b"> 路线图用高德底图（联网）</label><div class="sm" id="sh_bn">默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。</div><label><input type="checkbox" id="sh_l"> 公开酒店</label><div class="sm">默认不公开酒店名和从酒店出发的路段</div>
 <label><input type="checkbox" id="sh_c"> 公开花费</label><div class="sm">门票、餐饮人均、住宿估价</div>
 <label><input type="checkbox" id="sh_p"> 带上照片</label><div class="sm" id="sh_pn"></div>
-<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_gif">下载路线动画</button><button id="sh_cal" title="生成 .ics 日历文件，你自己双击导入；不连你的账号">导出日历（.ics）</button><div id="sh_err"></div>
+<button id="sh_html">下载网页</button><button id="sh_png">下载长图</button><button id="sh_pdf" title="整页一张的 PDF，里面的“在地图中打开 / 导航”可以直接点，手机上也行（长图是图片，点不了）">下载可点击长页面（PDF）</button><button id="sh_gif">下载路线动画</button><button id="sh_cal" title="生成 .ics 日历文件，你自己双击导入；不连你的账号">导出日历（.ics）</button><div id="sh_dir" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:13px"><span>保存到：<code id="sh_dirp">…</code></span><button class="pk" id="sh_dirpick">选择文件夹</button><button class="pk" id="sh_open">打开文件夹</button></div><div id="sh_err"></div>
 <div class="sm" style="margin-left:0">不含航班/车次号，不含任何 key；这是此刻的快照，行程改了要重新下载。</div></div>
 <div class="ph"><iframe id="sh_frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="分享预览"></iframe></div></div>
 <div class="pane" id="pane_hb">
@@ -699,7 +699,7 @@ $('undo').onclick = async () => { try { await api('undo', {base_revision: S.revi
 // ---- 聊天 + 自动刷新 ----
 const msgs = $('cmsgs'); let busy = false;
 // 助手回复里的 Markdown：先整体转义，再只渲染加粗、行内代码、列表、表格、引用、分隔线；图片和链接不渲染（不会向外部地址发请求）
-function mdInline(t) { return esc(t).replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>'); }
+function mdInline(t) { return esc(t).replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>'); }
 function md(src) {
   const L = String(src).replace(/\r/g, '').split('\n'), out = []; let i = 0;
   const isRow = l => /^\s*\|.*\|\s*$/.test(l), isUl = l => /^\s*[-*]\s+/.test(l), isOl = l => /^\s*\d+[.)]\s+/.test(l);
@@ -810,6 +810,7 @@ async function shareRefresh() {
     $('sh_b').disabled = !r.key_ok; if (!r.key_ok) $('sh_b').checked = false;
     $('sh_bn').textContent = !r.key_ok ? '没有检测到 AMAP_KEY：在你自己的终端里设置后重启工作台，这个选项才能用。' : (r.bm_note ? '部分底图没取到：' + r.bm_note + '（对应的图已退回无底图）' : '默认关闭。打开后会用你自己的高德 key 联网取底图，只发地图中心、缩放和图片大小，不发景点名和路线；底图范围内的酒店名可能出现在地图上。');
     $('sh_gif').disabled = !r.gif_ok; $('sh_gif').title = r.gif_ok ? '把路线图按天画出来的过程录成 GIF' : '需要先安装 Playwright 和 Pillow';
+    $('sh_pdf').disabled = !r.png_ok;
     $('sh_png').disabled = !r.png_ok; $('sh_png').title = r.png_ok ? '' : '需要先安装 Playwright：pip install playwright，再 python -m playwright install chromium';
     $('sh_p').disabled = !r.photo_count; if (!r.photo_count) $('sh_p').checked = false;
     $('sh_pn').textContent = r.photo_count ? '已有 ' + r.photo_count + ' 张，放在对应景点下面' : '还没有照片：在“编辑”模式下给景点添加';
@@ -1023,7 +1024,7 @@ function homeMaybe() {
 function homeDone() { try { sessionStorage.setItem('tsHome', '1'); } catch (e) {} $('home').classList.remove('on'); }
 $('home_plan').onclick = () => { homeDone(); pgShow('plan'); }; $('home_restore').onclick = () => { homeDone(); pgShow('restore'); };
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
-$('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message; } catch (e) { $('sh_err').textContent = e.message; } };
+$('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message + '（点右边“打开文件夹”就能找到）'; } catch (e) { $('sh_err').textContent = e.message; } };
 let VD_ALBUM = '';
 const vdSrc = () => VD_ALBUM ? {album: VD_ALBUM} : {folder: $('vd_path').value};
 $('vd_path').oninput = () => { VD_ALBUM = ''; };
@@ -1182,8 +1183,11 @@ $('hb_tovid').onclick = async () => { const d = HB.data; await pgShow('vid'); if
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
   try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_fp').onclick = async () => { $('hb_fp').disabled = true; try { say('正在补照片…'); const r = await api('hb_fill_photos', {per_stop: 3}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); toast(e.message, true); } finally { $('hb_fp').disabled = false; } };
-async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
+async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('sh_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
 $('hb_dirpick').onclick = async () => { try { const r = await api('pick_path', {kind: 'folder', prompt: '请选择导出文件夹'}); if (r.path) { const d = await dirLoad({path: r.path}); if (d) toast('导出文件夹已改为 ' + d.path); } } catch (e) { toast(e.message, true); } };
+$('sh_dirpick').onclick = $('hb_dirpick').onclick;
+$('sh_open').onclick = async () => { try { const r = await api('reveal_exports', {}); $('sh_err').textContent = '已打开：' + r.path; } catch (e) { $('sh_err').textContent = e.message; } };
+$('sh_pdf').onclick = async () => { $('sh_err').textContent = '正在生成 PDF…'; $('sh_pdf').disabled = true; try { const r = await api('share_pdf', shareOpts()); dl(r.pdf, '行程分享.pdf'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } finally { $('sh_pdf').disabled = false; } };
 $('hb_dirdef').onclick = async () => { const d = await dirLoad({path: ''}); if (d) toast('已恢复默认导出文件夹：' + d.path); };
 dirLoad();
 $('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r = await api('hb_regions', {}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };

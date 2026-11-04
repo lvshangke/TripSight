@@ -59,6 +59,19 @@ def search_links(keyword: str, city: Optional[str] = None, kind: str = GUIDE,
             for s in chosen]
 
 
+def search_links_many(keywords: list[str], city: Optional[str] = None, kind: str = GUIDE,
+                      sites: Optional[list[str]] = None) -> list[dict[str, object]]:
+    """一次给多个景点/餐厅各生成一组搜索链接：[{keyword, links}]（最多 12 个，重复的去掉）。"""
+    seen: list[str] = []
+    for k in keywords:
+        k = str(k).strip()
+        if k and k not in seen:
+            seen.append(k)
+    if not seen:
+        raise ValueError("关键词不能为空")
+    return [{"keyword": k, "links": search_links(k, city, kind, sites)} for k in seen[:12]]
+
+
 def templates() -> list[dict[str, object]]:
     """给网页用：页面自己用关键词拼网址（模板只有这一份）。"""
     return [{"id": s.id, "name": s.name, "kinds": list(s.kinds), "tpl": s.template, "suffix": s.suffix} for s in SITES]

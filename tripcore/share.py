@@ -42,6 +42,7 @@ h1{font-family:var(--hfont);font-weight:var(--hw);font-size:var(--hs);margin:4px
 .sb{flex:1;min-width:0}.sb .nm{font-weight:600}.sb .tm{color:var(--mute);font-size:13px}
 .sb .ln{color:var(--mute);font-size:12.5px}.sb a{color:var(--link);font-size:12.5px;text-decoration:none}
 .leg{margin:0 14px 0 48px;padding:2px 0 2px 10px;border-left:2px dashed var(--line);color:var(--mute);font-size:12.5px}
+.leg a{color:var(--link);margin-left:6px;text-decoration:none;border-bottom:1px solid currentColor}
 .meal,.hot,.term{padding:6px 14px 6px 48px;color:var(--mute);font-size:13px}
 .ph{display:block;width:100%;border-radius:var(--rb);margin:6px 0 2px}.cap{color:var(--mute);font-size:12px;margin-bottom:4px}
 .ph{cursor:zoom-in}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:9}#lb.on{display:flex}
@@ -192,7 +193,8 @@ def _day_html(trip: Trip, d: dict, color: str, st: dict, show_lodging: bool, sho
                 km = f' · {e["km"]:.1f}km' if e.get("km") else ""
                 est = "" if e.get("real") else "（估算）"
                 note = f'｜{e["note"]}' if e.get("note") else ""
-                out.append(f'<div class="leg">{_e(e["mode"])} {e["minutes"]}分钟{km}{est}{_e(note)}</div>')
+                nav = f' <a href="{_e(e["link"])}">导航</a>' if e.get("link") else ""
+                out.append(f'<div class="leg">{_e(e["mode"])} {e["minutes"]}分钟{km}{est}{_e(note)}{nav}</div>')
         elif t == "stop":
             lines = [x for x in e["lines"] if show_costs or not x.startswith("门票")]
             ln = "".join(f'<div class="ln">{_e(x)}</div>' for x in lines)
@@ -275,6 +277,26 @@ def render_png(html_path: Path, png_path: Path, width: int = 430) -> Optional[st
             b.close()
     except Exception as e:                                  # 浏览器没装好等：不影响 HTML
         return f"截图失败：{type(e).__name__}"
+    return None
+
+
+def render_pdf(html_path: Path, pdf_path: Path, width: int = 430) -> Optional[str]:
+    """把分享页存成“一页到底”的 PDF（手机宽度）：和长图长得一样，但“在地图中打开 / 导航”链接可以点。成功返回 None，失败返回原因。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return "没有安装 playwright（pip install playwright && python -m playwright install chromium）"
+    try:
+        with sync_playwright() as p:
+            b = _launch(p)
+            pg = b.new_page(viewport={"width": width, "height": 900})
+            pg.goto(html_path.resolve().as_uri())
+            h = int(pg.evaluate("document.documentElement.scrollHeight")) + 2
+            pg.pdf(path=str(pdf_path), width=f"{width}px", height=f"{min(h, 18000)}px", print_background=True,
+                   margin={"top": "0", "right": "0", "bottom": "0", "left": "0"})
+            b.close()
+    except Exception as e:
+        return f"生成 PDF 失败：{type(e).__name__}"
     return None
 
 
