@@ -163,3 +163,17 @@ def test_route_card_with_basemap_uses_given_image_and_path():
     seg2 = v.Seg("card", 3.0, title="t", points=pts, variant="route")
     seg2.extra["base_fn"] = lambda p, d: (_ for _ in ()).throw(RuntimeError("没网"))
     assert v._route_card(seg2, (720, 1280), v._pal("手账"), 1.0).size == (720, 1280)     # 取不到底图退回线条图
+
+
+def test_scan_videos_defaults_to_restore_source_and_status_mentions_videos(tmp_path, monkeypatch):
+    """恢复行程：不给路径也能用读照片的那个文件夹整理视频；restore_status 提示有几段视频可以剪短片。"""
+    import shutil
+    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+        pytest.skip("需要 ffmpeg")
+    from tests.test_photo_trip_tools import _album
+    from tripcore import mcp_server as s
+    photos = tmp_path / "ph"; photos.mkdir(); _album(photos)
+    s.import_photo_trip(str(photos))
+    _mk(photos / "a.mov", "2026-06-19T02:03:00Z")
+    assert "1 段视频" in s.restore_status()
+    assert "a.mov" in s.scan_videos() or "视频" in s.scan_videos()

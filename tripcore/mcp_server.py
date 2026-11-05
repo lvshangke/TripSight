@@ -1288,6 +1288,9 @@ def _video_stops() -> tuple[list[dict], list[dict]]:
 def _video_scan(folder: str, album: str = ""):
     from . import video as _v
     missing = 0
+    if not folder and not album:                     # 没给来源：恢复行程就用读照片的那个相册/文件夹
+        side = _load_json_file(_photo_trip_path())
+        album, folder = str(side.get("album") or ""), str(side.get("folder") or "")
     try:
         if album:
             from . import photoslib as _pl
@@ -1329,7 +1332,8 @@ def scan_videos(folder: str = "", album: str = "") -> str:
     """整理用户的视频素材：扫描 folder（用户给的文件夹，不递归）里的 .mov/.mp4/.m4v，读拍摄时间、位置（iPhone 视频自带）、时长，
     按拍摄时间和位置归到行程里的各个景点，返回每个景点有几段、多长，以及归不上的。只读元数据，不看画面内容；需要本机装好 ffmpeg。
     归不上的多半是没带位置、时间又对不上，让用户检查或手动指定；要出粗剪片用 export_rough_cut。
-    视频在照片 App 相册里时给 album=相册名（Mac，只读本机原文件，不复制；只在 iCloud 上的读不了），不用先导出。"""
+    视频在照片 App 相册里时给 album=相册名（Mac，只读本机原文件，不复制；只在 iCloud 上的读不了），不用先导出。
+    恢复行程里不给 folder 和 album 就用读照片的那个相册/文件夹。"""
     _v, clips, bad, n, order = _video_scan(folder, album)
     names = {o["id"]: o["name"] for o in order}
     per: dict[str, list] = {}
@@ -1912,8 +1916,26 @@ AUTO_FLOW = ("执行模式：【自动执行】用户在页面上打开了自动
              "②tag_regions，再 autoname_stops（失败就把结果里的原因告诉用户，不要改用别的服务反查）；"
              "③同一天里名字相同或明显同属一个景区的点 merge_stops，明显不是景点的零散点 delete_stop；"
              "④suggest_day_titles 后给每天 set_day_title；⑤有图可看的点用 view_stop 看过再 save_stop_story（只写画面里看得到的）；"
-             "⑥最后不要调用 export_handbook：告诉用户手册预览已准备好，请他在页面第 5 步点“导出”。每一步的结果都以工具返回为准，不编造。")
+             "⑥用户在对话里说了要旅行短片（或“连短片一起做”）且照片来源里有视频（下面会写“视频 N 段”）：scan_videos() 看分组并一句话告诉用户，再 export_rough_cut()"
+             "（不用给路径，默认用读照片的那个来源；长度没说就 60 秒，风格用页面上选的、没有就手账；basemap=true 联网用高德地图，只在用户说要时才开）；用户没提短片就只说一句“视频可以剪成旅行短片”；"
+             "⑦最后不要调用 export_handbook：告诉用户手册预览已准备好，请他在页面第 5 步点“导出”。每一步的结果都以工具返回为准，不编造。")
 CONFIRM_FLOW = "执行模式：【逐步确认】改动前（导入、合并、删除、改名、导出）先和用户确认。"
+
+
+def _restore_video_count() -> int:
+    """恢复行程的照片来源（相册或文件夹这一层）里有几段视频；读不了按 0。"""
+    from .video import VIDEO_EXT
+    try:
+        side = _load_json_file(_photo_trip_path())
+        if side.get("album"):
+            from . import photoslib as _pl
+            paths, missing = _pl.album_videos(str(side["album"]))
+            return len(paths) + missing
+        if side.get("folder"):
+            return sum(1 for p in Path(side["folder"]).expanduser().iterdir() if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in VIDEO_EXT)
+    except Exception:
+        return 0
+    return 0
 
 
 def restore_status() -> str:
@@ -1939,6 +1961,9 @@ def restore_status() -> str:
     job = _job_line()
     if job:
         lines.append(job)
+    nv = _restore_video_count()
+    if nv:
+        lines.append(f"照片来源里有 {nv} 段视频：用户想要时可以 scan_videos() 看分组、export_rough_cut() 剪成旅行短片（不用给路径）。")
     lines.append(AUTO_FLOW if restore_auto() else CONFIRM_FLOW)
     return "\n".join(lines)
 
