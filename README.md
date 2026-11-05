@@ -64,21 +64,23 @@ TripSight 是一个**全流程旅行助手**：它不是“一键生成攻略”
 
 TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的“工作台面”**：Agent 只负责听懂你要什么、决定调用哪个工具；排程、检查、查路线、查天气、生成导出这些都由确定性的 MCP 工具完成，每一步都出现在左侧“助手”卡片里，可核对、可撤销。下面是三条完整流程的**演示重放**（完整视频在 [`docs/videos/`](docs/videos/)，点图片可看 mp4）：
 
-<table>
-<tr>
-<td width="50%" valign="top"><b>① 计划行程：说想去哪 → 助手排好、查实、串起路线</b><br><br>
-<a href="docs/videos/plan-flow.mp4"><img src="docs/images/plan-preview.gif" alt="计划行程演示重放：新建行程、聊天加景点、分天、提案确认、选餐厅、记住宿、换真实路线、自动查天气、导出"></a><br>
-<sub>Agent 做的事：把一句话拆成“查坐标→加景点→分 3 天→检查”；发现观前街太早到时<b>提出修改提案</b>，等你回“确认”才执行；找餐厅、记住宿（只记录不预订）；一句话把 11 段换成高德真实路线；工作台打开后<b>自动</b>补天气；最后导出分享页、PDF、日历。</sub></td>
-<td width="50%" valign="top"><b>② 恢复行程：从旧手机相册还原一次走过的旅行</b><br><br>
-<a href="docs/videos/restore-flow.mp4"><img src="docs/images/restore-preview.gif" alt="恢复行程演示重放：选相册、预览、选日期、自动执行、编辑、导出"></a><br>
-<sub>Agent 做的事：打开“自动执行”后，它连续完成<b>还原停留点 → 查地名 → 标注城市/区县 → 给每天起标题 → 补景点照片</b>，停在预览等你确认；耗时步骤在后台跑，不会因工具超时中断；之后可继续编辑，并导出手册、卡片、PDF、路线动画。</sub></td>
-</tr>
-</table>
+<b>① 计划行程：说想去哪 → 助手排好、查实、串起路线</b>
 
-<p><b>③ 恢复行程 → 导出里的「旅行短片」选项</b>（真实测试：作者在台州拍的 7 段 iPhone 视频，景点名用高德反查）<br>
-<a href="docs/videos/film-flow.mp4"><img src="docs/images/film-preview.gif" width="48%" alt="旅行短片选项演示重放"></a>&ensp;
-<a href="docs/videos/travel-film-sample.mp4"><b>▶ 查看生成的旅行短片示例（51 秒）</b></a><br>
-<sub>在导出这一步，如果相册/文件夹里有视频，会多出一个可选的「旅行短片」块：先看视频怎么按景点分组，再一键生成。Agent 做的事：只读视频的拍摄时间、位置和时长（不看画面），按行程归到各景点；片头（行程名、日期、几天几处多少公里）、每天一张标题卡（用你起的标题）、画线动画的路线卡、景点名字幕条、交叉淡化，保留每段视频的原声并统一音量，版式色调跟你选的手册风格一致；路线卡可选画在真实的高德地图上、沿高德驾车路径（联网，用你自己的 key，只发地图范围和相邻景点坐标，不发景点名）；没有配乐，也可以另外生成剪映草稿。演示视频里页面操作和短片播放（带原声）是完整一条。在聊天里也能让助手做：开着「自动执行」说一句“连旅行短片一起做”，助手会在还原、起名、标区县、起标题之后，自己整理视频分组并生成短片（不用给路径）。</sub></p>
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/plan-flow.mp4">直接打开 plan-flow.mp4</a></sub></p>
+
+<sub>Agent 做的事：把一句话拆成“查坐标→加景点→分 3 天→检查”；发现观前街太早到时<b>提出修改提案</b>，等你回“确认”才执行；找餐厅、记住宿（只记录不预订）；一句话把 11 段换成高德真实路线；工作台打开后<b>自动</b>补天气；最后导出分享页、PDF、日历。</sub>
+
+<b>② 恢复行程：从旧手机相册还原一次走过的旅行</b>
+
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/restore-flow.mp4" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/restore-flow.mp4">直接打开 restore-flow.mp4</a></sub></p>
+
+<sub>Agent 做的事：打开“自动执行”后，它连续完成<b>还原停留点 → 查地名 → 标注城市/区县 → 给每天起标题 → 补景点照片</b>，停在预览等你确认；耗时步骤在后台跑，不会因工具超时中断；之后可继续编辑，并导出手册、卡片、PDF、路线动画。</sub>
+
+<b>③ 恢复行程 → 导出里的「旅行短片」选项</b>
+
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/film-flow.mp4" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/film-flow.mp4">直接打开 film-flow.mp4</a></sub></p>
+
+<sub>在导出这一步，如果相册/文件夹里有视频，会多出一个可选的「旅行短片」块：先看视频怎么按景点分组，再一键生成。Agent 做的事：只读视频的拍摄时间、位置和时长（不看画面），按行程归到各景点；片头（行程名、日期、几天几处多少公里）、每天一张标题卡（用你起的标题）、画线动画的路线卡、景点名字幕条、交叉淡化，保留每段视频的原声并统一音量，版式色调跟你选的手册风格一致；路线卡可选画在真实的高德地图上、沿高德驾车路径（联网，用你自己的 key，只发地图范围和相邻景点坐标，不发景点名）；没有配乐，也可以另外生成剪映草稿。演示视频里页面操作和短片播放（带原声）是完整一条。在聊天里也能让助手做：开着「自动执行」说一句“连旅行短片一起做”，助手会在还原、起名、标区县、起标题之后，自己整理视频分组并生成短片（不用给路径）。　<a href="docs/videos/travel-film-sample.mp4"><b>▶ 看生成的旅行短片示例（51 秒，带原声）</b></a></sub>
 
 <sub>说明：这些是**演示重放**——用真实引擎生成的数据或真实运行结果（计划行程用作者的一次真实对话记录与行程快照；恢复行程用作者旧手机 2024 年 1 月海南三天的相册，只选了风景照片），在真实页面上按真实的步骤顺序回放，**不是**模型现场操作的录屏。地图为高德底图 © 高德地图。</sub>
 
@@ -133,8 +135,8 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 <p>
 <img src="docs/images/feat-links.gif" width="23%" alt="点击跳转导航">&ensp;
 <img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;
-<img src="docs/images/feat-travelogue.gif" width="23%" alt="游记生成">
+<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">
+
 </p>
 
 <sub>图中为演示用的苏州 3 日行程（天气为真实预报）和作者旧手机的海南相册（只选风景）；底图 © 高德地图。以上截图为演示重放生成。</sub>

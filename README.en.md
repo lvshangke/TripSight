@@ -31,21 +31,24 @@ TripSight is an **all-in-one travel assistant**. It is not a "one-click guide ge
 
 In TripSight the **chat assistant is the operator and the web workbench is its work surface**; every step shows up in the "Assistant" card on the left — verifiable and undoable. Three flows below are **demo replays** (full videos in [`docs/videos/`](docs/videos/); click a preview to open the mp4):
 
-<table>
-<tr>
-<td width="50%" valign="top"><b>1. Plan a trip</b><br><br>
-<a href="docs/videos/plan-flow.mp4"><img src="docs/images/plan-preview.gif" alt="Plan-trip replay"></a><br>
-<sub>One sentence becomes lookup → add stops → split into 3 days → check; a late-opening place triggers a <b>proposal</b> you must confirm; lunch and (never booked) hotel; 11 legs become real Amap routes; weather is fetched <b>automatically</b>; then export.</sub></td>
-<td width="50%" valign="top"><b>2. Restore a trip</b><br><br>
-<a href="docs/videos/restore-flow.mp4"><img src="docs/images/restore-preview.gif" alt="Restore-trip replay"></a><br>
-<sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; then edit and export a handbook, cards, PDF and route animation.</sub></td>
-</tr>
-</table>
+<b>1. Plan a trip</b>
 
-<p><b>3. Restore → Export: the optional "Travel film"</b> (a real test with 7 iPhone clips from a Taizhou trip, stops named via Amap)<br>
-<a href="docs/videos/film-flow.mp4"><img src="docs/images/film-preview.gif" width="48%" alt="Travel film option replay"></a>&ensp;
-<a href="docs/videos/travel-film-sample.mp4"><b>▶ Watch the generated film (51 s)</b></a><br>
-<sub>When the album/folder contains videos, the export step shows an optional "Travel film" block: preview how clips group by stop, then generate. The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and builds an intro (trip name, dates, days/places/km), a title card per day (your titles), animated route cards, place captions, cross-dissolves, the clips' original sound with normalised loudness, all in the handbook style you picked; route cards can optionally be drawn on the real Amap map along Amap driving paths (online, your own key; only map extent and neighbouring stop coordinates are sent, never stop names). The demo shows the page flow and the full film playing with its sound. You can also ask the assistant in chat: with auto mode on, say "include the travel film" and it scans the clips and generates the film after restoring, naming, tagging districts and day titles (no path needed). No added music; a Jianying draft is optional.</sub></p>
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/plan-flow.mp4">Open plan-flow.mp4</a></sub></p>
+
+<sub>One sentence becomes lookup → add stops → split into 3 days → check; a late-opening place triggers a <b>proposal</b> you must confirm; lunch and (never booked) hotel; 11 legs become real Amap routes; weather is fetched <b>automatically</b>; then export.</sub>
+
+<b>2. Restore a trip</b>
+
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/restore-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/restore-flow.mp4">Open restore-flow.mp4</a></sub></p>
+
+<sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; then edit and export a handbook, cards, PDF and route animation.</sub>
+
+<b>3. Restore → Export: the optional "Travel film"</b>
+
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/film-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/film-flow.mp4">Open film-flow.mp4</a></sub></p>
+
+<sub>When the album/folder contains videos, the export step shows an optional "Travel film" block: preview how clips group by stop, then generate. The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and builds an intro (trip name, dates, days/places/km), a title card per day (your titles), animated route cards, place captions, cross-dissolves, the clips' original sound with normalised loudness, all in the handbook style you picked; route cards can optionally be drawn on the real Amap map along Amap driving paths (online, your own key; only map extent and neighbouring stop coordinates are sent, never stop names). The demo shows the page flow and the full film playing with its sound. You can also ask the assistant in chat: with auto mode on, say "include the travel film" and it scans the clips and generates the film after restoring, naming, tagging districts and day titles (no path needed). No added music; a Jianying draft is optional. <a href="docs/videos/travel-film-sample.mp4"><b>▶ Watch the generated film (51 s, with sound)</b></a></sub>
+
 
 <sub>These are **demo replays**: data from the real engine or real runs, played back on the real page in the real step order — **not** a live model session. Plan flow = the author's real chat transcript and trip snapshots; restore flow = the author's old-phone album (Hainan, Jan 2024, scenery only). Basemap © Amap.</sub>
 
@@ -81,8 +84,8 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 <p>
 <img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&ensp;
 <img src="docs/images/feat-tools.gif" width="23%" alt="Tools">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&ensp;
-<img src="docs/images/feat-travelogue.gif" width="23%" alt="Travelogue">
+<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">
+
 </p>
 
 <sub>Screens use a demo Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap.</sub>
