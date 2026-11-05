@@ -70,7 +70,7 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 
 
-<video src="https://github.com/user-attachments/assets/f51d01ee-3c9b-452a-9449-619907dbe81e" width="560" controls></video>
+<video src="https://github.com/user-attachments/assets/f51d01ee-3c9b-452a-9449-619907dbe81e" width="70%" controls></video>
 
 
 
