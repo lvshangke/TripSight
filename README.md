@@ -1,7 +1,4 @@
 
-
-https://github.com/user-attachments/assets/fbc1564d-7bb2-4eef-b163-8dd038b1fe12
-
 <div align="center">
 
 <h1>🧭 TripSight</h1>
