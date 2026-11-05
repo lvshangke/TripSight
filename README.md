@@ -66,7 +66,11 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 <b>① 计划行程：说想去哪 → 助手排好、查实、串起路线</b>
 
-<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/plan-flow.mp4">直接打开 plan-flow.mp4</a></sub></p>
+
+
+
+
+<p align="center"><video src="[https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4](https://github.com/user-attachments/assets/45a83ba6-6f7e-492e-b9c6-a55b3a3d7a44)" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/plan-flow.mp4">直接打开 plan-flow.mp4</a></sub></p>
 
 <sub>Agent 做的事：把一句话拆成“查坐标→加景点→分 3 天→检查”；发现观前街太早到时<b>提出修改提案</b>，等你回“确认”才执行；找餐厅、记住宿（只记录不预订）；一句话把 11 段换成高德真实路线；工作台打开后<b>自动</b>补天气；最后导出分享页、PDF、日历。</sub>
 
@@ -120,11 +124,7 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 <a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="恢复行程编辑页：台州的停留点、照片和助手"></a>
 
-**分享的种类很多，这里只放一排缩略图**：8 种分享风格（手账、杂志、清新、胶片、海边……）一键切换，每天还有一张按当天范围放大的路线图，可导出分天播放的路线动画 GIF。酒店和花费默认不公开，勾选才带。
-
-<img src="docs/images/share-strip.jpg" alt="8 种分享风格（缩略）">
-
-**还有这些小功能**（早先录的演示，界面是旧版，功能仍然有效）：
+**还有这些小功能**：
 
 <p>
 <img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;
