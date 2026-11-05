@@ -69,8 +69,9 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 
 
-
-<p align="center"><video src="[https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4](https://github.com/user-attachments/assets/45a83ba6-6f7e-492e-b9c6-a55b3a3d7a44)" width="560" controls></video><br><sub>没有显示播放器？<a href="docs/videos/plan-flow.mp4">直接打开 plan-flow.mp4</a></sub></p>
+<p align="center">
+  <video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4" width="560" controls></video>
+</p>
 
 <sub>Agent 做的事：把一句话拆成“查坐标→加景点→分 3 天→检查”；发现观前街太早到时<b>提出修改提案</b>，等你回“确认”才执行；找餐厅、记住宿（只记录不预订）；一句话把 11 段换成高德真实路线；工作台打开后<b>自动</b>补天气；最后导出分享页、PDF、日历。</sub>
 
