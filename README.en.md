@@ -158,16 +158,25 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 
 </details>
 
-## 🏗️ Architecture
+## 🏗️ Architecture and capability split
+
+**86 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
+
+| Stage | Tools | Skills | Highlights |
+|---|---|---|---|
+| **Before · Plan** | 41 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
+| **After · Restore** | 16 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…) |
+| **Record & share** | 10 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
+| **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
 
 ```
-chat agent (LLM, e.g. nanobot) ──proposes──▶ tripcore MCP server ──▶ trip.json (versioned, undoable)
-   understands intent only                    schedules · checks · versions · routes
-                                              facts only from tools or the user
-web workbench (127.0.0.1) ─────────────────────────────▲
+tripcore/   core library and MCP server (mcp_server.py: 86 tools; scheduler / validator / changes;
+            amap / routemap / weather; phototrip / photoslib / stays; handbook / share / video; web + webpage: workbench)
+skills/     manuals for the agent
+nanobot/    example config (no secrets)
+scripts/    install_skills.py · merge_nanobot_config.py
+tests/  docs/
 ```
-
-`tripcore/` is the core library and MCP server; `skills/` holds the agent's instructions; `nanobot/config.example.json` is the integration sample (no secrets); `scripts/install_skills.py` installs the skills into nanobot. nanobot itself is not vendored: you install it yourself, so upgrading it never conflicts with this repo.
 
 ## 🔐 Safety
 

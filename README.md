@@ -177,17 +177,36 @@ https://github.com/user-attachments/assets/aa648752-0876-461f-9e26-5e3d3c9e1b88
 > - 价格、营业时间、天气均为参考值，出行前请以官方信息为准。
 > 助手**不会**订票、订酒店或付款。
 
-## 🏗️ 架构
+## 🏗️ 架构与能力分布
+
+**86 个 MCP 工具 · 9 份 skill · 570+ 个自动化测试**，覆盖计划、路上、恢复、记录、足迹五个阶段。LLM 只负责听懂和提议，工具确定性地做事，skill 规定什么时候用哪些工具、哪些事不能自己编。
+
+| 阶段 | 工具数 | 对应 skill | 代表功能 |
+|---|---|---|---|
+| **出发前 · 计划行程** | 41 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | 行程基础、景点与住宿、排程与检查、路线与交通、餐食、攻略与导入（`schedule_days` `check_plan` `refine_routes` `submit_candidates`…） |
+| **回来后 · 恢复行程** | 16 | `trip-restore` | 照片还原、起名、标区县、起标题、手册（`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…） |
+| **记录与分享** | 10 | `trip-export` | 手机地图、微信文字、高德 App 地图、日历、GPX、分享长图、旅行短片 |
+| **长期积累** | 15 | `trip-review` | 足迹、账单与花费、复盘、游记（12）；偏好记忆（3） |
+
+**项目结构**
 
 ```
-聊天 Agent（LLM，如 nanobot）  ──提案──▶  tripcore MCP 服务  ──▶  trip.json（版本化、可撤销）
-   只理解意图、提出修改                     排程 · 检查 · 版本 · 路线
-                                           事实只来自工具或用户
-网页工作台（127.0.0.1）  ─────────────────────────▲
+tripcore/                核心库与 MCP 服务
+├─ mcp_server.py         86 个工具的入口
+├─ scheduler.py · validator.py · changes.py   分天排程 / 规则检查 / 版本与撤销
+├─ amap.py · routemap.py · weather.py         高德路线与地图、天气
+├─ phototrip.py · photoslib.py · stays.py     照片聚类成停留点、读 Mac 照片 App
+├─ handbook.py · share.py · video.py          手册与卡片、分享、旅行短片
+└─ web.py · webpage.py   网页工作台（单文件页面，只监听 127.0.0.1）
+skills/                  给 Agent 的说明书
+nanobot/                 接入配置样例（不含密钥）
+scripts/                 install_skills.py · merge_nanobot_config.py
+tests/                   自动化测试
+docs/                    安装、WorkBuddy 接入、工具清单、功能与限制
 ```
 
-- `tripcore/` 是核心库和 MCP 服务；`skills/` 是给 Agent 的“说明书”（流程与铁律）；`nanobot/config.example.json` 是接入配置样例（不含密钥）；`scripts/install_skills.py` 把技能安装进 nanobot。
-- nanobot 不在本仓库里，由你自己安装；仓库只提供接入所需的技能、配置样例和脚本，这样升级 nanobot 不会和本项目冲突。
+- nanobot 不在本仓库里，由你自己安装；仓库只提供接入所需的技能、配置样例和脚本，升级 nanobot 不会和本项目冲突。
+- 数据是本机 JSON（`trip.json`，版本化、可撤销）；API key 只放在你自己的配置里。
 
 ## 🔐 安全原则
 
