@@ -118,14 +118,9 @@ TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的
 
 <a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="恢复行程编辑页：台州的停留点、照片和助手"></a>
 
-**分享的种类很多，下面是其中两类的缩略展示**（点开看大图）：8 种分享风格，以及每天一张按当天范围放大的路线图（还能导出分天播放的路线动画 GIF）。酒店和花费默认不公开，勾选才带。
+**分享的种类很多，这里只放一排缩略图**：8 种分享风格（手账、杂志、清新、胶片、海边……）一键切换，每天还有一张按当天范围放大的路线图，可导出分天播放的路线动画 GIF。酒店和花费默认不公开，勾选才带。
 
-<table>
-<tr>
-<td width="50%" align="center"><a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 种分享风格"></a><br><sub>8 种分享风格，一键切换</sub></td>
-<td width="50%" align="center"><a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="第 2 天、第 3 天的路线图"></a><br><sub>分天路线图（可带高德底图）</sub></td>
-</tr>
-</table>
+<img src="docs/images/share-strip.jpg" alt="8 种分享风格（缩略）">
 
 **还有这些小功能**（早先录的演示，界面是旧版，功能仍然有效）：
 

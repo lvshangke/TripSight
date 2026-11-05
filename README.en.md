@@ -66,14 +66,9 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 
 <a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="Restore edit page for the Taizhou trip"></a>
 
-**There are many share formats; two of them in small** (click for full size): 8 share themes and the per-day route maps (plus a route-animation GIF per day). Hotels and costs are hidden by default.
+**There are many share formats; here is just a thin strip**: 8 share themes (journal, magazine, fresh, film, seaside…) switch with one click, plus a per-day route map and an optional route-animation GIF. Hotels and costs are hidden by default.
 
-<table>
-<tr>
-<td width="50%" align="center"><a href="docs/images/showcase-themes.jpg"><img src="docs/images/showcase-themes.jpg" alt="8 share themes"></a><br><sub>8 share themes, one click</sub></td>
-<td width="50%" align="center"><a href="docs/images/showcase-routes.jpg"><img src="docs/images/showcase-routes.jpg" alt="Route maps of day 2 and day 3"></a><br><sub>Per-day route maps (optional Amap basemap)</sub></td>
-</tr>
-</table>
+<img src="docs/images/share-strip.jpg" alt="8 share themes (thumbnails)">
 
 **More small features** (older recordings, older UI, still valid):
 
