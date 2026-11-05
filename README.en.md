@@ -1,4 +1,27 @@
-# 🧭 TripSight
+<div align="center">
+
+<h1>🧭 TripSight</h1>
+
+<p>
+<a href="README.md">中文</a> ·
+<a href="docs/SETUP.md">Setup</a> ·
+<a href="DESIGN.md">Design notes</a>
+</p>
+
+<p>
+<img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
+<img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
+<img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
+<img src="https://img.shields.io/badge/MCP%20tools-86-8A2BE2" alt="MCP tools">
+</p>
+
+<p>
+<a href="docs/images/poster.jpg">
+<img src="docs/images/poster.jpg" alt="TripSight: plan, restore, record and share" width=100%>
+</a>
+</p>
+
+</div>
 
 **Your all-in-one travel assistant: plan before you go, check on the road, and rebuild the trip from your photo album when you are back.**
 
