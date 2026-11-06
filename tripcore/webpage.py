@@ -16,7 +16,7 @@ TEMPLATE = r"""<!doctype html>
 .vplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;padding:0}
 .vbd{flex:1;min-width:0}.vnm{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vnm span{font-weight:400;color:#7a7468;margin-left:4px}
 .vrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px}.vrow select,.vrow input[type=number],.vrow .vnote{font:inherit;padding:2px 5px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;min-width:0}
-.vrow select{max-width:150px}.vrow input[type=number]{width:54px}.vrow .vnote{flex:1;width:100%}.vrow button{font:inherit;font-size:12px;padding:1px 7px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;cursor:pointer}
+.vrow select{max-width:150px}.vrow input[type=number]{width:66px}.vrow .vnote{flex:1;width:100%}.vrow button{font:inherit;font-size:12px;padding:1px 7px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;cursor:pointer}
 .vtip{color:#7a7468;font-size:12px;margin:4px 0}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
 </style>
 <style>
