@@ -95,10 +95,10 @@ https://github.com/user-attachments/assets/441b25fe-3bd9-49a8-93a4-dde7a20816b5
 
 
 
-https://github.com/user-attachments/assets/aa648752-0876-461f-9e26-5e3d3c9e1b88
+<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/film-flow.mp4" width="560" controls></video><br><sub>播放不了？<a href="docs/videos/film-flow.mp4">打开 film-flow.mp4</a></sub></p>
 
 
-<sub>在导出这一步，如果相册/文件夹里有视频，会多出一个可选的「旅行短片」块：先看视频怎么按景点分组，再一键生成。Agent 做的事：只读视频的拍摄时间、位置和时长，按行程归到各景点；片头（行程名、日期、几天几处多少公里）、每天一张标题卡（用你起的标题）、画线动画的路线卡、景点名字幕条、交叉淡化，保留每段视频的原声并统一音量，版式色调跟你选的手册风格一致；路线卡可选画在真实的高德地图上、沿高德驾车路径；也可以另外生成剪映草稿。在聊天里也能让助手做：开着「自动执行」说一句“连旅行短片一起做”，助手会在还原、起名、标区县、起标题之后，自己整理视频分组并生成短片。
+<sub>在导出这一步，如果相册/文件夹里有视频，会多出一个可选的「旅行短片」块：先看视频怎么按景点分组，再一键生成。Agent 做的事：只读视频的拍摄时间、位置和时长，按行程归到各景点；片头（行程名、日期、几天几处多少公里）、每天一张标题卡（用你起的标题）、画线动画的路线卡、景点名字幕条、交叉淡化，保留每段视频的原声并统一音量，版式色调跟你选的手册风格一致；路线卡可选画在真实的高德地图上、沿高德驾车路径；也可以另外生成剪映草稿。在聊天里也能让助手做：开着「自动执行」说一句“连旅行短片一起做”，助手会在还原、起名、标区县、起标题之后，自己整理视频分组并生成短片。上面的演示就是在聊天里做的：先说“把视频按景点整理一下”，页面的「视频归类」自动列出每一段；再说“这段太短不要、那段只取第 3 到 10 秒、给这段配一句字幕”，助手逐条改，页面跟着变（在页面上直接改也行，两边是同一份记录）；满意后点「生成短片」。
 
 <sub>演示说明：harnesss使用nanobot;model使用qwen3.7-max。地图为高德底图 © 高德地图。</sub>
 
@@ -143,7 +143,7 @@ https://github.com/user-attachments/assets/aa648752-0876-461f-9e26-5e3d3c9e1b88
 **导出的样子**（同一份旧手机相册还原的三天行程，由真实导出文件生成；日历和 Obsidian 是用导出的 .ics / .md 渲染的效果示意）：
 
 <p align="center">
-<a href="docs/images/export-strip.jpg"><img src="docs/images/export-strip.jpg" alt="导出效果：足迹地图、小红书卡片、导入日历、Obsidian 笔记、网页手册、地图图钉" width="100%"></a>
+<a href="docs/images/export-strip.jpg"><img src="docs/images/export-strip.jpg" alt="导出效果：足迹地图、小红书卡片、导入日历、Obsidian 笔记" width="100%"></a>
 </p>
 
 ## 🔁 一次规划的流程

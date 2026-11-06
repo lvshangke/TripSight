@@ -970,6 +970,8 @@ function rmapFromHb() {
 }
 // ---- 助手运行过程（轮询 activity）
 let ACT = {since: 0, evs: new Map(), timer: null, refreshT: null, boot: Date.now() / 1000};
+const ACT_VIDEO = new Set(['scan_videos', 'video_clips', 'video_set', 'video_note']);   // 助手看/改视频归类：页面上的“视频归类”跟着刷新
+async function hvRefresh() { try { hvRender(await api('video_groups', {})); const v = $('hb_vid'); if (v && v.offsetParent) v.scrollIntoView({behavior: 'smooth', block: 'start'}); } catch (e) {} }
 const ACT_CHANGES = new Set(['import_photo_trip', 'run_naming_job', 'fill_stop_photos', 'merge_stops', 'delete_stop', 'autoname_stops', 'update_place', 'tag_regions', 'save_stop_story', 'set_day_title', 'new_trip', 'switch_trip', 'undo', 'remove_place', 'add_place', 'add_photo', 'remove_photo']);
 function actRender() {
   const list = [...ACT.evs.values()].sort((a, b) => a.t0 - b.t0).slice(-14).reverse();
@@ -983,14 +985,15 @@ function actRender() {
 async function actPoll() {
   if (PGCUR !== 'restore' || document.hidden) return;
   try {
-    const r = await api('activity', {since: ACT.since}); let changed = false;
-    r.events.forEach(e => { const old = ACT.evs.get(e.id); if (e.ts >= ACT.boot && (!old || old.state !== e.state)) actFollow(e); ACT.evs.set(e.id, e); ACT.since = Math.max(ACT.since, e.ts); if (e.state !== 'run' && (!old || old.state === 'run') && ACT_CHANGES.has(e.name) && e.state === 'ok') changed = true; });
+    const r = await api('activity', {since: ACT.since}); let changed = false, vchg = false;
+    r.events.forEach(e => { const old = ACT.evs.get(e.id); if (e.ts >= ACT.boot && (!old || old.state !== e.state)) actFollow(e); ACT.evs.set(e.id, e); ACT.since = Math.max(ACT.since, e.ts); if (e.state !== 'run' && (!old || old.state === 'run') && ACT_CHANGES.has(e.name) && e.state === 'ok') changed = true; if (e.state === 'ok' && (!old || old.state === 'run') && ACT_VIDEO.has(e.name)) vchg = true; });
+    if (vchg) hvRefresh();
     if (r.events.length) actRender();
     if (changed) { clearTimeout(ACT.refreshT); ACT.refreshT = setTimeout(async () => { try { await load(); await hbLoad(); } catch (e) {} }, 400); }
   } catch (e) {}
 }
 // 助手操作时，左侧跟着走：工具 → 第几步，并把来源、半径填进去
-const ACT_STEP = {list_photo_albums: 1, restore_status: 1, new_restore_trip: 1, import_photo_trip: 3, export_handbook: 5, export_notes: 5, export_calendar: 5, scan_videos: 5, export_rough_cut: 5,
+const ACT_STEP = {list_photo_albums: 1, restore_status: 1, new_restore_trip: 1, import_photo_trip: 3, export_handbook: 5, export_notes: 5, export_calendar: 5, scan_videos: 5, video_clips: 5, video_set: 5, video_note: 5, export_rough_cut: 5,
   view_stop: 4, run_naming_job: 4, fill_stop_photos: 4, autoname_stops: 4, tag_regions: 4, merge_stops: 4, delete_stop: 4, update_place: 4, save_stop_story: 4, set_day_title: 4, suggest_day_titles: 4};
 function actFollow(e) {
   const n = ACT_STEP[e.name]; if (!n || PGCUR !== 'restore' || $('rp_gate').classList.contains('on')) return;

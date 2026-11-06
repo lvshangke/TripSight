@@ -643,3 +643,10 @@ def test_restore_steps_free_jump_and_video_thumb_queue():
     assert "RS.busy" in h and "rsGo(+x.dataset.n, false, true)" in h      # 恢复完成后 1~5 步随时可点，只有“正在恢复”时不能点
     assert "HB.data.start_date" in h and "HB.data.radius_m" in h          # 回到第 1/2 步时，来源、半径、日期都填回去
     assert "hvPump" in h and 'loading="lazy"' not in h.split("function hvClip")[1].split("function hvRender")[0]   # 封面一次只取 2 张，播放请求不会被挤在后面
+
+
+def test_page_follows_assistant_video_edits():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert "ACT_VIDEO" in h and "hvRefresh" in h                       # 助手看/改视频归类时，页面的“视频归类”自动刷新
+    assert "video_set: 5" in h and "video_note: 5" in h                # 并且跟到导出这一步
