@@ -12,7 +12,7 @@ TEMPLATE = r"""<!doctype html>
 .vdc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
 .vcl{display:flex;gap:10px;background:#fff;border:1px solid #eadfcb;border-radius:10px;padding:8px}.vcl.off{opacity:.55}
 .vth{position:relative;flex:none;width:120px;height:90px;border-radius:8px;overflow:hidden;background:#2b2823;display:flex;align-items:center;justify-content:center}
-.vth img{width:100%;height:100%;object-fit:cover;display:block}.vth video{width:100%;height:100%;object-fit:contain;background:#000}
+.vth img{width:100%;height:100%;object-fit:cover;display:block}.vth video{width:100%;height:100%;object-fit:contain;background:#000}.vld{position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#fff;font-size:12px;pointer-events:none}
 .vplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;padding:0}
 .vbd{flex:1;min-width:0}.vnm{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vnm span{font-weight:400;color:#7a7468;margin-left:4px}
 .vrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px}.vrow select,.vrow input[type=number],.vrow .vnote{font:inherit;padding:2px 5px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;min-width:0}
@@ -906,27 +906,33 @@ document.addEventListener('mouseout', e => { if (e.target.closest && e.target.cl
 // ---- 恢复行程：整页流程 ----
 const RS = {step: 1, ok: false};
 const RS_NAMES = ['选来源', '预览调整', '恢复', '编辑', '导出'];
-function rsGo(n) {
-  RS.step = n; $('rp_body').dataset.s = n;
-  const rest = !!(HB.data && HB.data.restored);                       // 已经恢复出行程：回到前面的步骤后，还能点回后面的步骤（第 3 步是“正在恢复”，不能点）
-  $('rp_steps').innerHTML = RS_NAMES.map((t, i) => '<span class="' + (i + 1 === n ? 'on' : i + 1 < n ? 'done' : (rest && i + 1 > n && i + 1 !== 3 ? 'go' : '')) + '" data-n="' + (i + 1) + '"><i>' + (i + 1 < n ? '✓' : i + 1) + '</i>' + t + '</span>').join('');
-  $('rp_steps').querySelectorAll('.done,.go').forEach(x => x.onclick = () => { if (RS.step !== 3) rsGo(+x.dataset.n); });
-  $('rp_prev').style.visibility = n === 1 || n === 3 ? 'hidden' : '';
-  $('rp_next').style.display = n === 3 ? 'none' : '';
-  $('rp_next').textContent = n === 1 ? '下一步：预览' : n === 2 ? '恢复行程' : n === 4 ? '下一步：导出' : '导出在下面，完成后可返回';
-  $('rp_next').style.display = n === 5 || n === 3 ? 'none' : '';
-  $('rp_msg').textContent = n === 1 ? '填相册文件夹（或照片 App 相册），照片要带位置信息。' : n === 2 ? '先看看会得到几处；太碎就换“大景区”。' : n === 4 ? '改名字、调照片顺序、写几句话；选两处以上可合并。' : '';
-  if (n === 3) { $('hb_list').textContent = ''; }
-  if (n <= 2 && HB.data && HB.data.restored && !$('hb_folder').value && !$('hb_album').value && (HB.data.folder || HB.data.album)) {   // 回退到第 1、2 步：把恢复时用的来源填回去
-    if (HB.data.album) { $('hb_src').value = 'album'; hbSrcUi(); if (!$('hb_album').querySelector('option[value="' + HB.data.album.replace(/"/g, '') + '"]')) $('hb_album').innerHTML = '<option value="' + esc(HB.data.album) + '">' + esc(HB.data.album) + '</option>'; $('hb_album').value = HB.data.album; }
+function rsGo(n, busy, refresh) {
+  RS.step = n; RS.busy = n === 3 && !!busy; $('rp_body').dataset.s = n;
+  const rest = !!(HB.data && HB.data.restored);                       // 已经恢复出行程：1~5 步随时可以点；只有“正在恢复”的那几十秒不能点
+  $('rp_steps').innerHTML = RS_NAMES.map((t, i) => '<span class="' + (i + 1 === n ? 'on' : i + 1 < n ? 'done' : (rest ? 'go' : '')) + '" data-n="' + (i + 1) + '"><i>' + (i + 1 < n ? '✓' : i + 1) + '</i>' + t + '</span>').join('');
+  $('rp_steps').querySelectorAll('.done,.go').forEach(x => x.onclick = () => { if (!RS.busy) rsGo(+x.dataset.n, false, true); });
+  $('rp_prev').style.visibility = n === 1 || RS.busy ? 'hidden' : '';
+  $('rp_next').textContent = n === 1 ? '下一步：预览' : n === 2 ? '恢复行程' : n === 3 ? '下一步：编辑' : '下一步：导出';
+  $('rp_next').style.display = n === 5 || RS.busy ? 'none' : '';
+  $('rp_msg').textContent = n === 1 ? '填相册文件夹（或照片 App 相册），照片要带位置信息。' : n === 2 ? '先看看会得到几处；太碎就换“大景区”。' : n === 3 && !RS.busy ? '这是已经恢复出来的行程；要改名字、调照片，点下一步。' : n === 4 ? '改名字、调照片顺序、写几句话；选两处以上可合并。' : '';
+  if (RS.busy) $('hb_list').textContent = '';
+  if (n <= 2 && rest && !RS.dirty && (HB.data.folder || HB.data.album)) {   // 回到第 1、2 步：把恢复时用的来源填回去（你自己改过来源就不覆盖）
+    if (HB.data.album) { $('hb_src').value = 'album'; hbSrcUi(); if (![...$('hb_album').options].some(o => o.value === HB.data.album)) $('hb_album').innerHTML = '<option value="' + esc(HB.data.album) + '">' + esc(HB.data.album) + '</option>'; $('hb_album').value = HB.data.album; }
     else { $('hb_src').value = 'folder'; hbSrcUi(); $('hb_folder').value = HB.data.folder; }
+    if (HB.data.radius_m && [...$('hb_r').options].some(o => +o.value === HB.data.radius_m)) $('hb_r').value = HB.data.radius_m;
+    $('hb_d1').value = HB.data.start_date || ''; $('hb_d2').value = HB.data.end_date || '';
   }
-  if (n === 2 && !$('hb_pvo').innerHTML && ($('hb_folder').value || ($('hb_src').value === 'album' && $('hb_album').value))) $('hb_pv').click();
+  if (n === 2) {
+    const has = $('hb_src').value === 'album' ? $('hb_album').value : $('hb_folder').value, po = $('hb_pvo');
+    if (!has) po.innerHTML = '<div class="tlnote nosrc">还没选照片来源：点上面的“选来源”回到第 1 步。</div>';
+    else if (refresh || !po.innerHTML || po.querySelector('.nosrc')) $('hb_pv').click();
+  }
   $('rp_body').scrollTop = 0; if (n === 5) hbStylePreview();
   if ((n === 4 || n === 5) && PGCUR === 'restore') rmapFromHb();
 }
+['hb_src', 'hb_folder', 'hb_album'].forEach(id => { $(id).addEventListener('change', () => { RS.dirty = true; }); $(id).addEventListener('input', () => { RS.dirty = true; }); });
 function rsPreviewing(on, r, err) { if (RS.step === 1 && !on && r) rsGo(2); else if (RS.step === 1 && !on && err) $('rp_msg').textContent = err; $('rp_next').disabled = on; }
-function rsDone(ok, err) { if (ok) rsGo(4); else { rsGo(2); $('rp_msg').textContent = err || ''; } }
+function rsDone(ok, err) { if (ok) { RS.dirty = false; rsGo(4); } else { rsGo(2); $('rp_msg').textContent = err || ''; } }
 var PGCUR = 'plan';
 const CHAT_HOME = $('chat').parentNode, CHAT_NEXT = $('chat').nextSibling;
 const CHIPS_PLAN = $('chips').innerHTML;
@@ -996,7 +1002,7 @@ function actFollow(e) {
       else if (fo) { $('hb_src').value = 'folder'; hbSrcUi(); $('hb_folder').value = fo; }
       if (rd && [...$('hb_r').options].some(o => o.value === rd)) $('hb_r').value = rd;
     }
-    if (RS.step !== n && !(n === 4 && RS.step === 5)) rsGo(n);
+    if ((RS.step !== n || (n === 3 && !RS.busy)) && !(n === 4 && RS.step === 5)) rsGo(n, n === 3);
     $('rp_msg').textContent = '助手正在：' + (e.label || e.name);
   } else if (e.state === 'ok' && e.name === 'import_photo_trip') { rsGo(4); }
 }
@@ -1027,7 +1033,8 @@ const rsOpen = step => pgShow('restore', step);
 $('rp_prev').onclick = () => rsGo(Math.max(1, RS.step - 1));
 $('rp_next').onclick = async () => {
   if (RS.step === 1) { $('rp_msg').textContent = ''; $('hb_pv').click(); }
-  else if (RS.step === 2) { if (HB.data && HB.data.restored && !(await ask('重新恢复会按现在的设置重新生成行程，已经改过的名字、标题和照片顺序会丢失。继续吗？', '重新恢复'))) return; rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
+  else if (RS.step === 2) { if (HB.data && HB.data.restored && !(await ask('重新恢复会按现在的设置重新生成行程，已经改过的名字、标题和照片顺序会丢失。继续吗？', '重新恢复'))) return; rsGo(3, true); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
+  else if (RS.step === 3) rsGo(4);
   else if (RS.step === 4) rsGo(5);
 };
 document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
@@ -1043,10 +1050,19 @@ $('home_plan').onclick = () => { homeDone(); pgShow('plan'); }; $('home_restore'
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message + '（点右边“打开文件夹”就能找到）'; } catch (e) { $('sh_err').textContent = e.message; } };
 const hvFmt = d => d >= 60 ? Math.floor(d / 60) + ' 分 ' + Math.round(d % 60) + ' 秒' : Math.round(d) + ' 秒';
-const HV = {stops: [], stamp: 0};
+const HV = {stops: [], stamp: 0}, HVQ = {q: [], run: 0};
+function hvThumbs() { HVQ.q = [...document.querySelectorAll('#hv_groups img[data-src]')]; hvPump(); }
+function hvPump() {   // 封面一次只取 2 张：浏览器对同一个地址同时只开 6 条连接，封面太多会把“播放”的请求挤在后面
+  while (HVQ.run < 2 && HVQ.q.length) {
+    const im = HVQ.q.shift(); if (!im.isConnected || !im.dataset.src) continue;
+    HVQ.run++; let fin = false; const done = () => { if (fin) return; fin = true; HVQ.run--; hvPump(); };
+    im.onload = done; im.onerror = () => { im.style.display = 'none'; done(); }; setTimeout(done, 20000);
+    im.src = im.dataset.src; delete im.dataset.src;
+  }
+}
 function hvClip(c, inGroup) {
   const opts = '<option value="">不放进短片</option>' + HV.stops.map(s => '<option value="' + esc(s.id) + '"' + (s.id === c.stop ? ' selected' : '') + '>第 ' + s.day + ' 天 · ' + esc(s.name) + '</option>').join('');
-  return '<div class="vcl' + (c.use ? '' : ' off') + '" data-f="' + esc(c.file) + '" data-d="' + c.dur + '"><div class="vth"><img loading="lazy" src="video/thumb?f=' + encodeURIComponent(c.file) + '" alt="" onerror="this.style.display=\'none\'"><button class="vplay" title="播放原视频">▶</button></div><div class="vbd">'
+  return '<div class="vcl' + (c.use ? '' : ' off') + '" data-f="' + esc(c.file) + '" data-d="' + c.dur + '"><div class="vth"><img data-src="video/thumb?f=' + encodeURIComponent(c.file) + '" alt=""><button class="vplay" title="播放原视频">▶</button></div><div class="vbd">'
     + '<div class="vnm" title="' + esc(c.file) + '">' + esc(c.file) + '<span>' + hvFmt(c.dur) + (c.at ? ' · ' + esc(c.at) : '') + '</span></div>'
     + '<div class="vrow"><label><input type="checkbox" class="vuse"' + (c.use ? ' checked' : '') + '> 放进短片</label><select class="vst" title="这段归到哪个景点">' + opts + '</select></div>'
     + '<div class="vrow">取 <input type="number" class="vt0" min="0" step="0.5" value="' + (c.t0 == null ? '' : c.t0) + '" placeholder="0"> – <input type="number" class="vt1" min="0" step="0.5" value="' + (c.t1 == null ? '' : c.t1) + '" placeholder="' + c.dur + '"> 秒<button class="vtc" title="取消裁剪，用整段">整段</button>' + (inGroup ? '<button class="vup" title="往前排">↑</button><button class="vdn" title="往后排">↓</button>' : '') + '</div>'
@@ -1060,7 +1076,7 @@ function hvRender(r) {
     + x.clips.map(c => hvClip(c, true)).join('') + '</div></div>').join('');
   if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上；选一个景点就会放进短片）</span></div><div class="vdc">' + r.lost.map(c => hvClip(c, false)).join('') + '</div></div>';
   if ((r.skipped || []).length) h += '<div class="vdg vdoff"><div class="vdh"><b>不放进短片</b><span class="vdn">' + r.skipped.length + ' 段（勾上“放进短片”就恢复）</span></div><div class="vdc">' + r.skipped.map(c => hvClip(c, false)).join('') + '</div></div>';
-  $('hv_groups').innerHTML = h;
+  HVQ.q = []; $('hv_groups').innerHTML = h; hvThumbs();
 }
 async function hvEdit(file, patch) {
   try { hvRender(await api('video_edit', Object.assign({file: file}, patch))); } catch (e) { $('hv_out').textContent = e.message; try { hvRender(await api('video_groups', {})); } catch (x) {} }
@@ -1079,7 +1095,8 @@ $('hv_groups').addEventListener('click', e => {
   const box = e.target.closest('.vcl'); if (!box) return; const f = box.dataset.f, t = e.target;
   if (t.classList.contains('vplay')) {
     const a = box.querySelector('.vt0').value, b = box.querySelector('.vt1').value, frag = a !== '' || b !== '' ? '#t=' + (a || 0) + (b !== '' ? ',' + b : '') : '';
-    const th = box.querySelector('.vth'); th.innerHTML = '<video controls autoplay playsinline src="video/src?f=' + encodeURIComponent(f) + frag + '"></video>';
+    const th = box.querySelector('.vth'); th.innerHTML = '<video controls autoplay playsinline preload="auto" src="video/src?f=' + encodeURIComponent(f) + frag + '"></video><span class="vld">加载中…</span>';
+    const vd = th.firstChild; ['loadeddata', 'playing', 'canplay'].forEach(ev => vd.addEventListener(ev, () => { const l = th.querySelector('.vld'); if (l) l.remove(); }));
     th.firstChild.onerror = () => { th.innerHTML = '<span class="tlnote" style="color:#fff;padding:6px">浏览器播不了这个格式；可以在访达里打开原文件</span>'; };
   } else if (t.classList.contains('vtc')) hvEdit(f, {clear_trim: true});
   else if (t.classList.contains('vup') || t.classList.contains('vdn')) {

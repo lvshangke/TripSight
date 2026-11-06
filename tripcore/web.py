@@ -782,6 +782,7 @@ def hb_state() -> dict[str, Any]:
     for r in rows:
         r["region"] = labels.get(r["id"], "")
     return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""), "album": side.get("album", ""),
+            "radius_m": side.get("radius_m") or 0, "start_date": side.get("start_date", ""), "end_date": side.get("end_date", ""),
             "vision": bool(_vi.config()), "max_photos": 6, "day_titles": ms._day_titles(),
             "videos": (int(side.get("videos") or 0) if side.get("album") else (_video_count(side["folder"]) if side.get("folder") else 0)), "album_videos": bool(side.get("album"))}
 

@@ -2037,7 +2037,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
             vids = len(_pv) + _miss
         except Exception:
             vids = 0
-    _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "videos": vids, "stops": [
+    _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "videos": vids, "radius_m": int(radius_m), "start_date": start_date or "", "end_date": end_date or "", "stops": [
         {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files, "guessed": sp.guessed}
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
     lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
