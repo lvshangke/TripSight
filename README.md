@@ -140,6 +140,12 @@ https://github.com/user-attachments/assets/aa648752-0876-461f-9e26-5e3d3c9e1b88
 
 <sub>图中为演示用的苏州 3 日行程（天气为真实预报）和作者旧手机的海南相册（只选风景）；底图 © 高德地图。以上截图为演示重放生成。</sub>
 
+**导出的样子**（同一份旧手机相册还原的三天行程，由真实导出文件生成；日历和 Obsidian 是用导出的 .ics / .md 渲染的效果示意）：
+
+<p align="center">
+<a href="docs/images/export-strip.jpg"><img src="docs/images/export-strip.jpg" alt="导出效果：足迹地图、小红书卡片、导入日历、Obsidian 笔记、网页手册、地图图钉" width="100%"></a>
+</p>
+
 ## 🔁 一次规划的流程
 
 1. **说想去哪**：聊天里报目的地、日期、人数、节奏；或在网页里点“新建行程”填表。
