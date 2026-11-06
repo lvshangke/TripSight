@@ -610,3 +610,28 @@ def test_restore_page_has_title_box_and_back_step_refills_source():
     h = page_html()
     assert 'id="hb_title"' in h and "hbSaveTitle" in h and "hb_title" in h
     assert "HB.data.folder" in h and "重新恢复会按现在的设置" in h and "ask('重新恢复会" in h
+
+
+def test_stepper_lets_you_click_forward_again_after_going_back():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert "span.go" in h and "'go'" in h and ".querySelectorAll('.done,.go')" in h
+
+
+def test_card_photo_count_auto_varies_and_fixed_is_fixed():
+    from tripcore.handbook import card_photo_count
+    assert [card_photo_count(0, i, 9) for i in range(4)] == [3, 2, 4, 1]
+    assert card_photo_count(0, 2, 2) == 2 and card_photo_count(0, 0, 0) == 1      # 不超过实际有的张数
+    assert card_photo_count(5, 0, 2) == 5 and card_photo_count(1, 3, 9) == 1
+
+
+def test_book_html_pages_toc_and_numbers():
+    import re
+    from tripcore.book import build_book_html
+    st = lambda n, k: {"n": n, "name": f"景点{n}", "rg": "", "t": "09:00–10:00", "dur": 60, "hours": "", "pics": [(f"{n}{j}.jpg", "") for j in range(k)], "facts": [], "imp": "", "leg": ""}
+    days = [{"idx": 0, "title": "海边", "date": "1月18日 周四", "wx": "", "km": 3.0, "svg": "<svg class=\"route\"></svg>", "stops": [st(1, 3), st(2, 0)]},
+            {"idx": 1, "title": "", "date": "", "wx": "", "km": 0, "svg": "<svg></svg>", "stops": [st(1, 6)]}]
+    h = build_book_html("测试书", days, theme_css="", base_css="", km_all=3.0, stops_all=3)
+    assert h.count('class="pg') == 1 + 1 + (1 + 2) + (1 + 1) + 1          # 封面、目录、两天的章首和景点页、版权页
+    assert '<em>3</em>' in h and '<em>6</em>' in h                         # 目录里的页码：第 1 天从第 3 页，第 2 天从第 6 页
+    assert 'ph-area n3' in h and 'ph-area n6' in h and "148mm 210mm" in h

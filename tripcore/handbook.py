@@ -21,6 +21,7 @@ from .timeline import day_visits
 
 WEEK = "一二三四五六日"
 _BAD = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+CARD_AUTO = [3, 2, 4, 1, 3, 5, 2]       # 自动模式：每张卡片的照片张数错开，不是每天都一样；不超过这一天实际有的照片数
 MAX_PHOTOS = 6          # 每个景点最多展示几张，有几张放几张
 VIDEO_EXT = {".mp4", ".mov", ".webm", ".m4v"}
 e = html.escape
@@ -203,9 +204,16 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 {_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}"""
 
 
+def card_photo_count(card_photos: int, nth: int, avail: int) -> int:
+    """这张卡片放几张照片：指定了 1~5 就固定；0 = 自动，按第几张卡片错开（3、2、4、1…），最多取这一天有的张数。"""
+    if card_photos and int(card_photos) > 0:
+        return max(1, min(int(card_photos), 5))
+    return max(1, min(CARD_AUTO[nth % len(CARD_AUTO)], max(avail, 1)))
+
+
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 3, card_size: float = 1.0, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 0, card_size: float = 1.0, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -244,6 +252,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         shutil.copy2(vp, dst); files.append(f"media/{dst.name}"); vids[pid] = f"media/{dst.name}"
 
     days_html, card_jobs, km_all, stops_all = [], [], 0.0, 0
+    book_days: list[dict] = []
     dt = {str(k): v for k, v in (day_titles or {}).items() if v}
     rg = regions or {}
     for day in trip.plan.days:
@@ -262,6 +271,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             head += f'<div class="wx">天气预报：{e(wx.day_weather)} {round(wx.day_temp)}°C（预报，非实况）</div>'
         parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs, bm=basemap, pins=[pin_of.get(v.place.id) for v in vs] if thumb_pins else None)]
         first_pic = None
+        bk_stops: list[dict] = []
         for i, v in enumerate(vs):
             p = v.place
             rgtag = f'<span class="rg">{e(rg[p.id])}</span> · ' if rg.get(p.id) else ''
@@ -294,17 +304,24 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             elif sty.get("impression"):
                 body += f'<p class="imp">“{e(sty["impression"])}”<small>{"我写的" if sty.get("by") == "user" else "AI 根据照片的描写，仅供参考，可修改"}</small></p>'
             body += "</div>"
+            bk_stops.append({"n": i + 1, "name": p.name, "rg": rg.get(p.id, ""), "t": f"{_hm(v.arrive)}–{_hm(v.leave)}", "dur": p.duration_min, "hours": p.opening_hours,
+                             "pics": [(x["file"], x.get("caption", "")) for x in by_place.get(p.id, [])[:MAX_PHOTOS]], "facts": list(sty.get("facts") or []), "imp": sty.get("impression", ""), "imp_by": sty.get("by", ""),
+                             "leg": (f"{(st.legs[i].note or st.legs[i].mode)} · {st.legs[i].distance_km} km · {st.legs[i].minutes} 分钟" + ("（估算）" if st.legs[i].detail_level == "estimate" else "")) if i < len(st.legs) else ""})
             parts.append(body)
             if i < len(st.legs):
                 lg = st.legs[i]
                 parts.append(f'<div class="leg">{e(lg.note or lg.mode)} · {lg.distance_km} km · {lg.minutes} 分钟' + ("（估算）" if lg.detail_level == "estimate" else "") + "</div>")
         parts.append("</section>")
         days_html.append("".join(parts))
+        book_days.append({"idx": day.index, "title": dtitle, "date": (f"{d.month}月{d.day}日 周{WEEK[d.weekday()]}" if d else ""),
+                          "wx": (f"天气预报：{wx.day_weather} {round(wx.day_temp)}°C（预报，非实况）" if wx is not None and getattr(wx, "day_weather", "") else ""),
+                          "km": km, "svg": parts[1], "stops": bk_stops})
         pool = [list(by_place.get(v.place.id, [])) for v in vs]
         picked: list[str] = []
-        for r in range(MAX_PHOTOS):                       # 轮流从每一站取，最多 card_photos 张，让一天的卡片尽量覆盖不同地方
+        want = card_photo_count(card_photos, len(card_jobs), sum(len(x) for x in pool))
+        for r in range(MAX_PHOTOS):                       # 轮流从每一站取，最多 want 张，让一天的卡片尽量覆盖不同地方
             for lst in pool:
-                if r < len(lst) and len(picked) < max(1, min(int(card_photos), 5)):
+                if r < len(lst) and len(picked) < want:
                     picked.append(f"../photos/{lst[r]['file']}")
         card_jobs.append((day.index, d, vs, km, st.legs, picked))
 
@@ -351,8 +368,14 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             with sync_playwright() as p:
                 b = _share._launch(p)
                 pg = b.new_page()
-                pg.goto((root / "index.html").resolve().as_uri()); pg.wait_for_timeout(300)
-                pg.pdf(path=str(root / f"{base}.pdf"), format="A4", print_background=True, margin={"top": "12mm", "bottom": "12mm", "left": "10mm", "right": "10mm"})
+                from .book import build_book_html
+                bf = root / "_book.html"
+                hero = next((f"photos/{x[0]}" for dd in book_days for ss in dd["stops"] for x in ss["pics"]), "")
+                bf.write_text(build_book_html(trip.meta.name, book_days, theme_css=theme_css(style), base_css=CSS, km_all=km_all, stops_all=stops_all,
+                                              chapters=" → ".join(chs), spending=spending, hero=hero), encoding="utf-8")
+                pg.goto(bf.resolve().as_uri()); pg.wait_for_timeout(500)
+                pg.pdf(path=str(root / f"{base}.pdf"), prefer_css_page_size=True, print_background=True)
+                bf.unlink()
                 b.close()
             files.append(f"{base}.pdf")
         except ImportError:

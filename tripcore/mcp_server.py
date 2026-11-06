@@ -1561,11 +1561,11 @@ def export_calendar(folder: str = "") -> str:
 
 
 def export_handbook(show_photos: bool = True, video_path: str = "", video_place: str = "", cards: bool = True, basemap: bool = False, pdf: bool = False, style: str = "手账",
-                    show_spending: bool = False, spending_categories: Optional[list[str]] = None, card_photos: int = 3, thumb_pins: bool = False, card_size: float = 1.0) -> str:
+                    show_spending: bool = False, spending_categories: Optional[list[str]] = None, card_photos: int = 0, thumb_pins: bool = False, card_size: float = 1.0) -> str:
     """生成一份行程手册：一个本地网页文件夹（封面、每天路线图和时间表、每站一张手账卡），加每天一张 3:4 卡片图和一份发布文案，可自己发小红书或存进知识库。
     只写本机 ~/Documents/TripSight/，不联网、不连账号，也不会替用户发布。时间只是估算，营业时间标了来源；酒店和花费不会出现。
     默认会放用户挂过的照片（含人像；已去掉定位）；用户说要不露脸、或要公开分享前不想带照片时传 show_photos=false；视频只用用户给的原文件：video_path 是视频路径，
-    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。style 是版式风格：手账（默认）/ 杂志 / 清新 / 胶片 / 海边，只换配色字体，网页、卡片图、PDF 都跟着变。show_spending=true 在手册最后加一页“后记：这一趟的花费”（只有总额和各类别金额，没有商户和明细；数据来自 import_bills 导入的账单，默认不放；放之前要问用户，花费属于隐私），spending_categories 可以只选某几类（门票/餐饮/交通/住宿/购物/其他）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。card_size=0.6–1.5 是卡片上照片的大小（0.75 小 / 1 中 / 1.3 大，默认 1）；card_photos=1–5 是每张卡片图放几张照片（默认 3，轮流取这一天各站的照片；没那么多就放有的）。thumb_pins=true 让路线图上有照片的点用圆形缩略图当图钉（没照片的点仍是数字圆点，需要 show_photos）。已有导出不会被覆盖。"""
+    video_place 是它属于哪个景点，两个都给才放，原样复制不转码，文件可能很大。cards=false 可跳过卡片图（卡片图需要 playwright）。basemap=true 给每天路线图加高德街道底图（会联网，用用户自己的 AMAP_KEY，只发中心点、缩放和图片大小，不发景点名；失败时自动退回无底图）。style 是版式风格：手账（默认）/ 杂志 / 清新 / 胶片 / 海边，只换配色字体，网页、卡片图、PDF 都跟着变。show_spending=true 在手册最后加一页“后记：这一趟的花费”（只有总额和各类别金额，没有商户和明细；数据来自 import_bills 导入的账单，默认不放；放之前要问用户，花费属于隐私），spending_categories 可以只选某几类（门票/餐饮/交通/住宿/购物/其他）。pdf=true 另存一份 PDF（同样需要 playwright）。每个景点最多展示 6 张照片。card_size=0.6–1.5 是卡片上照片的大小（0.75 小 / 1 中 / 1.3 大，默认 1）；card_photos=0 是自动（默认）：每张卡片的照片张数错开（3、2、4、1…），不是每天都一样；1–5 是固定每张卡片放几张（轮流取这一天各站的照片；没那么多就放有的）。thumb_pins=true 让路线图上有照片的点用圆形缩略图当图钉（没照片的点仍是数字圆点，需要 show_photos）。已有导出不会被覆盖。"""
     trip = _load()
     if trip.plan is None or not trip.plan.days:
         raise ToolError("还没有分天，请先 schedule_days。")
