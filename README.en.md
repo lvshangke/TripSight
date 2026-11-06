@@ -91,27 +91,19 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 <a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" width="49%" alt="Restore edit page for the Taizhou trip, click a pin for thumbnails"></a>
 </p>
 
-**Share formats for a planned trip** (all generated locally from the same itinerary, no login; real exports of the Suzhou demo, the calendar is rendered from the exported .ics as an illustration): a share page (HTML, can become a PDF, 8 themes, hotels and costs hidden by default), a phone map page (a single file, opens in a phone browser) and a calendar file (.ics). There are also chat-ready text, a GPX track and a dedicated Amap App map.
+**More small features**:
 
-<a href="docs/images/share-formats.jpg"><img src="docs/images/share-formats.jpg" alt="Share formats: share page, phone map page, calendar" width="100%"></a>
-
-**More small features** (older recordings, older UI, still valid):
-
-<p>
-<img src="docs/images/demo.gif" width="23%" alt="Drag and check">&ensp;
-<img src="docs/images/feat-closed.gif" width="23%" alt="Closures and opening hours">&ensp;
-<img src="docs/images/feat-route.gif" width="23%" alt="Real routes">&ensp;
-<img src="docs/images/feat-weather.gif" width="23%" alt="Weather">
-</p>
-<p>
-<img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&ensp;
-<img src="docs/images/feat-tools.gif" width="23%" alt="Tools">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&ensp;
-<img src="docs/images/feat-edit.gif" width="23%" alt="Edit the handbook and cards in place">&ensp;
-<img src="docs/images/feat-footprint.gif" width="23%" alt="Footprint map: click a pin for photo thumbnails">
-</p>
+<p align="center"><img src="docs/images/demo.gif" width="23%" alt="Drag and check">&emsp;<img src="docs/images/feat-closed.gif" width="23%" alt="Closures and opening hours">&emsp;<img src="docs/images/feat-route.gif" width="23%" alt="Real routes"></p>
+<p align="center"><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&emsp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&emsp;<img src="docs/images/feat-tools.gif" width="23%" alt="Tools"></p>
+<p align="center"><img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&emsp;<img src="docs/images/feat-edit.gif" width="23%" alt="Edit handbook and cards in place">&emsp;<img src="docs/images/feat-footprint.gif" width="23%" alt="Footprint map: click a pin for thumbnails"></p>
 
 <sub>Screens use a demo Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap.</sub>
+
+**What sharing and exporting look like**: the left three are formats you can take from a planned trip (real exports of the Suzhou demo: share page in HTML/PDF with 8 themes, a single-file phone map page, an .ics calendar — the calendar picture is rendered from the exported .ics as an illustration); the right four are exports of the three-day trip restored from the old-phone album (footprint map, Xiaohongshu card, calendar import, Obsidian note, from real export files). Chat-ready text, a GPX track and a dedicated Amap App map are also available.
+
+<p align="center">
+<a href="docs/images/export-all.jpg"><img src="docs/images/export-all.jpg" alt="Share and export: share page, phone map page, calendar; footprint map, card, calendar import, Obsidian note" width="100%"></a>
+</p>
 
 ## 🧩 Capabilities
 

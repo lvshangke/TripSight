@@ -122,32 +122,18 @@ https://github.com/user-attachments/assets/441b25fe-3bd9-49a8-93a4-dde7a20816b5
 <a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" width="49%" alt="恢复行程编辑页：台州的停留点、照片，点图钉看缩略图"></a>
 </p>
 
-**计划行程可以带走的几种分享格式**（都用同一份行程在本机生成，不用登录；图中是真实导出的苏州 3 日，日历是用导出的 .ics 渲染的效果示意）：分享页（HTML，可转 PDF，有 8 种风格，酒店和花费默认不显示）、手机地图页（单个文件，手机浏览器直接打开）、日历文件（.ics，双击导入）；另外还有微信里能直接发的文字、GPX 轨迹和高德 App 专属地图。
-
-<a href="docs/images/share-formats.jpg"><img src="docs/images/share-formats.jpg" alt="分享格式：分享页、手机地图页、日历文件" width="100%"></a>
-
 **还有这些小功能**：
 
-<p>
-<img src="docs/images/demo.gif" width="23%" alt="拖动检查">&ensp;
-<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆与营业时间">&ensp;
-<img src="docs/images/feat-route.gif" width="23%" alt="真实路线">&ensp;
-<img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">
-</p>
-<p>
-<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转导航">&ensp;
-<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&ensp;
-<img src="docs/images/feat-edit.gif" width="23%" alt="手册与卡片直接编辑">&ensp;
-<img src="docs/images/feat-footprint.gif" width="23%" alt="足迹地图：点图钉看照片缩略图">
-</p>
+<p align="center"><img src="docs/images/demo.gif" width="23%" alt="拖动检查">&emsp;<img src="docs/images/feat-closed.gif" width="23%" alt="闭馆与营业时间">&emsp;<img src="docs/images/feat-route.gif" width="23%" alt="真实路线"></p>
+<p align="center"><img src="docs/images/feat-weather.gif" width="23%" alt="天气提示">&emsp;<img src="docs/images/feat-links.gif" width="23%" alt="点击跳转导航">&emsp;<img src="docs/images/feat-tools.gif" width="23%" alt="工具与能力"></p>
+<p align="center"><img src="docs/images/feat-export.gif" width="23%" alt="一键导出">&emsp;<img src="docs/images/feat-edit.gif" width="23%" alt="手册与卡片直接编辑">&emsp;<img src="docs/images/feat-footprint.gif" width="23%" alt="足迹地图：点图钉看照片缩略图"></p>
 
 <sub>图中为演示用的苏州 3 日行程（天气为真实预报）和作者旧手机的海南相册（只选风景）；底图 © 高德地图。以上截图为演示重放生成。</sub>
 
-**导出的样子**（同一份旧手机相册还原的三天行程，由真实导出文件生成；日历和 Obsidian 是用导出的 .ics / .md 渲染的效果示意）：
+**分享与导出的样子**：左边三张是计划行程可以带走的格式（真实导出的苏州 3 日：分享页 HTML/可转 PDF、有 8 种风格，手机地图页是单个文件，日历是 .ics；日历图是用导出的 .ics 渲染的效果示意）；右边四张是同一份旧手机相册还原的三天行程的导出（足迹地图、小红书卡片、导入日历、Obsidian 笔记，由真实导出文件生成）。另外还有微信里能直接发的文字、GPX 轨迹和高德 App 专属地图。
 
 <p align="center">
-<a href="docs/images/export-strip.jpg"><img src="docs/images/export-strip.jpg" alt="导出效果：足迹地图、小红书卡片、导入日历、Obsidian 笔记" width="100%"></a>
+<a href="docs/images/export-all.jpg"><img src="docs/images/export-all.jpg" alt="分享与导出：分享页、手机地图页、日历，足迹地图、小红书卡片、导入日历、Obsidian 笔记" width="100%"></a>
 </p>
 
 ## 🔁 一次规划的流程
