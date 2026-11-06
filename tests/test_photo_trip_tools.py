@@ -590,3 +590,23 @@ def test_share_html_has_navigation_links_on_legs():
     src = inspect.getsource(sh._day_html)
     assert 'e.get("link")' in src and "导航" in src
     assert hasattr(sh, "render_pdf")
+
+
+def test_hb_title_renames_trip_for_handbook(tmp_path, monkeypatch):
+    from tripcore import web
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    with pytest.raises(web.HttpError):
+        web.hb_title({"title": "  "})
+    with pytest.raises(web.HttpError):
+        web.hb_title({"title": "字" * 41})
+    assert web.hb_title({"title": "台州三日游"})["name"] == "台州三日游"
+    assert web.hb_state()["name"] == "台州三日游"
+    assert "台州三日游" in web.hb_style_preview({"style": "手账"})["page"]
+
+
+def test_restore_page_has_title_box_and_back_step_refills_source():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert 'id="hb_title"' in h and "hbSaveTitle" in h and "hb_title" in h
+    assert "HB.data.folder" in h and "重新恢复会按现在的设置" in h and "ask('重新恢复会" in h

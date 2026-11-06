@@ -318,6 +318,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span>  <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
 <div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
+<div class="hvrow"><label title="手册封面、文件夹名里用的名字；改了会同时改这个行程的名字">手册标题 <input id="hb_title" maxlength="40" style="width:240px" placeholder="如：台州三日游"></label></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf"> PDF</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
 <label><input type="checkbox" id="hb_ph" checked> 带照片（含人像）</label><label title="每张小红书卡片图放几张照片，轮流取这一天各站的照片">卡片放 <select id="hb_cp"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> 张照片</label><label title="小红书卡片上照片的大小">照片大小 <select id="hb_cs"><option value="0.75">小</option><option value="1" selected>中</option><option value="1.3">大</option></select></label><label><input type="checkbox" id="hb_bm"> 路线图用高德底图（联网）</label><label title="路线图上有照片的点用圆形缩略图代替数字圆点"><input type="checkbox" id="hb_pin"> 缩略图当图钉</label>
@@ -906,6 +907,11 @@ function rsGo(n) {
   $('rp_next').style.display = n === 5 || n === 3 ? 'none' : '';
   $('rp_msg').textContent = n === 1 ? '填相册文件夹（或照片 App 相册），照片要带位置信息。' : n === 2 ? '先看看会得到几处；太碎就换“大景区”。' : n === 4 ? '改名字、调照片顺序、写几句话；选两处以上可合并。' : '';
   if (n === 3) { $('hb_list').textContent = ''; }
+  if (n <= 2 && HB.data && HB.data.restored && !$('hb_folder').value && !$('hb_album').value && (HB.data.folder || HB.data.album)) {   // 回退到第 1、2 步：把恢复时用的来源填回去
+    if (HB.data.album) { $('hb_src').value = 'album'; hbSrcUi(); if (!$('hb_album').querySelector('option[value="' + HB.data.album.replace(/"/g, '') + '"]')) $('hb_album').innerHTML = '<option value="' + esc(HB.data.album) + '">' + esc(HB.data.album) + '</option>'; $('hb_album').value = HB.data.album; }
+    else { $('hb_src').value = 'folder'; hbSrcUi(); $('hb_folder').value = HB.data.folder; }
+  }
+  if (n === 2 && !$('hb_pvo').innerHTML && ($('hb_folder').value || ($('hb_src').value === 'album' && $('hb_album').value))) $('hb_pv').click();
   $('rp_body').scrollTop = 0; if (n === 5) hbStylePreview();
   if ((n === 4 || n === 5) && PGCUR === 'restore') rmapFromHb();
 }
@@ -1009,9 +1015,9 @@ async function pgShow(name, step) {
 }
 const rsOpen = step => pgShow('restore', step);
 $('rp_prev').onclick = () => rsGo(Math.max(1, RS.step - 1));
-$('rp_next').onclick = () => {
+$('rp_next').onclick = async () => {
   if (RS.step === 1) { $('rp_msg').textContent = ''; $('hb_pv').click(); }
-  else if (RS.step === 2) { rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
+  else if (RS.step === 2) { if (HB.data && HB.data.restored && !(await ask('重新恢复会按现在的设置重新生成行程，已经改过的名字、标题和照片顺序会丢失。继续吗？', '重新恢复'))) return; rsGo(3); $('hb_list').textContent = '正在读取照片并还原，几十秒内…'; $('hb_go').click(); }
   else if (RS.step === 4) rsGo(5);
 };
 document.querySelectorAll('#topnav button[data-pg]').forEach(b => b.onclick = () => pgShow(b.dataset.pg));
@@ -1074,6 +1080,7 @@ function hbRender() {
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.m === HB.mode));
   $('hb_vid').style.display = restore && d.videos ? 'block' : 'none'; $('hb_vidn').textContent = (d.album_videos ? '照片 App 相册里有 ' : '照片文件夹里有 ') + d.videos + ' 段视频，可以剪成一条旅行短片';
   $('hb_import').style.display = restore ? '' : 'none'; $('hb_merge').style.display = restore && d.restored ? '' : 'none';
+  if (document.activeElement !== $('hb_title')) $('hb_title').value = d.name || '';
   $('hb_hint').textContent = restore ? '把拍过的照片还原成走过的行程，边看边改，满意了再导出。' : '给计划里的每个景点配照片和文字，做成可以带着走、也可以分享的手册。';
   const rows = d.stops.filter(s => !restore || s.restored);
   if (!rows.length) { $('hb_list').innerHTML = '<div class="tlnote">' + (restore ? '还没有恢复过的行程：在上面填相册文件夹，点“读取照片”。' : '这个行程还没有排好的景点。') + '</div>'; return; }
@@ -1213,10 +1220,16 @@ $('hb_mgo').onclick = async () => {
 };
 $('hb_sp').onchange = () => { $('hb_spc').style.display = $('hb_sp').checked ? '' : 'none'; };
 $('hb_open').onclick = async () => { try { const r = await api('reveal_exports', {}); $('hb_out').textContent = '已打开：' + r.path; } catch (e) { $('hb_out').textContent = e.message; } };
+async function hbSaveTitle() {
+  const t = $('hb_title').value.trim();
+  if (!t || (HB.data && t === HB.data.name)) return;
+  await api('hb_title', {title: t}); if (HB.data) HB.data.name = t; try { await load(); } catch (e) {}
+}
+$('hb_title').onchange = () => { hbSaveTitle().then(hbPvSoon).catch(e => toast(e.message)); };
 $('hb_exp').onclick = async () => {
   const formats = [...document.querySelectorAll('.hbf:checked')].map(x => x.value);
   $('hb_exp').disabled = true; $('hb_out').textContent = '正在生成…（卡片图和 PDF 需要几十秒）';
-  try { const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ' + $('hb_dirp').textContent + ' 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
+  try { await hbSaveTitle(); const r = await api('hb_export', {formats: formats, style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, basemap: $('hb_bm').checked, thumb_pins: $('hb_pin').checked, spending: $('hb_sp').checked, spending_cats: [...document.querySelectorAll('.hbsc:checked')].map(x => x.value)}); $('hb_out').textContent = r.message; toast('已导出，文件在 ' + $('hb_dirp').textContent + ' 下'); } catch (e) { $('hb_out').textContent = e.message; toast(e.message, true); }
   $('hb_exp').disabled = false;
 };
 
