@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
 <img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-86-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/MCP%20tools-89-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -183,17 +183,17 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 
 ## 🏗️ Architecture and capability split
 
-**86 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
+**89 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
 
 | Stage | Tools | Skills | Highlights |
 |---|---|---|---|
-| **Before · Plan** | 41 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
+| **Before · Plan** | 45 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
 | **After · Restore** | 16 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…) |
-| **Record & share** | 10 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
+| **Record & share** | 13 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
 | **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
 
 ```
-tripcore/   core library and MCP server (mcp_server.py: 86 tools; scheduler / validator / changes;
+tripcore/   core library and MCP server (mcp_server.py: 89 tools; scheduler / validator / changes;
             amap / routemap / weather; phototrip / photoslib / stays; handbook / share / video; web + webpage: workbench)
 skills/     manuals for the agent
 nanobot/    example config (no secrets)

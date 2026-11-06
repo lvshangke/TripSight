@@ -8,7 +8,16 @@ TEMPLATE = r"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TripSight 工作台</title>
-<style>__CSS__.hbvid{width:100%;margin-top:14px;padding:14px;border:1px solid #eadfcb;border-radius:14px;background:#fffdf8}.hvh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.hvrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0}.hvbar{width:120px;height:6px;border-radius:99px;background:#eadfcb;overflow:hidden}.hvbar i{display:block;height:100%;width:0;background:#c4553a;transition:width .4s}.hvjy{margin-top:8px}.vdsum{margin:10px 0 6px}.vdg{background:#fffdf8;border:1px solid #eadfcb;border-radius:12px;padding:10px 14px;margin:8px 0}.vdh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.vdd{background:#c4553a;color:#fff;border-radius:99px;padding:1px 10px;font-size:12px}.vdn{color:#7a7468;font-size:12px;margin-left:auto}.vdc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.vdc span{background:#f3ead9;border-radius:99px;padding:2px 10px;font-size:12px}.vdlost{border-style:dashed}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
+<style>__CSS__.hbvid{width:100%;margin-top:14px;padding:14px;border:1px solid #eadfcb;border-radius:14px;background:#fffdf8}.hvh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.hvrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0}.hvbar{width:120px;height:6px;border-radius:99px;background:#eadfcb;overflow:hidden}.hvbar i{display:block;height:100%;width:0;background:#c4553a;transition:width .4s}.hvjy{margin-top:8px}.vdsum{margin:10px 0 6px}.vdg{background:#fffdf8;border:1px solid #eadfcb;border-radius:12px;padding:10px 14px;margin:8px 0}.vdh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.vdd{background:#c4553a;color:#fff;border-radius:99px;padding:1px 10px;font-size:12px}.vdn{color:#7a7468;font-size:12px;margin-left:auto}.vdc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.vdc span{background:#f3ead9;border-radius:99px;padding:2px 10px;font-size:12px}.vdlost{border-style:dashed}.vdoff{opacity:.95;background:#f6f1e7}
+.vdc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.vcl{display:flex;gap:10px;background:#fff;border:1px solid #eadfcb;border-radius:10px;padding:8px}.vcl.off{opacity:.55}
+.vth{position:relative;flex:none;width:120px;height:90px;border-radius:8px;overflow:hidden;background:#2b2823;display:flex;align-items:center;justify-content:center}
+.vth img{width:100%;height:100%;object-fit:cover;display:block}.vth video{width:100%;height:100%;object-fit:contain;background:#000}
+.vplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;padding:0}
+.vbd{flex:1;min-width:0}.vnm{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vnm span{font-weight:400;color:#7a7468;margin-left:4px}
+.vrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px}.vrow select,.vrow input[type=number],.vrow .vnote{font:inherit;padding:2px 5px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;min-width:0}
+.vrow select{max-width:150px}.vrow input[type=number]{width:54px}.vrow .vnote{flex:1;width:100%}.vrow button{font:inherit;font-size:12px;padding:1px 7px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;cursor:pointer}
+.vtip{color:#7a7468;font-size:12px;margin:4px 0}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
 </style>
 <style>
 html,body{height:100%;margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
@@ -769,7 +778,7 @@ const fit = () => setTimeout(() => map.invalidateSize(), 50); window.addEventLis
 $('ctoggle').onclick = () => { $('chat').classList.toggle('hide'); syncSp2(); fit(); }; $('cclose').onclick = () => { $('chat').classList.add('hide'); syncSp2(); fit(); };
 setInterval(async () => {
   if (document.hidden || !S || drag) return;
-  try { const r = await api('rev'); if (r.revision !== S.revision || (r.trip || null) !== (S.trip || null)) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
+  try { const r = await api('rev'); if (r.vrev && r.vrev !== HV.stamp && $('hv_groups').innerHTML && !$('hv_groups').contains(document.activeElement)) { try { hvRender(await api('video_groups', {})); } catch (x) { HV.stamp = r.vrev; } } if (r.revision !== S.revision || (r.trip || null) !== (S.trip || null)) { if (pending) { closePrev(); say('行程在别处被修改了，刚才的预览已取消。'); } await load(); } } catch (e) {}
 }, 2000);
 chatStatus(); setInterval(() => { if (!document.hidden && !$('chat').classList.contains('hide')) chatStatus(); }, 10000);
 // ---- 三栏宽度可拖动（记住上次的宽度；双击分隔条恢复默认）----
@@ -1034,14 +1043,50 @@ $('home_plan').onclick = () => { homeDone(); pgShow('plan'); }; $('home_restore'
 $('more').onclick = () => moOpen(); $('mo_close').onclick = moClose; $('mo').onclick = e => { if (e.target === $('mo')) moClose(); };
 $('sh_cal').onclick = async () => { $('sh_err').textContent = '正在生成…'; try { const r = await api('cal_export', {}); $('sh_err').textContent = r.message + '（点右边“打开文件夹”就能找到）'; } catch (e) { $('sh_err').textContent = e.message; } };
 const hvFmt = d => d >= 60 ? Math.floor(d / 60) + ' 分 ' + Math.round(d % 60) + ' 秒' : Math.round(d) + ' 秒';
+const HV = {stops: [], stamp: 0};
+function hvClip(c, inGroup) {
+  const opts = '<option value="">不放进短片</option>' + HV.stops.map(s => '<option value="' + esc(s.id) + '"' + (s.id === c.stop ? ' selected' : '') + '>第 ' + s.day + ' 天 · ' + esc(s.name) + '</option>').join('');
+  return '<div class="vcl' + (c.use ? '' : ' off') + '" data-f="' + esc(c.file) + '" data-d="' + c.dur + '"><div class="vth"><img loading="lazy" src="video/thumb?f=' + encodeURIComponent(c.file) + '" alt="" onerror="this.style.display=\'none\'"><button class="vplay" title="播放原视频">▶</button></div><div class="vbd">'
+    + '<div class="vnm" title="' + esc(c.file) + '">' + esc(c.file) + '<span>' + hvFmt(c.dur) + (c.at ? ' · ' + esc(c.at) : '') + '</span></div>'
+    + '<div class="vrow"><label><input type="checkbox" class="vuse"' + (c.use ? ' checked' : '') + '> 放进短片</label><select class="vst" title="这段归到哪个景点">' + opts + '</select></div>'
+    + '<div class="vrow">取 <input type="number" class="vt0" min="0" step="0.5" value="' + (c.t0 == null ? '' : c.t0) + '" placeholder="0"> – <input type="number" class="vt1" min="0" step="0.5" value="' + (c.t1 == null ? '' : c.t1) + '" placeholder="' + c.dur + '"> 秒<button class="vtc" title="取消裁剪，用整段">整段</button>' + (inGroup ? '<button class="vup" title="往前排">↑</button><button class="vdn" title="往后排">↓</button>' : '') + '</div>'
+    + '<div class="vrow"><input class="vnote" maxlength="20" placeholder="字幕（景点名后面，可不写）" value="' + esc(c.note) + '"></div></div></div>';
+}
 function hvRender(r) {
+  HV.stops = r.stops || []; HV.stamp = r.edits || 0;
   const g = r.groups || [];
-  let h = '<div class="vdsum"><b>' + r.total + '</b> 段视频，共 ' + r.minutes + ' 分钟，归到景点 <b>' + r.assigned + '</b> 段' + (r.bad ? '，另有 ' + r.bad + ' 个读不了' : '') + '</div>';
+  let h = '<div class="vdsum"><b>' + r.total + '</b> 段视频，共 ' + r.minutes + ' 分钟，会放进短片 <b>' + r.assigned + '</b> 段' + (r.bad ? '，另有 ' + r.bad + ' 个读不了' : '') + '</div><div class="vtip">每段都能改：点 ▶ 看原视频；取消勾选就不放进短片；换景点、只取某几秒、调顺序、写字幕。改动自动保存，也可以在聊天里让助手改。</div>';
   h += g.map(x => '<div class="vdg"><div class="vdh"><span class="vdd">第 ' + x.day + ' 天</span><b>' + esc(x.name) + '</b><span class="vdn">' + x.clips.length + ' 段 · ' + hvFmt(x.clips.reduce((a, c) => a + c.dur, 0)) + '</span></div><div class="vdc">'
-    + x.clips.map(c => '<span title="' + esc(c.file) + '">' + esc(c.file) + ' · ' + hvFmt(c.dur) + '</span>').join('') + '</div></div>').join('');
-  if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上，不会放进短片）</span></div><div class="vdc">' + r.lost.map(c => '<span>' + esc(c.file) + ' · ' + hvFmt(c.dur) + '</span>').join('') + '</div></div>';
+    + x.clips.map(c => hvClip(c, true)).join('') + '</div></div>').join('');
+  if ((r.lost || []).length) h += '<div class="vdg vdlost"><div class="vdh"><b>没归到景点</b><span class="vdn">' + r.lost.length + ' 段（没带位置、时间也对不上；选一个景点就会放进短片）</span></div><div class="vdc">' + r.lost.map(c => hvClip(c, false)).join('') + '</div></div>';
+  if ((r.skipped || []).length) h += '<div class="vdg vdoff"><div class="vdh"><b>不放进短片</b><span class="vdn">' + r.skipped.length + ' 段（勾上“放进短片”就恢复）</span></div><div class="vdc">' + r.skipped.map(c => hvClip(c, false)).join('') + '</div></div>';
   $('hv_groups').innerHTML = h;
 }
+async function hvEdit(file, patch) {
+  try { hvRender(await api('video_edit', Object.assign({file: file}, patch))); } catch (e) { $('hv_out').textContent = e.message; try { hvRender(await api('video_groups', {})); } catch (x) {} }
+}
+$('hv_groups').addEventListener('change', e => {
+  const box = e.target.closest('.vcl'); if (!box) return; const f = box.dataset.f, t = e.target;
+  if (t.classList.contains('vuse')) hvEdit(f, {use: t.checked});
+  else if (t.classList.contains('vst')) hvEdit(f, {stop: t.value});
+  else if (t.classList.contains('vnote')) hvEdit(f, {note: t.value});
+  else if (t.classList.contains('vt0') || t.classList.contains('vt1')) {
+    const a = box.querySelector('.vt0').value, b = box.querySelector('.vt1').value;
+    if (a === '' && b === '') hvEdit(f, {clear_trim: true}); else hvEdit(f, {t0: a === '' ? 0 : +a, t1: b === '' ? +box.dataset.d : +b});
+  }
+});
+$('hv_groups').addEventListener('click', e => {
+  const box = e.target.closest('.vcl'); if (!box) return; const f = box.dataset.f, t = e.target;
+  if (t.classList.contains('vplay')) {
+    const a = box.querySelector('.vt0').value, b = box.querySelector('.vt1').value, frag = a !== '' || b !== '' ? '#t=' + (a || 0) + (b !== '' ? ',' + b : '') : '';
+    const th = box.querySelector('.vth'); th.innerHTML = '<video controls autoplay playsinline src="video/src?f=' + encodeURIComponent(f) + frag + '"></video>';
+    th.firstChild.onerror = () => { th.innerHTML = '<span class="tlnote" style="color:#fff;padding:6px">浏览器播不了这个格式；可以在访达里打开原文件</span>'; };
+  } else if (t.classList.contains('vtc')) hvEdit(f, {clear_trim: true});
+  else if (t.classList.contains('vup') || t.classList.contains('vdn')) {
+    const sibs = [...box.parentNode.querySelectorAll('.vcl')], i = sibs.indexOf(box), to = t.classList.contains('vup') ? i - 1 : i + 1;
+    if (to >= 0 && to < sibs.length) hvEdit(f, {position: to + 1});
+  }
+});
 $('hv_scan').onclick = async () => { $('hv_out').textContent = ''; $('hv_groups').innerHTML = '<div class="tlnote">正在读取视频信息…</div>'; try { hvRender(await api('video_scan', {})); } catch (e) { $('hv_groups').innerHTML = ''; $('hv_out').textContent = e.message; } };
 let hvTimer = null;
 function hvPoll() {

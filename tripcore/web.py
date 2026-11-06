@@ -25,7 +25,7 @@ from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -439,7 +439,7 @@ def add_place_web(body: dict) -> dict[str, Any]:
 
 
 def rev() -> dict[str, Any]:
-    return {"revision": ms._load().revision, "trip": _slug()}
+    return {"revision": ms._load().revision, "trip": _slug(), "vrev": ms.video_edits_stamp()}
 
 
 def trips() -> dict[str, Any]:
@@ -1349,11 +1349,66 @@ def video_scan(body: dict) -> dict[str, Any]:
         raise HttpError(400, str(e))
 
 
+def video_edit(body: dict) -> dict[str, Any]:
+    """改一段视频的处理（选用、换景点、裁剪、字幕、顺序）；返回最新的分组，页面直接重画。和聊天里助手的 video_set / video_note 写同一份记录。"""
+    file = str(body.get("file") or "")
+    try:
+        if file:
+            if "note" in body:
+                ms.video_note(file, str(body.get("note") or ""))
+            kw: dict[str, Any] = {}
+            if "use" in body:
+                kw["use"] = bool(body["use"])
+            if "stop" in body:
+                kw["place"] = str(body.get("stop") or "")
+            if body.get("t0") is not None or body.get("t1") is not None:
+                try:
+                    kw["start_s"], kw["end_s"] = float(body["t0"]), float(body["t1"])
+                except (TypeError, ValueError):
+                    raise HttpError(400, "起止要填两个数字（秒）。")
+            if body.get("clear_trim"):
+                kw["clear_trim"] = True
+            if body.get("position"):
+                kw["position"] = int(body["position"])
+            if body.get("reset"):
+                kw["reset"] = True
+            if kw:
+                ms.video_set(file, **kw)
+        return ms.video_groups(*ms._VLAST.get("k", ("", "")), fresh=False)
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
+def video_groups_now(body: dict) -> dict[str, Any]:
+    """按已读过的视频重画分组（聊天里助手改了之后页面用它刷新）；还没读过就报错。"""
+    try:
+        return ms.video_groups(*ms._VLAST.get("k", ("", "")), fresh=not ms._VCACHE)
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
+
+
 def _cut_file() -> Path:
     return ms.export_root() / "短片" / "旅行短片.mp4"
 
 
 _VJOB: dict[str, Any] = {"state": "idle"}
+
+
+def video_thumb(path: Path) -> bytes:
+    """原视频的封面小图（取第 1 秒附近一帧，宽 360），缓存在导出文件夹的 短片/_thumbs 里；只读原视频，需要 ffmpeg。"""
+    import hashlib
+    import subprocess
+    st = path.stat()
+    d = ms.export_root() / "短片" / "_thumbs"
+    out = d / (hashlib.sha1(f"{path}|{st.st_mtime_ns}|{st.st_size}".encode()).hexdigest()[:20] + ".jpg")
+    if out.is_file():
+        return out.read_bytes()
+    d.mkdir(parents=True, exist_ok=True)
+    for ss in ("1", "0"):
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", ss, "-i", str(path), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(out)], capture_output=True, timeout=30)
+        if r.returncode == 0 and out.is_file() and out.stat().st_size > 0:
+            return out.read_bytes()
+    return b""
 
 
 def _video_job(kw: dict) -> None:
@@ -1409,7 +1464,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "video_status": video_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_pdf": share_pdf, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "fp_build": fp_build}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "video_edit": video_edit, "video_groups": video_groups_now, "fp_build": fp_build}
 
 
 def make_handler(token: str, state: dict):
@@ -1459,12 +1514,43 @@ def make_handler(token: str, state: dict):
                 self._run(ROUTES_GET[rest[4:]])
             elif urlparse(self.path).path.endswith("/video/film.mp4"):
                 self._send_cut()
+            elif urlparse(self.path).path.endswith("/video/thumb"):
+                self._send_thumb()
+            elif urlparse(self.path).path.endswith("/video/src"):
+                self._send_src()
             else:
                 self._json(404, {"error": "not found"})
 
-        def _send_cut(self) -> None:
-            """只提供最近一次旅行短片（固定文件，不接受路径参数），支持 Range，网页里的播放器才能拖动进度。"""
-            f = _cut_file()
+        def _clip_path(self) -> Optional[Path]:
+            """视频预览只认最近一次扫描到的文件名（不接受路径），文件名对应的本机路径由服务端查表。"""
+            name = (parse_qs(urlparse(self.path).query).get("f") or [""])[0]
+            p = ms._VPATHS.get(name)
+            if not p or not Path(p).is_file():
+                self._json(404, {"error": "找不到这段视频，先点“读取视频”"})
+                return None
+            return Path(p)
+
+        def _send_thumb(self) -> None:
+            p = self._clip_path()
+            if p is None:
+                return
+            try:
+                img = video_thumb(p)
+            except Exception:
+                img = b""
+            if not img:
+                self._json(404, {"error": "没有生成封面（需要 ffmpeg）"})
+                return
+            self._send(200, img, "image/jpeg")
+
+        def _send_src(self) -> None:
+            p = self._clip_path()
+            if p is not None:
+                self._send_cut(p, "video/quicktime" if p.suffix.lower() == ".mov" else "video/mp4")
+
+        def _send_cut(self, f: Optional[Path] = None, ctype: str = "video/mp4") -> None:
+            """只提供最近一次旅行短片或最近扫描到的原视频（不接受路径参数），支持 Range，网页里的播放器才能拖动进度。"""
+            f = f or _cut_file()
             try:
                 size = f.stat().st_size
             except OSError:
@@ -1482,7 +1568,7 @@ def make_handler(token: str, state: dict):
                 if a > b:
                     self.send_response(416); self.send_header("Content-Range", f"bytes */{size}"); self.end_headers(); return
             self.send_response(206 if m else 200)
-            self.send_header("Content-Type", "video/mp4"); self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Type", ctype); self.send_header("Accept-Ranges", "bytes")
             self.send_header("Content-Length", str(b - a + 1)); self.send_header("Cache-Control", "no-store")
             if m:
                 self.send_header("Content-Range", f"bytes {a}-{b}/{size}")

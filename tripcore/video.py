@@ -42,6 +42,10 @@ class Clip:
     h: int = 0
     audio: bool = False
     stop: Optional[str] = None              # 归到的景点 id
+    skip: bool = False                      # 用户标了“不用”：不放进短片
+    t0: Optional[float] = None              # 用户设的起止（秒）；两个都有才算裁剪
+    t1: Optional[float] = None
+    note: str = ""                          # 用户给这一段写的字幕（放在景点名后面）
 
 
 def need_ffmpeg() -> None:
@@ -182,8 +186,16 @@ class Seg:
     extra: dict = field(default_factory=dict)    # 卡片附加内容：day_title / stops / stats
 
 
+def _trim(c: Clip) -> Optional[tuple[float, float]]:
+    """用户设的裁剪区间（秒），夹在视频长度内；没设或无效返回 None。"""
+    if c.t0 is None or c.t1 is None:
+        return None
+    a, b = max(0.0, float(c.t0)), min(float(c.dur), float(c.t1))
+    return (a, b) if b - a >= 0.5 else None
+
+
 def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: float = 8, clip_min: float = 1.5,
-         cards: bool = True, meta: Optional[dict] = None, day_titles: Optional[dict] = None) -> list[Seg]:
+         cards: bool = True, meta: Optional[dict] = None, day_titles: Optional[dict] = None, orders: Optional[dict] = None) -> list[Seg]:
     """order: 按行程顺序 [{id, name, day(0起), date, lat, lon}]。target_s=0 表示不限，每段取 clip_max 秒以内。
     总长超过目标时先按比例缩短每段（不短于 clip_min），还超就每个景点轻轻删几段。
     meta 给了（{"name", "range", "stats"}）就加片头和片尾；day_titles = {"1": "天涯海角", ...}（第几天从 1 起）用在每天的标题卡上。
@@ -193,10 +205,13 @@ def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: fl
     for c in clips:
         if c.stop:
             by_stop.setdefault(c.stop, []).append(c)
+    orders = orders or {}
     chosen: list[tuple[dict, Clip, float]] = []
     for s in order:
-        for c in sorted(by_stop.get(s["id"], []), key=lambda c: (c.start or datetime.max, c.file)):
-            chosen.append((s, c, min(float(clip_max), c.dur)))
+        pos = {f: i for i, f in enumerate(orders.get(s["id"], []))}          # 用户排过顺序的先按他排的，其余按拍摄时间接在后面
+        for c in sorted((x for x in by_stop.get(s["id"], []) if not x.skip), key=lambda c: (pos.get(c.file, len(pos)), c.start or datetime.max, c.file)):
+            tr = _trim(c)
+            chosen.append((s, c, (tr[1] - tr[0]) if tr else min(float(clip_max), c.dur)))
     if not chosen:
         raise VideoError("没有视频归到行程里的景点，粗剪不出东西。可以先检查拍摄时间/位置，或者确认行程日期。")
     days = sorted({s["day"] for s, _, _ in chosen})
@@ -231,8 +246,9 @@ def plan(clips: list[Clip], order: list[dict], target_s: float = 0, clip_max: fl
                             day=cur_day, variant="day", extra={"day_title": day_titles.get(str(cur_day + 1), ""), "stops": [p[0] for p in pts]}))
             if len(pts) >= 2:
                 segs.append(Seg("card", ROUTE_SECS, title=f"第{cur_day + 1}天的路线", day=cur_day, points=pts, variant="route"))
-        off = max(0.0, (c.dur - L) / 2)
-        segs.append(Seg("clip", L, clip=c, offset=off, lower=s["name"], stop=s["id"], day=s["day"]))
+        tr = _trim(c)
+        off = tr[0] if tr else max(0.0, (c.dur - L) / 2)
+        segs.append(Seg("clip", L, clip=c, offset=off, lower=(s["name"] + " · " + c.note) if c.note else s["name"], stop=s["id"], day=s["day"]))
     if meta:
         segs.append(Seg("card", OUTRO_SECS, title=meta.get("name", ""), sub=meta.get("range", ""), variant="outro"))
     return segs

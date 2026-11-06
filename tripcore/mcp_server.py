@@ -1297,47 +1297,241 @@ def _video_stops() -> tuple[list[dict], list[dict]]:
     return stops, order
 
 
-def _video_scan(folder: str, album: str = ""):
+_VCACHE: dict[tuple[str, str], tuple[list, int]] = {}      # (文件夹, 相册) → 读过的视频元数据，避免每次改一下都重新 ffprobe
+_VLAST: dict[str, tuple[str, str]] = {}                        # 最近一次扫描用的来源；video_set / video_note 沿用它
+_VPATHS: dict[str, str] = {}                                  # 文件名 → 本机路径；网页只能预览最近扫描到的这些视频，不接受任意路径
+
+
+def _video_edits_path() -> Path:
+    return trip_path().with_name("video_edits.json")
+
+
+def _video_edits() -> dict:
+    d = _load_json_file(_video_edits_path())
+    if not isinstance(d.get("clips"), dict):
+        d["clips"] = {}
+    if not isinstance(d.get("orders"), dict):
+        d["orders"] = {}
+    return d
+
+
+def _save_video_edits(d: dict) -> None:
+    p = _video_edits_path()
+    if not d.get("clips") and not d.get("orders"):
+        try:
+            p.unlink()
+        except OSError:
+            pass
+        return
+    try:
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"写入失败：{e}")
+
+
+def video_edits_stamp() -> float:
+    try:
+        return _video_edits_path().stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _video_scan(folder: str, album: str = "", fresh: bool = True):
+    import dataclasses
     from . import video as _v
     missing = 0
     if not folder and not album:                     # 没给来源：恢复行程就用读照片的那个相册/文件夹
         side = _load_json_file(_photo_trip_path())
         album, folder = str(side.get("album") or ""), str(side.get("folder") or "")
+    key = (folder, album)
+    _VLAST["k"] = key
     try:
-        if album:
-            from . import photoslib as _pl
-            try:
-                files, missing = _pl.album_videos(album)
-            except _pl.PhotosLibError as e:
-                raise ToolError(str(e))
-            clips, bad = _v.scan_files(files)
+        if not fresh and key in _VCACHE:
+            cached, bad = _VCACHE[key]
+            clips = [dataclasses.replace(c) for c in cached]
         else:
-            if not folder:
-                raise ToolError("要给视频文件夹 folder，或（Mac 上）照片 App 的相册名 album。")
-            root = Path(folder).expanduser()
-            if not root.is_dir():
-                raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
-            clips, bad = _v.scan(root)
+            if album:
+                from . import photoslib as _pl
+                try:
+                    files, missing = _pl.album_videos(album)
+                except _pl.PhotosLibError as e:
+                    raise ToolError(str(e))
+                clips, bad = _v.scan_files(files)
+            else:
+                if not folder:
+                    raise ToolError("要给视频文件夹 folder，或（Mac 上）照片 App 的相册名 album。")
+                root = Path(folder).expanduser()
+                if not root.is_dir():
+                    raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+                clips, bad = _v.scan(root)
+            bad += missing                           # 相册里只在 iCloud 上、本机没有原文件的，算“读不了”
+            if clips:
+                _VCACHE[key] = ([dataclasses.replace(c) for c in clips], bad)
     except _v.VideoError as e:
         raise ToolError(str(e))
-    bad += missing                                   # 相册里只在 iCloud 上、本机没有原文件的，算“读不了”
     if not clips:
-        raise ToolError("没有读到视频（支持 .mov / .mp4 / .m4v；文件夹不递归子文件夹" + (f"；相册里有 {missing} 段只在 iCloud 上、本机没有原文件，需要先在照片 App 里下载" if missing else "") + "）。")
+        raise ToolError("没有读到视频（支持 .mov / .mp4 / .m4v；文件夹不递归子文件夹" + (f"；相册里有 {missing} 段只在 iCloud 上、本机没有原文件，需要先在照片 App 里下载原片" if missing else "") + "）。")
+    for c in clips:
+        _VPATHS[c.file] = c.path
     stops, order = _video_stops()
-    n = _v.assign(clips, stops)
+    _v.assign(clips, stops)
+    ed = _video_edits()
+    ids = {o["id"] for o in order}
+    for c in clips:                                  # 用户（或助手）改过的：换景点、不用、裁剪、字幕
+        e = ed["clips"].get(c.file)
+        if not e:
+            continue
+        if "stop" in e and (e["stop"] in ids or e["stop"] == ""):
+            c.stop = e["stop"] or None
+        if e.get("use") is False:
+            c.skip = True
+        if e.get("t0") is not None and e.get("t1") is not None:
+            c.t0, c.t1 = float(e["t0"]), float(e["t1"])
+        c.note = str(e.get("note") or "")
+    n = sum(1 for c in clips if c.stop and not c.skip)
     return _v, clips, bad, n, order
 
 
-def video_groups(folder: str = "", album: str = "") -> dict:
-    """scan_videos 的结构化版本（给网页用）：按景点分组的片段、归不上的片段、读不了的个数。"""
-    _v, clips, bad, n, order = _video_scan(folder, album)
+def video_groups(folder: str = "", album: str = "", fresh: bool = True) -> dict:
+    """scan_videos 的结构化版本（给网页用）：按景点分组的片段（含是否选用、裁剪、字幕）、没归到景点的、不用的、读不了的个数。"""
+    _v, clips, bad, n, order = _video_scan(folder, album, fresh)
+    ed = _video_edits()
+
+    def row(c) -> dict:
+        tr = _v._trim(c)
+        return {"file": c.file, "dur": round(c.dur, 1), "at": c.start.strftime("%m-%d %H:%M") if c.start else "", "use": not c.skip, "stop": c.stop or "",
+                "t0": round(tr[0], 1) if tr else None, "t1": round(tr[1], 1) if tr else None, "note": c.note, "moved": "stop" in ed["clips"].get(c.file, {}),
+                "web": c.file.lower().endswith((".mp4", ".m4v", ".mov"))}
     per: dict[str, list] = {}
     for c in clips:
-        per.setdefault(c.stop or "", []).append(c)
-    groups = [{"day": o["day"] + 1, "id": o["id"], "name": o["name"],
-               "clips": [{"file": c.file, "dur": round(c.dur, 1)} for c in per[o["id"]]]} for o in order if per.get(o["id"])]
+        if not c.skip:
+            per.setdefault(c.stop or "", []).append(c)
+    groups = []
+    for o in order:
+        lst = per.get(o["id"], [])
+        pos = {f: i for i, f in enumerate(ed["orders"].get(o["id"], []))}
+        lst = sorted(lst, key=lambda c: (pos.get(c.file, len(pos)), c.start.isoformat() if c.start else "~", c.file))
+        if lst:
+            groups.append({"day": o["day"] + 1, "id": o["id"], "name": o["name"], "clips": [row(c) for c in lst]})
     return {"total": len(clips), "minutes": round(sum(c.dur for c in clips) / 60, 1), "bad": bad, "assigned": n, "groups": groups,
-            "lost": [{"file": c.file, "dur": round(c.dur, 1)} for c in per.get("", [])]}
+            "lost": [row(c) for c in per.get("", []) if not c.skip], "skipped": [row(c) for c in clips if c.skip],
+            "stops": [{"id": o["id"], "name": o["name"], "day": o["day"] + 1} for o in order], "edits": video_edits_stamp()}
+
+
+def _clip_key(file: str, clips: list) -> str:
+    names = [c.file for c in clips]
+    if file in names:
+        return file
+    hit = [x for x in names if file and file in x]
+    if len(hit) == 1:
+        return hit[0]
+    raise ToolError(f"找不到视频「{file}」。先用 video_clips 看有哪些，文件名要写完整。")
+
+
+def _stop_ref(ref: str, order: list[dict]) -> str:
+    if ref in ("", "无", "不归"):
+        return ""
+    for o in order:
+        if ref == o["id"]:
+            return o["id"]
+    hit = [o["id"] for o in order if o["name"] == ref] or [o["id"] for o in order if ref in o["name"]]
+    if len(hit) == 1:
+        return hit[0]
+    raise ToolError(f"景点「{ref}」" + ("有好几个叫这个名字的" if hit else "不在行程里") + "，请用 video_clips 里写的景点名或 id。")
+
+
+def video_clips(folder: str = "", album: str = "") -> str:
+    """列出每段视频现在的状态：归到哪个景点、是否选用、裁剪起止、字幕，以及没归到景点的和标了不用的。给用户看或要改之前先调用它。
+    默认用恢复行程读照片的那个文件夹/相册；已经读过就不会重新 ffprobe。只读。"""
+    r = video_groups(folder or _VLAST.get("k", ("", ""))[0], album or _VLAST.get("k", ("", ""))[1], fresh=False)
+    lines = [f"共 {r['total']} 段视频，{r['minutes']} 分钟；归到景点并选用 {r['assigned']} 段" + (f"；另有 {r['bad']} 个读不了" if r["bad"] else "")]
+
+    def fmt(c: dict) -> str:
+        tr = f"，裁剪 {c['t0']}–{c['t1']}s" if c["t0"] is not None else ""
+        return f"  - {c['file']}（{c['dur']}s{('，' + c['at']) if c['at'] else ''}{tr}{('，字幕：' + c['note']) if c['note'] else ''}{'，已手动指定景点' if c['moved'] else ''}）"
+    for g in r["groups"]:
+        lines.append(f"第{g['day']}天 · {g['name']}（id={g['id']}）：")
+        lines += [fmt(c) for c in g["clips"]]
+    if r["lost"]:
+        lines.append("没归到景点（不会放进短片，可用 video_set 指定景点）：")
+        lines += [fmt(c) for c in r["lost"]]
+    if r["skipped"]:
+        lines.append("标了不用：")
+        lines += [fmt(c) for c in r["skipped"]]
+    lines.append("可选的景点：" + "、".join(f"{s['name']}" for s in r["stops"]))
+    return "\n".join(lines)
+
+
+def video_set(file: str, use: Optional[bool] = None, place: Optional[str] = None, start_s: Optional[float] = None, end_s: Optional[float] = None,
+              position: Optional[int] = None, reset: bool = False, clear_trim: bool = False) -> str:
+    """改一段视频在旅行短片里的处理（只改你传的项；改完再 export_rough_cut 才会生成）：
+    use=false 这段不放进短片（true 恢复）；place 换成别的景点（景点名或 id，写 "" 表示不归到任何景点）；
+    start_s 和 end_s 一起给，只取这一段（秒，至少 0.5 秒，不超过视频长度）；position 在所属景点里排第几（从 1 起）；clear_trim=true 取消裁剪、用整段；reset=true 清除这段的所有修改。
+    file 是 video_clips 里写的文件名。不改原视频文件。"""
+    _v, clips, bad, n, order = _video_scan(*_VLAST.get("k", ("", "")), fresh=False)
+    key = _clip_key(file, clips)
+    clip = next(c for c in clips if c.file == key)
+    ed = _video_edits()
+    e = ed["clips"].setdefault(key, {})
+    changed = []
+    if reset:
+        ed["clips"].pop(key, None)
+        for lst in ed["orders"].values():
+            if key in lst:
+                lst.remove(key)
+        _save_video_edits(ed)
+        return f"已清除「{key}」的所有修改。"
+    if use is not None:
+        e["use"] = bool(use); changed.append("选用" if use else "不用")
+    if place is not None:
+        e["stop"] = _stop_ref(str(place), order); changed.append("换景点")
+        for lst in ed["orders"].values():
+            if key in lst:
+                lst.remove(key)
+    if clear_trim:
+        e.pop("t0", None); e.pop("t1", None); changed.append("用整段")
+    if (start_s is None) != (end_s is None):
+        raise ToolError("裁剪要同时给 start_s 和 end_s。")
+    if start_s is not None:
+        a, b = float(start_s), float(end_s)
+        if a < 0 or b - a < 0.5 or b > clip.dur + 0.05:
+            raise ToolError(f"裁剪区间不对：需要 0 ≤ start_s，end_s − start_s ≥ 0.5，且 end_s 不超过视频长度 {clip.dur:.1f} 秒。")
+        e["t0"], e["t1"] = round(a, 1), round(min(b, clip.dur), 1); changed.append("裁剪")
+    if position is not None:
+        sid = e.get("stop", clip.stop or "") if "stop" in e else (clip.stop or "")
+        if not sid:
+            raise ToolError("这段还没归到景点，先用 place 指定景点再排顺序。")
+        same = sorted([c for c in clips if c.stop == sid and not c.skip or c.file == key and sid], key=lambda c: c.start.isoformat() if c.start else "~")
+        cur = [f for f in ed["orders"].get(sid, []) if f in {c.file for c in same} and f != key]
+        rest = [c.file for c in same if c.file not in cur and c.file != key]
+        seq = cur + rest
+        seq.insert(max(0, min(int(position) - 1, len(seq))), key)
+        ed["orders"][sid] = seq; changed.append("顺序")
+    if not changed:
+        raise ToolError("没有要改的项：use / place / start_s+end_s / clear_trim / position / reset 至少给一个。")
+    if not e:
+        ed["clips"].pop(key, None)
+    _save_video_edits(ed)
+    return f"已改「{key}」：{'、'.join(changed)}。生成短片时生效（export_rough_cut）。"
+
+
+def video_note(file: str, note: str = "") -> str:
+    """给一段视频写字幕（显示在景点名后面，最多 20 字；只写用户说的话，不要自己编内容）。note 留空 = 清除。file 是 video_clips 里写的文件名。"""
+    note = (note or "").strip()
+    if len(note) > 20:
+        raise ToolError("字幕最多 20 个字。")
+    _v, clips, bad, n, order = _video_scan(*_VLAST.get("k", ("", "")), fresh=False)
+    key = _clip_key(file, clips)
+    ed = _video_edits()
+    e = ed["clips"].setdefault(key, {})
+    if note:
+        e["note"] = note
+    else:
+        e.pop("note", None)
+    if not e:
+        ed["clips"].pop(key, None)
+    _save_video_edits(ed)
+    return f"已{'写入' if note else '清除'}「{key}」的字幕" + (f"：{note}" if note else "") + "。生成短片时生效。"
 
 
 def scan_videos(folder: str = "", album: str = "") -> str:
@@ -1443,7 +1637,7 @@ def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bo
     _v, clips, bad, n, order = _video_scan(folder, album)
     try:
         segs = _v.plan(clips, order, target_s=float(target_seconds), clip_max=float(max(2, min(int(clip_max), 30))), cards=bool(cards),
-                       meta=_film_meta(order) if intro_outro else None, day_titles=_day_titles())
+                       meta=_film_meta(order) if intro_outro else None, day_titles=_day_titles(), orders=_video_edits()["orders"])
         size = _v._canvas(clips)
         bm_note = ""
         if basemap:
@@ -3894,6 +4088,7 @@ TOOLS = [
     set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
+    video_clips, video_set, video_note,
 ]
 
 

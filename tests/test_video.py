@@ -177,3 +177,66 @@ def test_scan_videos_defaults_to_restore_source_and_status_mentions_videos(tmp_p
     _mk(photos / "a.mov", "2026-06-19T02:03:00Z")
     assert "1 段视频" in s.restore_status()
     assert "a.mov" in s.scan_videos() or "视频" in s.scan_videos()
+
+
+def test_plan_honors_skip_trim_order_and_note():
+    a = v.Clip("a.mov", "/x/a.mov", 20, datetime(2026, 6, 19, 10, 0), stop="p1")
+    b = v.Clip("b.mov", "/x/b.mov", 20, datetime(2026, 6, 19, 10, 5), stop="p1", t0=4.0, t1=9.0, note="落日")
+    c = v.Clip("c.mov", "/x/c.mov", 20, datetime(2026, 6, 19, 10, 9), stop="p1", skip=True)
+    segs = [s for s in v.plan([a, b, c], _order(), clip_max=8) if s.kind == "clip"]
+    assert [s.clip.file for s in segs] == ["a.mov", "b.mov"]                    # c 标了不用
+    sb = segs[1]
+    assert sb.offset == 4.0 and abs(sb.secs - 5.0) < 1e-6 and sb.lower.endswith("落日")     # 裁剪区间原样用，字幕接在景点名后面
+    segs2 = [s for s in v.plan([a, b], _order(), clip_max=8, orders={"p1": ["b.mov", "a.mov"]}) if s.kind == "clip"]
+    assert [s.clip.file for s in segs2] == ["b.mov", "a.mov"]                   # 用户排过顺序的按他的
+    bad = v.Clip("d.mov", "/x/d.mov", 3, None, stop="p1", t0=2.9, t1=3.0)            # 区间太短 → 忽略裁剪
+    assert v._trim(bad) is None
+
+
+@pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")
+def test_video_edit_tools_and_web_roundtrip(tmp_path, monkeypatch):
+    pytest.importorskip("mcp")
+    pytest.importorskip("PIL")
+    from tests.test_photo_trip_tools import _album
+    from tripcore import mcp_server as s, web
+    photos = _album(tmp_path / "ph") if (tmp_path / "ph").mkdir() is None else None
+    s.import_photo_trip(str(photos))
+    vids = tmp_path / "vid"; vids.mkdir()
+    _mk(vids / "a.mov", "2026-06-19T02:03:00Z"); _mk(vids / "b.mov", "2026-06-19T02:04:00Z"); _mk(vids / "c.mov", "2026-06-19T14:00:00Z")
+    s.scan_videos(str(vids))
+    out = s.video_clips()
+    assert "a.mov" in out and "没归到景点" in out and "c.mov" in out
+    with pytest.raises(s.ToolError):
+        s.video_set("不存在.mov", use=False)
+    with pytest.raises(s.ToolError):
+        s.video_set("a.mov", start_s=1.0)                                   # 起止要成对
+    with pytest.raises(s.ToolError):
+        s.video_set("a.mov", start_s=1.0, end_s=99.0)                       # 超过视频长度
+    s.video_set("a.mov", start_s=0.5, end_s=2.5)
+    s.video_note("a.mov", "落日")
+    with pytest.raises(s.ToolError):
+        s.video_note("a.mov", "字" * 21)
+    g = s.video_groups(str(vids), fresh=False)
+    ca = next(c for gg in g["groups"] for c in gg["clips"] if c["file"] == "a.mov")
+    assert ca["t0"] == 0.5 and ca["t1"] == 2.5 and ca["note"] == "落日"
+    s.video_set("b.mov", use=False)
+    g = s.video_groups(str(vids), fresh=False)
+    assert [c["file"] for c in g["skipped"]] == ["b.mov"] and g["assigned"] == 1
+    sid = g["groups"][0]["id"]
+    s.video_set("c.mov", place=sid)                                         # 手动把归不上的指定到景点
+    g = s.video_groups(str(vids), fresh=False)
+    assert not g["lost"] and {c["file"] for c in g["groups"][0]["clips"]} == {"a.mov", "c.mov"}
+    s.video_set("c.mov", position=1)
+    g = s.video_groups(str(vids), fresh=False)
+    assert [c["file"] for c in g["groups"][0]["clips"]] == ["c.mov", "a.mov"]
+    r = web.video_edit({"file": "a.mov", "clear_trim": True, "stop": ""})       # 网页和助手改的是同一份记录
+    assert any(c["file"] == "a.mov" for c in r["lost"])
+    r = web.video_edit({"file": "a.mov", "reset": True})
+    assert not any(c["file"] == "a.mov" for c in r["lost"])
+    with pytest.raises(web.HttpError):
+        web.video_edit({"file": "a.mov", "t0": "x", "t1": 1})
+    assert web.rev()["vrev"] > 0
+    jpg = web.video_thumb(Path(s._VPATHS["a.mov"]))
+    assert jpg[:2] == b"\xff\xd8"
+    res = s.export_rough_cut(str(vids), clip_max=2)
+    assert "已生成旅行短片" in res
