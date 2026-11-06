@@ -260,7 +260,7 @@ def test_daycard_stats_and_hours_state(monkeypatch):
     from tripcore.daycard import category_label
     _harbin(monkeypatch)
     s.add_place("中央大街", 45.7710, 126.6200, duration_min=90, ticket_price=0, category="风景名胜;风景名胜;步行街")
-    s.add_place("红专街早市", 45.7620, 126.6480, duration_min=60, opening_hours="周一至周日 04:00-10:00", hours_source="amap", ticket_price=20)
+    s.add_place("红专街早市", 45.7620, 126.6480, duration_min=60, opening_hours="周一至周日 04:00-10:00", hours_source="amap", ticket_price=20, ticket_source="官网")
     s.schedule_days()
     snap = web.snapshot()
     st = snap["day_stats"]["0"]
@@ -288,3 +288,23 @@ def test_daycard_marks_closed_arrival_as_bad_and_unknown_cost(monkeypatch):
     by = {t.place(pid).name: v for pid, v in snap["stop_info"].items()}
     assert by["早市"]["state"] == "bad"                              # 中央大街在前，早市 10:40 才到，已关门
     assert snap["day_stats"]["0"]["cost_known"] is False             # 没有任何价格：写“待核实”，不写 ¥0
+
+
+def test_ticket_price_needs_source_and_free_with_source_is_known(monkeypatch):
+    from tripcore import web
+    _harbin(monkeypatch)
+    with pytest.raises(s.ToolError):
+        s.add_place("甲", 45.771, 126.62, ticket_price=30)
+    s.add_place("中央大街", 45.771, 126.62, ticket_price=0, ticket_source="https://example.gov.cn/a", ticket_date="2026-11-06")
+    s.schedule_days()
+    st = web.snapshot()["day_stats"]["0"]
+    assert st["cost"] == 0 and st["cost_known"] and st["ticket_missing"] == 0
+    s.add_place("乙", 45.762, 126.648)
+    s.schedule_days()
+    assert web.snapshot()["day_stats"]["0"]["ticket_missing"] == 1
+    pid = next(p.id for p in s._load().places if p.name == "乙")
+    with pytest.raises(s.ToolError):
+        s.update_place(pid, ticket_price=40)
+    s.update_place(pid, ticket_price=40, ticket_source="官网", ticket_date="2026-11-06")
+    assert s._load().place(pid).ticket_source == "官网"
+    assert "门票价格还没有来源" not in s.final_check()

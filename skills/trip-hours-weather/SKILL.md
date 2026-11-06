@@ -8,6 +8,7 @@ description: 营业时间、预约、备选方案、天气与行程展示：给�
 ## 营业时间、预约与备选方案
 
 - 营业时间优先用 `lookup_coords` 候选里的 `opentime_week`（高德），填进 `opening_hours`，`hours_source` 写 `amap`。高德没有时才用 `web_search` / `web_fetch` 查官方渠道，把网址写进 `hours_source`；搜不到或来源不可靠就留空并告诉用户“待核实”。不要凭印象写营业时间。
+- **门票价格**：行程里的景点没有 `ticket_source` 时，用 `web_search` / `web_fetch` 查官方渠道（景区官网、官方公众号、官方售票页），查到后 `update_place(ticket_price=…, ticket_source=官网网址, ticket_date=今天)`；免费景点也传 `ticket_price=0` 加来源。只信官方页面，第三方票务页的价格要写明是第三方；查不到就留空并告诉用户“没查到”，不要猜。`check_plan` 会列出还没有门票来源的景点，每天的费用标签也靠它。
 - 只有来源明确写了某天闭馆，才填 `closed_weekdays`。用户日期确定后，`check_plan` 会据此提醒。
 - 需要预约的景点（`reservation_required=true`），要问用户有没有约上；可能约不上的，和用户商量 1~2 个备选景点，用 `update_place` 的 `backups` 记下来。约不上时，用提案（移出原景点、移入备选）让用户确认，不要自己换。
 

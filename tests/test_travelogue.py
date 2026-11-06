@@ -14,8 +14,8 @@ def tmp_trip(tmp_path, monkeypatch):
 
 def _trip():
     s.new_trip(name="游记测试", num_days=2, start_date="2026-10-01", end_date="2026-10-02")
-    s.add_place("故宫", 39.9163, 116.3972, duration_min=240, must_go=True, priority=5, ticket_price=60)
-    s.add_place("天坛", 39.8822, 116.4066, duration_min=120, ticket_price=34)
+    s.add_place("故宫", 39.9163, 116.3972, duration_min=240, must_go=True, priority=5, ticket_price=60, ticket_source="官网")
+    s.add_place("天坛", 39.8822, 116.4066, duration_min=120, ticket_price=34, ticket_source="官网")
     s.add_place("颐和园", 39.9999, 116.2755, duration_min=180)
     s.add_lodging("秘密酒店XYZ", 39.91, 116.40, price_min=300, price_max=500, choose=True)
     s.schedule_days()

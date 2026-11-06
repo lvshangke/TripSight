@@ -80,6 +80,8 @@ class Place(BaseModel):
     priority: int = Field(default=3, ge=1, le=5, description="重要程度 1~5，5 最重要")
     must_go: bool = Field(default=False, description="是否必去")
     ticket_price: float = Field(default=0, ge=0, description="门票（元）")
+    ticket_source: str = Field(default="", description="门票价格的来源：官网/官方公众号网址、user 等；写了来源（即使是 0=免费）才算已核实，空表示还没查")
+    ticket_date: str = Field(default="", description="门票价格的查询日期（YYYY-MM-DD）")
     closed_weekdays: list[int] = Field(
         default_factory=list, description="每周哪几天闭馆：0=周一 … 6=周日"
     )

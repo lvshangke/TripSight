@@ -67,7 +67,9 @@ def build(trip: Trip, timelines: dict[int, list[dict]]) -> dict[str, Any]:
             "places": len(day.items),
             "km": km, "km_estimated": any(not e.get("real") for e in legs),
             "minutes": ds.total_min, "over": ds.total_min > limit,
-            "cost": round(cost), "cost_known": cost > 0,
+            "cost": round(cost),
+            "cost_known": cost > 0 or (bool(day.items) and all(trip.place(it.place_id).ticket_source for it in day.items)),
+            "ticket_missing": sum(1 for it in day.items if not trip.place(it.place_id).ticket_source),
             "date": d.isoformat() if d else "", "weekday": f"周{_WEEK[d.weekday()]}" if d else "",
             "errors": sum(1 for x in issues if x.day_index == i and x.severity == "error"),
         }

@@ -340,6 +340,8 @@ def add_place(
     priority: int = 3,
     must_go: bool = False,
     ticket_price: float = 0,
+    ticket_source: str = "",
+    ticket_date: str = "",
     closed_weekdays: Optional[list[int]] = None,
     reservation_required: bool = False,
     notes: str = "",
@@ -354,6 +356,8 @@ def add_place(
     """添加一个景点。lat/lon 必须来自 lookup_coords 或用户，绝不能自己编。
     ticket_price（元）、duration_min、closed_weekdays 如果没有可靠来源，请保持默认（门票填 0），
     不要凭印象编数字；verified=False 时会在备注里标“待核实”，用户确认过的数据才传 verified=True。
+    ticket_source / ticket_date：门票价格的来源（官网或官方公众号网址、user）和查询日期。有联网搜索能力时先查官方渠道再填价格，
+    免费景点也写来源（ticket_price=0 加来源=免费）；查不到就两项都留空，不要猜。
     closed_weekdays：闭馆的星期，0=周一 … 6=周日。
     opening_hours：营业时间原文，必须同时写 hours_source（amap，或网页网址，或 user），没有来源就留空。
     backups：备选景点的 id 列表（需要预约、可能约不上时设置）。
@@ -365,6 +369,8 @@ def add_place(
             raise ToolError(f"备选景点 {b} 不存在，请先添加或确认 id。")
     if opening_hours and not hours_source:
         raise ToolError("填营业时间必须同时填来源 hours_source（amap / 网址 / user）。")
+    if ticket_price and not ticket_source:
+        raise ToolError("填门票价格必须同时填来源 ticket_source（官网网址 / user）和 ticket_date；查不到就留 0。")
     if not verified:
         notes = (notes + " " if notes else "") + "[门票/时长/闭馆日待核实]"
     pid = _next_id("p", [p.id for p in trip.places])
@@ -372,6 +378,7 @@ def add_place(
         place = Place(
             id=pid, name=name, lat=lat, lon=lon, duration_min=duration_min,
             priority=priority, must_go=must_go, ticket_price=ticket_price,
+            ticket_source=ticket_source, ticket_date=ticket_date,
             closed_weekdays=closed_weekdays or [], reservation_required=reservation_required,
             notes=notes, source=source, opening_hours=opening_hours, hours_source=hours_source,
             backups=backups or [], category=category, outdoor=outdoor,
@@ -477,6 +484,8 @@ def update_place(
     priority: Optional[int] = None,
     must_go: Optional[bool] = None,
     ticket_price: Optional[float] = None,
+    ticket_source: Optional[str] = None,
+    ticket_date: Optional[str] = None,
     closed_weekdays: Optional[list[int]] = None,
     reservation_required: Optional[bool] = None,
     notes: Optional[str] = None,
@@ -487,7 +496,8 @@ def update_place(
     outdoor: Optional[bool] = None,
 ) -> str:
     """修改景点的资料（只改传入的字段）。这不改变它在行程里的位置；改完后请再 schedule_days。
-    坐标/价格必须来自工具或用户。"""
+    坐标/价格必须来自工具或用户。改 ticket_price 要同时写 ticket_source（官网网址 / user）和 ticket_date；
+    联网查到官方票价后用它写入，免费景点传 ticket_price=0 加来源。"""
     trip = _load()
     try:
         trip.place(place_id)
@@ -495,11 +505,13 @@ def update_place(
         raise ToolError(str(e))
     changes = {k: v for k, v in dict(
         name=name, lat=lat, lon=lon, duration_min=duration_min, priority=priority, must_go=must_go,
-        ticket_price=ticket_price, closed_weekdays=closed_weekdays,
+        ticket_price=ticket_price, ticket_source=ticket_source, ticket_date=ticket_date, closed_weekdays=closed_weekdays,
         reservation_required=reservation_required, notes=notes, opening_hours=opening_hours,
         hours_source=hours_source, backups=backups, category=category, outdoor=outdoor).items() if v is not None}
     if not changes:
         raise ToolError("没有传入要修改的字段。")
+    if changes.get("ticket_price") and not (changes.get("ticket_source") or trip.place(place_id).ticket_source):
+        raise ToolError("填门票价格必须同时填来源 ticket_source（官网网址 / user）和 ticket_date；查不到就别填。")
     for b in changes.get("backups", []):
         if b == place_id or all(p.id != b for p in trip.places):
             raise ToolError(f"备选景点 {b} 不存在或就是它自己。")

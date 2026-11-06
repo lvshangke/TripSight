@@ -74,6 +74,9 @@ def build_checklist(trip: Trip, today: Optional[date] = None) -> list[Item]:
     unverified = [p.name for p in placed if "待核实" in p.notes]
     if unverified:
         out.append(Item("info", "资料", f"这些景点的门票/时长/闭馆日还是“待核实”：{'、'.join(unverified[:8])}" + ("…" if len(unverified) > 8 else "")))
+    noticket = [p.name for p in placed if not p.ticket_source]
+    if noticket:
+        out.append(Item("info", "资料", f"这些景点的门票价格还没有来源（有联网搜索就查官方渠道，用 update_place 写 ticket_price/ticket_source/ticket_date；免费的也写来源）：{'、'.join(noticket[:8])}" + ("…" if len(noticket) > 8 else "")))
     nohours = [p.name for p in placed if not p.opening_hours and not p.waypoints]
     if nohours:
         out.append(Item("info", "资料", f"这些景点没有营业时间（可用 fill_hours 补）：{'、'.join(nohours[:8])}" + ("…" if len(nohours) > 8 else "")))

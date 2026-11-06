@@ -128,7 +128,7 @@ def test_wrong_confirm_code_is_rejected():
 def test_update_and_remove_place():
     _setup_trip()
     s.schedule_days()
-    s.update_place("p2", ticket_price=35, duration_min=60)
+    s.update_place("p2", ticket_price=35, ticket_source="user", duration_min=60)
     assert s._load().place("p2").ticket_price == 35
     with pytest.raises(s.ToolError):
         s.update_place("p2")

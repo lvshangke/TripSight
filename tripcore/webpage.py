@@ -573,7 +573,7 @@ function dayHead(d) {
   if (st.places !== undefined) {
     chips.push('<span class="chip">📍 ' + st.places + ' 个景点</span>');
     chips.push('<span class="chip" title="' + (st.km_estimated ? '含估算路段，点“更新路线”后更准' : '真实路线') + '">🚶 ' + (st.km_estimated ? '约 ' : '') + st.km + ' km</span>');
-    chips.push(st.cost_known ? '<span class="chip" title="门票 + 已选餐厅人均，按人数；不含交通和未选的餐食">💰 ¥' + st.cost + '</span>' : '<span class="chip mute" title="还没有门票或餐厅价格">💰 待核实</span>');
+    chips.push(st.cost_known ? '<span class="chip" title="门票 + 已选餐厅人均，按人数；不含交通和未选的餐食' + (st.ticket_missing ? '；还有 ' + st.ticket_missing + ' 个景点的门票价格没查到' : '') + '">💰 ¥' + st.cost + (st.ticket_missing ? '+' : '') + '</span>' : '<span class="chip mute" title="还没有门票或餐厅价格">💰 待核实</span>');
     chips.push('<span class="chip' + (st.over ? ' warn' : '') + '" title="游玩 + 路上的总时间' + (st.over ? '，超过了这个节奏的上限' : '') + '">⏱ ' + fmtMin(st.minutes) + '</span>');
     if (st.errors) chips.push('<span class="chip err" title="必须处理的问题">● ' + st.errors + ' 个问题</span>');
   }

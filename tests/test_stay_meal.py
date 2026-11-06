@@ -61,7 +61,7 @@ def test_day_budgets_multiply_travelers():
 def test_suggest_lodging_tool_returns_segments_and_snapshot_has_meal_gaps():
     from tripcore import mcp_server as s, web
     s.new_trip(start_date="2026-10-20", end_date="2026-10-22", city="北京")
-    s.add_place("甲", 39.91, 116.39, duration_min=240, ticket_price=50)
+    s.add_place("甲", 39.91, 116.39, duration_min=240, ticket_price=50, ticket_source="官网")
     s.add_place("乙", 39.92, 116.40, duration_min=300)
     s.schedule_days()
     out = s.suggest_lodging()
