@@ -79,3 +79,24 @@ def test_nearby_points_merge_into_one_numbered_pin():
     f = fp.TripFoot("a", "甲", 1, "", True, [(0, 28.7, 121.4, "x"), (0, 28.70001, 121.40001, "y"), (0, 28.8, 121.5, "z")])
     html = fp.build_html([f])
     assert html.count('class="t t0 pin"') == 2 and ">2</text>" in html
+
+
+
+def test_footprint_data_photo_pins_and_real_days():
+    """网页足迹页：每个点带日期和这一站自己的照片缩略图；天数按真正拍过照的天数算（跨年的相册不是几百天）。"""
+    from PIL import Image
+    d = _trip("台州", [("甲", 28.70, 121.40), ("乙", 28.80, 121.50)])
+    ids = [p.id for p in s._load().places]
+    (d / "photos").mkdir(exist_ok=True)
+    Image.new("RGB", (80, 60), (200, 80, 60)).save(d / "photos" / "a.jpg")
+    (d / "photos.json").write_text(json.dumps([{"id": "x1", "file": "a.jpg", "place_id": ids[0]}, {"id": "x2", "file": "a.jpg", "place_id": ids[0], "hide": True}]), encoding="utf-8")
+    (d / "photo_trip.json").write_text(json.dumps({"stops": [{"place_id": ids[0], "start": "2024-01-18T09:00:00"}, {"place_id": ids[1], "start": "2025-03-02T10:00:00"}]}), encoding="utf-8")
+    out = s.footprint_data()
+    t = out["trips"][0]
+    assert t["days"] == 2 and out["totals"]["days"] == 2
+    p0, p1 = t["pins"]
+    assert p0["date"] == "2024-01-18" and len(p0["thumbs"]) == 1 and p0["thumbs"][0].startswith("data:image/jpeg")   # 隐藏的照片不用
+    assert p1["thumbs"] == [] and len(p0["pos"]) == 2
+    html = (d / "足迹.html")
+    s.footprint()
+    assert "<image" in html.read_text(encoding="utf-8")                                                          # 导出的地图页也用照片图钉

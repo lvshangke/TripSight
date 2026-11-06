@@ -17,6 +17,11 @@ TEMPLATE = r"""<!doctype html>
 .vbd{flex:1;min-width:0}.vnm{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vnm span{font-weight:400;color:#7a7468;margin-left:4px}
 .vrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px;font-size:12px}.vrow select,.vrow input[type=number],.vrow .vnote{font:inherit;padding:2px 5px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;min-width:0}
 .vrow select{max-width:150px}.vrow input[type=number]{width:66px}.vrow .vnote{flex:1;width:100%}.vrow button{font:inherit;font-size:12px;padding:1px 7px;border:1px solid #e3dac8;border-radius:6px;background:#fffdf8;cursor:pointer}
+.fptiles{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.fptiles .tl{flex:1;min-width:96px;background:#fffdf8;border:1px solid #e3dac8;border-radius:12px;padding:8px 12px}.fptiles .tl b{display:block;font-size:22px;color:#c4553a}.fptiles .tl span{font-size:12px;color:#8a8374}
+.fpchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.fpchips button{display:flex;gap:8px;align-items:center;font:inherit;font-size:12px;background:#fffdf8;border:1px solid #e3dac8;border-radius:99px;padding:4px 12px 4px 8px;cursor:pointer}.fpchips button i{width:12px;height:12px;border-radius:50%}.fpchips button.off{opacity:.4}
+#fmap{height:calc(100vh - 360px);min-height:420px;border-radius:14px;border:1px solid #e3dac8;background:#eef3e8;overflow:hidden}
+.fpin{background:none!important;border:0!important}.fpin .fp{width:46px;height:46px;border-radius:50%;border:3px solid var(--c);background:var(--c) var(--img) center/cover;box-shadow:0 2px 8px rgba(0,0,0,.35);position:relative}.fpin .fp b{position:absolute;right:-7px;top:-7px;min-width:20px;height:20px;border-radius:10px;background:var(--c);color:#fff;font:700 11px/16px sans-serif;text-align:center;border:2px solid #fff;padding:0 3px;box-sizing:border-box}
+.fpop{min-width:170px;font-size:13px}.fpop b{display:block;font-size:14px}.fpop span{color:#8a8374;font-size:12px}.fpop .th{display:flex;gap:4px;margin-top:6px}.fpop .th img{width:56px;height:56px;object-fit:cover;border-radius:6px}.fpop .it{padding:3px 0;border-top:1px dotted #e3dac8}
 .vtip{color:#7a7468;font-size:12px;margin:4px 0}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
 </style>
 <style>
@@ -348,10 +353,10 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_rep"></div><div id="bl_mode"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_fp">
-<div class="hbimp"><b>我的足迹</b><label title="联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 地图加高德底图（联网）</label><button id="fp_go" class="pri">刷新</button>
-<div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程，和复盘里标了“去了”的景点；纯计划不算。公里数是直线距离累加，只是下限。城市来自“标城市”，没标的不猜。</div></div>
-<pre id="fp_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre>
-<div class="ph" style="height:480px"><iframe id="fp_frame" sandbox="allow-scripts" title="足迹地图" style="width:100%;height:100%;border:0;background:#fff"></iframe></div></div>
+<div class="hbimp"><b>我的足迹</b><button id="fp_go" class="pri">刷新</button><button id="fp_exp" title="生成一份可以单独打开、发给别人的地图页">导出地图页</button><label title="只影响“导出地图页”：联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 导出的地图页加高德底图（联网）</label>
+<div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程；纯计划不算。每个圆形图钉是那一站自己的照片，附近的会合并成带数字的图钉，点一下展开或看照片。公里数是直线距离累加，只是下限；城市来自“标城市”，没标的不猜。</div></div>
+<div id="fp_tiles" class="fptiles"></div><div id="fp_chips" class="fpchips"></div>
+<div id="fmap"></div><div class="tlnote" id="fp_note" style="margin:6px 0"></div><pre id="fp_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
 <div class="pane" id="pane_tools"><div class="tbar"><input id="tl_q" placeholder="搜索能力，例如：酒店、导出、天气"><span class="tlnote" id="tl_n"></span></div><div class="chips" id="tl_kind"></div><div class="chips" id="tl_cat"></div><div id="tl_out">加载中…</div></div>
 </div></div>
 <div id="ap"><div class="box"><h3>加景点</h3>
@@ -1030,7 +1035,7 @@ async function pgShow(name, step) {
   $(m[0]).appendChild(pn); pn.classList.add('on');
   $(name === 'restore' ? 'rp' : 'pg_' + name).classList.add('on');
   if (name === 'restore') return hbLoad().then(() => { rmapInit(); rmapFromHb(); return rsGo(step || (HB.data && HB.data.restored ? 4 : 1)); });
-  if (name === 'bill') blLoad(); else if (name === 'fp') fpLoad(false);
+  if (name === 'bill') blLoad(); else if (name === 'fp') fpLoad();
 }
 const rsOpen = step => pgShow('restore', step);
 $('rp_prev').onclick = () => rsGo(Math.max(1, RS.step - 1));
@@ -1124,12 +1129,50 @@ $('hv_go').onclick = async () => {
   try { await api('video_cut', {target_seconds: +$('hv_t').value, clip_max: +$('hv_m').value, cards: $('hv_c').checked, intro_outro: $('hv_io').checked, basemap: $('hv_bm').checked, style: $('hb_style').value, jianying_dir: $('hv_jy').value}); hvPoll(); }
   catch (e) { $('hv_out').textContent = e.message; $('hv_go').disabled = false; $('hv_bar').style.display = 'none'; $('hv_st').textContent = ''; }
 };
-async function fpLoad(withBm) {
-  $('fp_msg').textContent = '正在汇总…';
-  try { const r = withBm ? await api('fp_build', {basemap: true}) : await api('fp_state'); $('fp_msg').textContent = r.message; $('fp_frame').srcdoc = r.html || ''; }
-  catch (e) { $('fp_msg').textContent = e.message; $('fp_frame').srcdoc = ''; }
+const FP = {map: null, tile: null, layer: null, data: null, off: new Set(), fit: true};
+function fpInit() {
+  if (!FP.map) { FP.map = L.map('fmap', {zoomControl: false}); L.control.zoom({position: 'bottomright'}).addTo(FP.map); FP.map.setView([32, 108], 4); FP.map.on('zoomend', fpDraw); }
+  const t = S && S.map && S.map.tiles;
+  if (t && (!FP.tile || FP.tile._url !== t.url)) { if (FP.tile) FP.map.removeLayer(FP.tile); FP.tile = L.tileLayer(t.url, {subdomains: t.sub, maxZoom: 18, minZoom: 3, attribution: t.attr}).addTo(FP.map); }
+  setTimeout(() => { try { FP.map.invalidateSize(); } catch (e) {} }, 80);
 }
-$('fp_go').onclick = () => fpLoad($('fp_bm').checked);
+function fpIcon(col, th, n) { return L.divIcon({className: 'fpin', iconSize: [46, 46], iconAnchor: [23, 23], html: '<div class="fp" style="--c:' + col + (th ? ';--img:url(' + th + ')' : '') + '">' + (n > 1 ? '<b>' + n + '</b>' : '') + '</div>'}); }
+function fpDraw() {
+  if (!FP.map || !FP.data) return;
+  if (FP.layer) FP.map.removeLayer(FP.layer); FP.layer = L.layerGroup().addTo(FP.map);
+  const shown = FP.data.trips.filter(t => !FP.off.has(t.slug)), all = [];
+  shown.forEach(t => {
+    const byDay = {}; t.pins.forEach(p => (byDay[p.day] = byDay[p.day] || []).push(p));
+    Object.values(byDay).forEach(g => { if (g.length > 1) L.polyline(g.map(p => p.pos), {color: t.color, weight: 3, opacity: .7, dashArray: '2 8'}).addTo(FP.layer); });
+    t.pins.forEach(p => all.push({t: t, p: p}));
+  });
+  const cl = [];                                                    // 屏幕上挨得近的合并成一个图钉
+  all.forEach(a => { const pt = FP.map.latLngToLayerPoint(a.p.pos); const h = cl.find(c => Math.abs(c.x - pt.x) < 40 && Math.abs(c.y - pt.y) < 40); if (h) h.items.push(a); else cl.push({x: pt.x, y: pt.y, items: [a]}); });
+  cl.forEach(c => {
+    const first = c.items.find(i => i.p.thumbs.length) || c.items[0], it0 = c.items[0];
+    const m = L.marker(it0.p.pos, {icon: fpIcon(it0.t.color, (first.p.thumbs || [])[0] || '', c.items.length)}).addTo(FP.layer);
+    if (c.items.length === 1) {
+      const p = it0.p; m.bindPopup('<div class="fpop"><b>' + esc(p.name) + '</b><span>' + esc(it0.t.name) + ' · 第 ' + p.day + ' 天' + (p.date ? ' · ' + esc(p.date) : '') + '</span>' + (p.thumbs.length ? '<div class="th">' + p.thumbs.map(u => '<img src="' + u + '">').join('') + '</div>' : '') + '</div>');
+    } else {
+      const b = L.latLngBounds(c.items.map(i => i.p.pos)), same = b.getNorthEast().equals(b.getSouthWest());
+      m.on('click', () => { if (FP.map.getZoom() < 17 && !same) FP.map.fitBounds(b, {padding: [80, 80], maxZoom: 17}); else m.bindPopup('<div class="fpop">' + c.items.map(i => '<div class="it"><b>' + esc(i.p.name) + '</b><span>' + esc(i.t.name) + ' · 第 ' + i.p.day + ' 天</span></div>').join('') + '</div>').openPopup(); });
+    }
+  });
+  if (FP.fit && all.length) { FP.fit = false; FP.map.off('zoomend', fpDraw); FP.map.fitBounds(L.latLngBounds(all.map(a => a.p.pos)), {padding: [70, 70], maxZoom: 14}); FP.map.on('zoomend', fpDraw); fpDraw(); }
+}
+async function fpLoad() {
+  $('fp_msg').textContent = '正在汇总…'; fpInit();
+  try {
+    const r = await api('fp_data', {}); FP.data = r; FP.fit = true; $('fp_msg').textContent = r.message;
+    const t = r.totals; $('fp_tiles').innerHTML = [[t.trips, '趟'], [t.days, '天'], [t.places, '个地方'], [t.cities, '座城市'], [t.km, '公里（直线，下限）']].map(x => '<div class="tl"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>').join('');
+    $('fp_chips').innerHTML = r.trips.map(x => '<button data-s="' + esc(x.slug) + '" class="' + (FP.off.has(x.slug) ? 'off' : '') + '"><i style="background:' + x.color + '"></i>' + esc(x.name) + '<span class="tlnote">' + x.days + ' 天 · ' + x.pins.length + ' 处' + (x.cities.length ? ' · ' + esc(x.cities.slice(0, 4).join('、')) + (x.cities.length > 4 ? ' 等 ' + x.cities.length + ' 座' : '') : '') + '</span></button>').join('');
+    $('fp_chips').querySelectorAll('button').forEach(b => b.onclick = () => { FP.off.has(b.dataset.s) ? FP.off.delete(b.dataset.s) : FP.off.add(b.dataset.s); b.classList.toggle('off'); FP.fit = true; fpDraw(); });
+    $('fp_note').textContent = S && S.map && S.map.tiles ? '' : '没有地图底图（没配高德 key 或没联网），只显示点位。';
+    fpDraw();
+  } catch (e) { $('fp_msg').textContent = e.message; }
+}
+$('fp_go').onclick = () => fpLoad();
+$('fp_exp').onclick = async () => { $('fp_msg').textContent = '正在生成地图页…'; try { const r = await api('fp_build', {basemap: $('fp_bm').checked}); $('fp_msg').textContent = r.message; } catch (e) { $('fp_msg').textContent = e.message; } };
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
 ['sh_l', 'sh_c', 'sh_p', 'sh_t', 'sh_b'].forEach(id => $(id).onchange = shareRefresh);
 $('sh_html').onclick = () => { if (!shareHtml) return; const u = URL.createObjectURL(new Blob([shareHtml], {type: 'text/html'})); dl(u, '行程分享.html'); setTimeout(() => URL.revokeObjectURL(u), 2000); };

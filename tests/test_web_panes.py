@@ -14,7 +14,7 @@ from tripcore.webpage import page_html
 
 def test_page_has_new_entries():
     PAGE = page_html()
-    for k in ('data-pg="fp"', 'id="sh_cal"', 'id="hv_go"', 'id="fp_frame"'):
+    for k in ('data-pg="fp"', 'id="sh_cal"', 'id="hv_go"', 'id="fmap"'):
         assert k in PAGE, k
     assert 'data-pg="vid"' not in PAGE and 'id="pane_vid"' not in PAGE
 

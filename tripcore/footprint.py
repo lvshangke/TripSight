@@ -27,6 +27,7 @@ class TripFoot:
     points: list[tuple[int, float, float, str]] = field(default_factory=list)   # (第几天, lat, lon, 名字)
     cities: list[str] = field(default_factory=list)
     tagged: bool = False
+    pins: list[dict] = field(default_factory=list)   # 和 points 一一对应：{"date": "2024-01-18", "thumbs": [data URI, ...]}（要缩略图时才有）
 
     @property
     def km(self) -> float:
@@ -44,13 +45,37 @@ def _json(p: Path) -> Any:
         return {}
 
 
-def collect(trips_root: Path) -> list[TripFoot]:
+def collect(trips_root: Path, thumbs: bool = False) -> list[TripFoot]:
     if not trips_root.is_dir():
         return []
-    return collect_dirs(sorted(d for d in trips_root.iterdir() if d.is_dir() and not d.name.startswith("_")))
+    return collect_dirs(sorted(d for d in trips_root.iterdir() if d.is_dir() and not d.name.startswith("_")), thumbs)
 
 
-def collect_dirs(dirs: list[Path]) -> list[TripFoot]:
+def _pin_info(d: Path, side: dict, place_ids: list[str], thumbs: bool) -> list[dict]:
+    """每个点的日期，和（可选）这一站自己的照片缩略图：只用手册里没被隐藏的照片，最多 3 张，封面在前。"""
+    from . import photos as _ph
+    when = {x.get("place_id"): str(x.get("start") or "")[:10] for x in side.get("stops", []) if isinstance(x, dict)}
+    items = []
+    if thumbs:
+        try:
+            items = _ph.load(d / "photos.json")
+        except Exception:
+            items = []
+    out = []
+    for pid in place_ids:
+        ts = []
+        for x in items:
+            if len(ts) >= 3:
+                break
+            if x.get("place_id") == pid and not x.get("hide"):
+                u = _ph.thumb_uri(d / "photos", x.get("file", ""), 140, 62)
+                if u:
+                    ts.append(u)
+        out.append({"date": when.get(pid, ""), "thumbs": ts})
+    return out
+
+
+def collect_dirs(dirs: list[Path], thumbs: bool = False) -> list[TripFoot]:
     out: list[TripFoot] = []
     for d in dirs:
         if not (d / "trip.json").exists():
@@ -65,6 +90,7 @@ def collect_dirs(dirs: list[Path]) -> list[TripFoot]:
         went = set()
         regions = _json(d / "regions.json")
         pts: list[tuple[int, float, float, str]] = []
+        pids: list[str] = []
         seen: set[str] = set()
         if t.plan:
             for day in t.plan.days:
@@ -72,6 +98,7 @@ def collect_dirs(dirs: list[Path]) -> list[TripFoot]:
                     pl = t.place(it.place_id)
                     if (photo or pl.id in went) and pl.id not in seen:
                         seen.add(pl.id)
+                        pids.append(pl.id)
                         pts.append((day.index, pl.lat, pl.lon, pl.name))
         if not pts:
             continue
@@ -81,8 +108,10 @@ def collect_dirs(dirs: list[Path]) -> list[TripFoot]:
             c = r.get("city") or r.get("province")
             if c and _short(c) not in cities:
                 cities.append(_short(c))
-        out.append(TripFoot(d.name, t.meta.name, t.meta.num_days, t.meta.start_date.isoformat() if t.meta.start_date else "",
-                            photo, pts, cities, bool(cities)))
+        info = _pin_info(d, _json(d / "photo_trip.json"), pids, thumbs)
+        real_days = len({x["date"] for x in info if x["date"]})            # 跨了好几年的相册，“天数”按真的拍过照的天数算，不按头尾相隔几天
+        out.append(TripFoot(d.name, t.meta.name, real_days or t.meta.num_days, t.meta.start_date.isoformat() if t.meta.start_date else "",
+                            photo, pts, cities, bool(cities), info))
     return out
 
 
@@ -137,7 +166,7 @@ def build_html(feet: list[TripFoot], bm=None) -> str:
         return ox + (lo * kx - min(xs)) * sc, oy + (max(lats) - la) * sc
 
     lines, pins = [], []
-    placed: list[list] = []                              # 合并很近的点：[x, y, 行程序号, [名字...]]
+    placed: list[list] = []                              # 合并很近的点：[x, y, 行程序号, [名字...], 第一张缩略图]
     for i, f in enumerate(feet):
         col = _COLORS[i % len(_COLORS)]
         for d in sorted({p[0] for p in f.points}):
@@ -146,16 +175,23 @@ def build_html(feet: list[TripFoot], bm=None) -> str:
                 pl = " ".join(f"{x:.1f},{y:.1f}" for x, y in seq)
                 lines.append(f'<g class="t t{i}"><polyline points="{pl}" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>'
                              f'<polyline points="{pl}" fill="none" stroke="{col}" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/></g>')
-        for p in f.points:
+        for k, p in enumerate(f.points):
             x, y = xy(p[1], p[2])
-            hit = next((q for q in placed if q[2] == i and abs(q[0] - x) < 16 and abs(q[1] - y) < 16), None)
+            th = ((f.pins[k]["thumbs"] if k < len(f.pins) else None) or [""])[0]
+            hit = next((q for q in placed if q[2] == i and abs(q[0] - x) < 22 and abs(q[1] - y) < 22), None)
             if hit:
                 hit[3].append(p[3])
+                hit[4] = hit[4] or th
             else:
-                placed.append([x, y, i, [p[3]]])
-    for x, y, i, names in placed:
+                placed.append([x, y, i, [p[3]], th])
+    for n, (x, y, i, names, th) in enumerate(placed):
         col = _COLORS[i % len(_COLORS)]
         tip = escape(feet[i].name + " · " + (names[0] if len(names) == 1 else f"{len(names)} 处：" + "、".join(names[:4]) + ("…" if len(names) > 4 else "")))
+        if th:                                            # 有照片：圆形照片图钉（颜色是哪一趟），合并了几处就在角上写个数
+            badge = (f'<circle cx="15" cy="-15" r="9" fill="{col}" stroke="#fff" stroke-width="2"/><text x="15" y="-11" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{len(names)}</text>' if len(names) > 1 else "")
+            pins.append(f'<g class="t t{i} pin" transform="translate({x:.1f},{y:.1f})" data-tip="{tip}"><circle r="21" fill="{col}" stroke="#fff" stroke-width="3"/>'
+                        f'<clipPath id="cp{n}"><circle r="17"/></clipPath><image href="{th}" x="-17" y="-17" width="34" height="34" preserveAspectRatio="xMidYMid slice" clip-path="url(#cp{n})"/>{badge}</g>')
+            continue
         pins.append(f'<g class="t t{i} pin" transform="translate({x:.1f},{y:.1f})" data-tip="{tip}"><ellipse cx="0" cy="1" rx="6" ry="2.2" fill="#000" opacity=".25"/>'
                     f'<path d="{_PIN}" fill="{col}" stroke="#fff" stroke-width="2"/>'
                     + (f'<text y="-15" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{len(names)}</text>' if len(names) > 1 else '<circle cy="-19" r="3.6" fill="#fff"/>') + '</g>')
@@ -179,3 +215,18 @@ def build_html(feet: list[TripFoot], bm=None) -> str:
 <div class="tcs">{cards}</div></main><div id="tp"></div>
 <script>const tp=document.getElementById('tp');document.querySelectorAll('.pin').forEach(p=>{{p.onmousemove=e=>{{tp.textContent=p.dataset.tip;tp.style.left=Math.min(innerWidth-tp.offsetWidth-8,e.clientX+12)+'px';tp.style.top=(e.clientY-34)+'px';tp.style.opacity=1}};p.onmouseleave=()=>tp.style.opacity=0}});
 document.querySelectorAll('.tc').forEach(b=>b.onclick=()=>{{b.classList.toggle('on');document.querySelectorAll('.t'+b.dataset.i).forEach(x=>x.classList.toggle('off',!b.classList.contains('on')))}})</script>"""
+
+
+def data(feet: list[TripFoot]) -> dict:
+    """给网页足迹页的数据：统计 + 每趟的点（坐标已转成高德底图用的 GCJ-02）、日期和照片缩略图。"""
+    from .coords import wgs84_to_gcj02
+    trips = []
+    for i, f in enumerate(feet):
+        pins = []
+        for k, p in enumerate(f.points):
+            la, lo = wgs84_to_gcj02(p[1], p[2])
+            info = f.pins[k] if k < len(f.pins) else {}
+            pins.append({"day": p[0] + 1, "pos": [round(la, 6), round(lo, 6)], "name": p[3], "date": info.get("date", ""), "thumbs": info.get("thumbs", [])})
+        trips.append({"slug": f.slug, "name": f.name, "start": f.start, "days": f.days, "km": round(f.km), "cities": f.cities, "color": _COLORS[i % len(_COLORS)], "pins": pins})
+    cities = sorted({c for f in feet for c in f.cities})
+    return {"trips": trips, "totals": {"trips": len(feet), "days": sum(f.days for f in feet), "places": sum(len(f.points) for f in feet), "cities": len(cities), "km": round(sum(f.km for f in feet))}}

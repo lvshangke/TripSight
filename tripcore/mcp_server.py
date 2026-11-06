@@ -1692,6 +1692,20 @@ def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, ca
     return make_film(folder, target_seconds, clip_max, cards, intro_outro, style, jianying_dir, draft_name, album, basemap=basemap)["message"]
 
 
+def footprint_data() -> dict:
+    """网页足迹页用的结构化数据（不是工具）：和 footprint 同样只认“恢复行程”，带每站的照片缩略图。"""
+    from . import footprint as _fp
+    if _single_file_mode():
+        feet = _fp.collect_dirs([trip_path().parent], thumbs=True)
+    else:
+        root = _root_dir()
+        _ws.migrate_legacy(root)
+        feet = _fp.collect(_ws.trips_dir(root), thumbs=True)
+    out = _fp.data(feet)
+    out["message"] = _fp.summary(feet)
+    return out
+
+
 def footprint(basemap: bool = False) -> str:
     """足迹统计与地图：把去过的行程合起来——几趟、几天、到过几个城市、大约走了多少公里，并生成一张所有去过的地方的地图页（~/.tripcore/足迹.html）。
     只算“去过”的：用“恢复行程”从照片还原的行程；计划行程和复盘不算。公里数是每天按先后顺序的直线距离累加，只是下限；
@@ -1701,11 +1715,11 @@ def footprint(basemap: bool = False) -> str:
     from . import footprint as _fp
     if _single_file_mode():
         root = trip_path().parent
-        feet = _fp.collect_dirs([root])
+        feet = _fp.collect_dirs([root], thumbs=True)
     else:
         root = _root_dir()
         _ws.migrate_legacy(root)
-        feet = _fp.collect(_ws.trips_dir(root))
+        feet = _fp.collect(_ws.trips_dir(root), thumbs=True)
     text = _fp.summary(feet)
     if not feet:
         return text
