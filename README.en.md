@@ -84,17 +84,16 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 
 ## 🖼️ At a glance
 
-**The workbench: itinerary on the left, Amap map in the middle, chat assistant on the right.**
+**Left: the plan workbench** (itinerary on the left, Amap map in the middle, chat assistant on the right). **Right: the restore edit page** (album → stay points → edit → export; click a pin on the map to see that place's photo thumbnails, and the list on the left jumps to the stop).
 
-<a href="docs/images/workbench.png"><img src="docs/images/workbench.png" alt="Plan workbench: 3 days in Suzhou with real routes, weather and the chat assistant"></a>
+<p>
+<a href="docs/images/workbench.png"><img src="docs/images/workbench.png" width="49%" alt="Plan workbench: 3 days in Suzhou with real routes, weather and the chat assistant"></a>&ensp;
+<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" width="49%" alt="Restore edit page for the Taizhou trip, click a pin for thumbnails"></a>
+</p>
 
-**Restore: album → stay points → edit → export.** Every action of the assistant appears in the "Assistant" card.
+**Share formats for a planned trip** (all generated locally from the same itinerary, no login; real exports of the Suzhou demo, the calendar is rendered from the exported .ics as an illustration): a share page (HTML, can become a PDF, 8 themes, hotels and costs hidden by default), a phone map page (a single file, opens in a phone browser) and a calendar file (.ics). There are also chat-ready text, a GPX track and a dedicated Amap App map.
 
-<a href="docs/images/workbench-restore.png"><img src="docs/images/workbench-restore.png" alt="Restore edit page for the Taizhou trip"></a>
-
-**There are many share formats; here is just a thin strip**: 8 share themes (journal, magazine, fresh, film, seaside…) switch with one click, plus a per-day route map and an optional route-animation GIF. Hotels and costs are hidden by default.
-
-<img src="docs/images/share-strip.jpg" alt="8 share themes (thumbnails)">
+<a href="docs/images/share-formats.jpg"><img src="docs/images/share-formats.jpg" alt="Share formats: share page, phone map page, calendar" width="100%"></a>
 
 **More small features** (older recordings, older UI, still valid):
 
@@ -107,8 +106,9 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 <p>
 <img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&ensp;
 <img src="docs/images/feat-tools.gif" width="23%" alt="Tools">&ensp;
-<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">
-
+<img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&ensp;
+<img src="docs/images/feat-edit.gif" width="23%" alt="Edit the handbook and cards in place">&ensp;
+<img src="docs/images/feat-footprint.gif" width="23%" alt="Footprint map: click a pin for photo thumbnails">
 </p>
 
 <sub>Screens use a demo Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap.</sub>
@@ -188,7 +188,7 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 | Stage | Tools | Skills | Highlights |
 |---|---|---|---|
 | **Before · Plan** | 45 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
-| **After · Restore** | 17 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…) |
+| **After · Restore** | 17 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook` `edit_handbook`…) |
 | **Record & share** | 13 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
 | **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
 

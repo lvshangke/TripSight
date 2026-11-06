@@ -690,3 +690,9 @@ def test_edit_handbook_texts_cards_and_preview_hooks(tmp_path, monkeypatch):
     s.edit_handbook("card_photos", "", day=1)
     assert "慢慢走" not in web.hb_style_preview({"style": "手账"})["page"] and not s._htext()["cards"]["1"].get("photos")
     assert "已清除" in web.hb_text({"kind": "afterword", "text": ""})["message"]
+
+
+def test_restore_map_pin_popup_has_thumbnails():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert "thumbs: (x.photos || [])" in h and "paddingBottomRight: [80, 170]" in h

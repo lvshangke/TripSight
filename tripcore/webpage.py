@@ -994,13 +994,14 @@ function rmapDraw(pts, onclick) {
   const byDay = {}; pts.forEach(p => (byDay[p.day] = byDay[p.day] || []).push(p));
   Object.keys(byDay).forEach(d => { const c = DAYC[(+d - 1 + DAYC.length) % DAYC.length]; if (byDay[d].length > 1) L.polyline(byDay[d].map(p => p.pos), {color: c, weight: 3, opacity: .75, dashArray: '7 6'}).addTo(RLAY); });
   pts.forEach(p => { const m = L.marker(p.pos, {icon: rpin(p.n)}).addTo(RLAY); m._p = p; if (p.tip) m.bindTooltip(p.tip, {direction: 'top', offset: [10, -26]});
+    if (p.thumbs && p.thumbs.length) m.bindPopup('<div class="fpop"><b>' + esc(p.tip || '') + '</b><span>第 ' + p.day + ' 天</span><div class="th">' + p.thumbs.map(u => '<img src="' + u + '">').join('') + '</div></div>', {offset: [10, -22], autoPanPadding: [40, 40]});
     m.on('click', () => { rmapSelect(m); if (onclick) onclick(p); }); p._m = m; });
-  RMAP.fitBounds(L.latLngBounds(pts.map(p => p.pos)), {padding: [60, 60], maxZoom: 16});
+  RMAP.fitBounds(L.latLngBounds(pts.map(p => p.pos)), {paddingTopLeft: [80, 90], paddingBottomRight: [80, 170], maxZoom: 16});
 }
 function rmapSelect(m) { if (RSEL) RSEL.setIcon(rpin(RSEL._p.n)); RSEL = m; m.setIcon(rpin(m._p.n, true)); }
 function rmapFromHb() {
   if (!HB.data || HB.mode !== 'restore') return;
-  const pts = HB.data.stops.filter(x => x.restored && x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: x.day, id: x.id, tip: x.name}));
+  const pts = HB.data.stops.filter(x => x.restored && x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: x.day, id: x.id, tip: x.name, thumbs: (x.photos || []).filter(q => !q.hide && q.thumb).slice(0, 3).map(q => q.thumb)}));
   $('rmap_chip').className = ''; $('rmap_chip').textContent = $('rp_gate').classList.contains('on') ? '' : '当前行程：' + HB.data.name + '（' + pts.length + ' 处）'; $('rmap_chip').style.display = $('rmap_chip').textContent ? '' : 'none';
   rmapDraw(pts, p => { const el = $('hb_' + p.id); if (el && RS.step === 4) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400); } });
 }
