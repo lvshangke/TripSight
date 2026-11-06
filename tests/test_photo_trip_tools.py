@@ -650,3 +650,43 @@ def test_page_follows_assistant_video_edits():
     h = page_html()
     assert "ACT_VIDEO" in h and "hvRefresh" in h                       # 助手看/改视频归类时，页面的“视频归类”自动刷新
     assert "video_set: 5" in h and "video_note: 5" in h                # 并且跟到导出这一步
+
+
+def test_edit_handbook_texts_cards_and_preview_hooks(tmp_path, monkeypatch):
+    """封面副标题、后记、每天一句话、停留说明、每张卡片的副标题/一句话/风格/照片：网页和聊天是同一份记录；预览可点着改，导出里没有编辑标记。"""
+    from tripcore import web, photos as ph
+    monkeypatch.setenv("TRIPCORE_EXPORT_DIR", str(tmp_path / "out"))
+    s.import_photo_trip(str(_album(tmp_path)))
+    with pytest.raises(s.ToolError):
+        s.edit_handbook("nope", "x")
+    with pytest.raises(s.ToolError):
+        s.edit_handbook("day_summary", "x", day=9)
+    with pytest.raises(s.ToolError):
+        s.edit_handbook("card_style", "不存在", day=1)
+    with pytest.raises(s.ToolError):
+        s.edit_handbook("card_photos", "不存在的id", day=1)
+    assert "副标题" in s.edit_handbook("subtitle", "慢慢走")
+    s.edit_handbook("afterword", "回来了，真好")
+    s.edit_handbook("day_summary", "第一天先看海", day=1)
+    pid = s._load().places[0].id
+    s.edit_handbook("stay_note", "吃了午饭", place_id=pid)
+    s.edit_handbook("card_caption", "终于看到海了", day=1)
+    s.edit_handbook("card_subtitle", "出发的那天", day=1)
+    s.edit_handbook("card_style", "海边", day=1)
+    ids = [x["id"] for x in ph.load(s._photo_index()) if not x.get("hide")][:2]
+    s.edit_handbook("card_photos", ",".join(ids), day=1)
+    r = web.hb_style_preview({"style": "手账", "edit": True})
+    for t in ("慢慢走", "回来了，真好", "第一天先看海", "吃了午饭"):
+        assert t in r["page"]
+    for k in ('data-ed="name:', 'data-ed="stay:', 'data-ed="dsum:1"', "data-ed=sub:cover", "data-ed=after:book", "[data-pid]"):
+        assert k in r["page"], k
+    c = r["cards"][0]
+    assert "终于看到海了" in c and "出发的那天" in c and 'data-ed="ccap:1"' in c and 'data-ed="csub:1"' in c and 'data-ed="ctitle:1"' in c
+    assert "#eaf3f9" in c                                                  # 这一天的卡片单独用了“海边”风格
+    assert r["card_days"][0] == 1 and r["cards_cfg"]["1"]["photos"] == ids and r["cards_cfg"]["1"]["style"] == "海边"
+    plain = web.hb_style_preview({"style": "手账"})
+    assert "慢慢走" in plain["page"] and "data-ed" not in plain["page"] and "data-pid" not in plain["page"]
+    s.edit_handbook("subtitle", "")
+    s.edit_handbook("card_photos", "", day=1)
+    assert "慢慢走" not in web.hb_style_preview({"style": "手账"})["page"] and not s._htext()["cards"]["1"].get("photos")
+    assert "已清除" in web.hb_text({"kind": "afterword", "text": ""})["message"]

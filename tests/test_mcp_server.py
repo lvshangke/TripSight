@@ -109,7 +109,7 @@ def test_server_registers_all_tools(monkeypatch):
     monkeypatch.setenv("TRIPCORE_TOOLS", "full")
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 89
+    assert len(names) == 90
 
 
 def test_wrong_confirm_code_is_rejected():

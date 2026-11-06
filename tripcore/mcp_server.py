@@ -1802,7 +1802,7 @@ def export_handbook(show_photos: bool = True, video_path: str = "", video_place:
         spend = _bl.summarize(led, spending_categories or None)
     try:
         res = build_handbook(trip, export_root(), photos=items, photo_dir=_photo_dir(),
-                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, thumb_pins=thumb_pins, card_photos=card_photos, card_size=card_size, day_titles=_day_titles())
+                             show_photos=show_photos, videos=videos, cards=cards, stories=_load_json_file(_stories_path()), basemap=bm, pdf=pdf, style=style, regions=_chapter_labels(), spending=spend, htext=_htext(), thumb_pins=thumb_pins, card_photos=card_photos, card_size=card_size, day_titles=_day_titles())
     except (OSError, ValueError) as e:
         raise ToolError(f"生成失败：{e}")
     if basemap:
@@ -2447,6 +2447,91 @@ def set_day_title(day: int, title: str = "") -> str:
         data.pop(str(int(day)), None)
     _day_titles_path().write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return f"第 {day} 天的标题" + (f"改为「{title}」。" if title else "已恢复为“第 N 天”。")
+
+
+def _htext_path() -> Path:
+    return trip_path().with_name("handbook_text.json")
+
+
+def _htext() -> dict:
+    """手册、卡片、PDF 上“用户自己写的话”和每张卡片的选择：{subtitle, afterword, days:{N:{summary}}, stops:{pid:{stay}}, cards:{N:{subtitle, caption, style, photos}}}。"""
+    d = _load_json_file(_htext_path())
+    for k, v in (("days", {}), ("stops", {}), ("cards", {})):
+        if not isinstance(d.get(k), dict):
+            d[k] = v
+    return d
+
+
+_HTEXT_LIMITS = {"subtitle": 30, "afterword": 400, "day_summary": 120, "stay_note": 40, "card_subtitle": 30, "card_caption": 40}
+
+
+def edit_handbook(kind: str, text: str = "", day: int = 0, place_id: str = "") -> str:
+    """改手册、卡片、PDF 上“用户自己的话”和每张小红书卡片的选择。这些文字只用用户说的原话，不要自己编；text 留空 = 清除（卡片的照片、风格留空 = 恢复自动 / 跟随全局）。
+    kind：
+    - subtitle：手册封面的副标题（≤30 字）
+    - afterword：手册结尾的“后记”（≤400 字）
+    - day_summary：第 day 天章首的一句话总结（≤120 字，要 day）
+    - stay_note：某个景点“停留”后面的一句说明，比如“在这里吃了午饭”（≤40 字，要 place_id）
+    - card_subtitle：第 day 天卡片上的副标题（≤30 字，要 day）；卡片标题就是每天的标题，用 set_day_title 改
+    - card_caption：第 day 天卡片上用户自己写的一句话（≤40 字，要 day）
+    - card_style：只让第 day 天这张卡片用另一个风格（风格名，空 = 跟随导出时选的）
+    - card_photos：第 day 天这张卡片用哪几张照片，text 是照片 id，逗号隔开，最多 5 张（id 从 view_stop 里看；空 = 自动挑）
+    只影响手册和卡片的排版，不改行程。"""
+    trip = _load()
+    kind = (kind or "").strip()
+    if kind not in _HTEXT_LIMITS and kind not in ("card_style", "card_photos"):
+        raise ToolError("kind 只能是：" + "、".join(list(_HTEXT_LIMITS) + ["card_style", "card_photos"]))
+    text = (text or "").strip()
+    d = _htext()
+    needs_day = kind in ("day_summary", "card_subtitle", "card_caption", "card_style", "card_photos")
+    if needs_day and not (trip.plan and 1 <= int(day) <= len(trip.plan.days)):
+        raise ToolError(f"第 {day} 天不存在。")
+    if kind in _HTEXT_LIMITS:
+        if len(text) > _HTEXT_LIMITS[kind]:
+            raise ToolError(f"最多 {_HTEXT_LIMITS[kind]} 个字。")
+        bad = text and _guard_text(text)
+        if bad:
+            raise ToolError("；".join(bad))
+    if kind == "subtitle":
+        d["subtitle"] = text
+    elif kind == "afterword":
+        d["afterword"] = text
+    elif kind == "day_summary":
+        d["days"].setdefault(str(int(day)), {})["summary"] = text
+    elif kind == "stay_note":
+        pl = _find_place_ref(trip, place_id)
+        d["stops"].setdefault(pl.id, {})["stay"] = text
+    elif kind in ("card_subtitle", "card_caption"):
+        d["cards"].setdefault(str(int(day)), {})[kind.split("_", 1)[1]] = text
+    elif kind == "card_style":
+        from .handbook import THEMES
+        if text and text not in THEMES:
+            raise ToolError("风格只能是：" + "、".join(THEMES))
+        d["cards"].setdefault(str(int(day)), {})["style"] = text
+    else:
+        ids = [x.strip() for x in text.replace("，", ",").split(",") if x.strip()]
+        if len(ids) > 5:
+            raise ToolError("一张卡片最多 5 张照片。")
+        items = {x["id"]: x for x in _ph.load(_photo_index())}
+        from .handbook import day_visits
+        day_pids = {v.place.id for v in day_visits(trip, trip.plan.days[int(day) - 1])[0]}
+        for i in ids:
+            if i not in items or items[i].get("place_id") not in day_pids or items[i].get("hide"):
+                raise ToolError(f"照片 {i} 不是第 {day} 天可用的照片（不存在、不属于这一天或已隐藏）。")
+        d["cards"].setdefault(str(int(day)), {})["photos"] = ids
+    for k in [k for k, v in d["days"].items() if not any(v.values())]:
+        d["days"].pop(k)
+    for k in [k for k, v in d["stops"].items() if not any(v.values())]:
+        d["stops"].pop(k)
+    for k in [k for k, v in d["cards"].items() if not any(v.values())]:
+        d["cards"].pop(k)
+    try:
+        _htext_path().write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"写入失败：{e}")
+    names = {"subtitle": "封面副标题", "afterword": "后记", "day_summary": f"第 {day} 天的一句话总结", "stay_note": "停留说明", "card_subtitle": f"第 {day} 天卡片的副标题",
+             "card_caption": f"第 {day} 天卡片的一句话", "card_style": f"第 {day} 天卡片的风格", "card_photos": f"第 {day} 天卡片的照片"}
+    return names[kind] + (f"已设为「{text}」。" if text else "已清除（恢复默认）。")
 
 
 def suggest_day_titles() -> dict:
@@ -4099,7 +4184,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
-    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
+    set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, edit_handbook, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
     video_clips, video_set, video_note,

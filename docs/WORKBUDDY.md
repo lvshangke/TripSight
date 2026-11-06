@@ -42,7 +42,7 @@ pwd                  # 例如 /Users/你/tripcore
 
 说明：
 - `AMAP_KEY` 可以不填，没有它就没有真实路线、营业时间、天气和餐厅搜索，其余功能照常。key 只放在这里，不要提交到仓库，也不要发进聊天。
-- 默认只暴露“规划核心 + 恢复行程/手册”两档工具，省上下文；想要全部 89 个工具，在 `env` 里加 `"TRIPCORE_TOOLS": "full"`。
+- 默认只暴露“规划核心 + 恢复行程/手册”两档工具，省上下文；想要全部 90 个工具，在 `env` 里加 `"TRIPCORE_TOOLS": "full"`。
 - 如果 WorkBuddy 的 MCP 配置只接受 `command` 加 `args` 的写法，也可以写成 `"command": "/绝对路径/到/.venv/bin/python", "args": ["-m", "tripcore.mcp_server"]`。
 - 行程数据在 `~/.tripcore/`，不会因为换 Agent 而丢失。
 

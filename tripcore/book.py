@@ -60,7 +60,7 @@ def _facts_html(facts: list[dict]) -> str:
 
 
 def build_book_html(trip_name: str, days: list[dict[str, Any]], *, theme_css: str, base_css: str, km_all: float, stops_all: int,
-                    chapters: str = "", spending: Optional[dict[str, Any]] = None, hero: str = "") -> str:
+                    chapters: str = "", spending: Optional[dict[str, Any]] = None, hero: str = "", subtitle: str = "", afterword: str = "") -> str:
     """days 的每一项：idx, title, date(文字), wx(文字), km, svg(路线图), stops=[{n,name,rg,t,dur,hours,pics:[(file,caption)],facts,imp,imp_by,leg}]"""
     pages: list[str] = []          # 每个元素是一页内的 HTML（不含页码）；页码 = 序号 + 1
 
@@ -68,6 +68,7 @@ def build_book_html(trip_name: str, days: list[dict[str, Any]], *, theme_css: st
         f'<div class="pg cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{e(trip_name)}</h1>'
         f'<div class="m">{len(days)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>'
         + (f'<div class="chs">{e(chapters)}</div>' if chapters else "")
+        + (f'<div class="chs" style="font-style:italic;color:var(--ink)">{e(subtitle)}</div>' if subtitle else "")
         + (f'<div class="hero"><img src="{e(hero)}"></div>' if hero else "") + "</div>")
 
     # 页码先算出来：封面 1，目录 2，然后每天 1 页章首 + 站数页
@@ -91,6 +92,7 @@ def build_book_html(trip_name: str, days: list[dict[str, Any]], *, theme_css: st
             f'<div class="pg"><div class="k">DAY {d["idx"] + 1:02d}</div><div class="dayno">{d["idx"] + 1:02d}</div>'
             f'<div class="dtitle">{e(title)}</div><div class="dmeta">{e(d["date"])}{" · " if d["date"] else ""}{len(d["stops"])} 站 · {d["km"]} km</div>'
             + (f'<div class="dmeta">{e(d["wx"])}</div>' if d.get("wx") else "")
+            + (f'<div class="dmeta" style="font-style:italic;color:var(--ink)">{e(d["summary"])}</div>' if d.get("summary") else "")
             + d["svg"] + f'<ul class="sl">{sl}</ul></div>')
         for s in d["stops"]:
             pics = s["pics"][:6]
@@ -99,14 +101,17 @@ def build_book_html(trip_name: str, days: list[dict[str, Any]], *, theme_css: st
                 area = f'<div class="ph-area n{len(pics)}">{cells}</div>'
             else:
                 area = '<div class="nop"></div>'
-            meta = (f'<span class="rg">{e(s["rg"])}</span> · ' if s.get("rg") else "") + f'{e(s["t"])} · 建议停留 {s["dur"]} 分钟' + (f' · 营业：{e(s["hours"])}' if s.get("hours") else "")
+            meta = (f'<span class="rg">{e(s["rg"])}</span> · ' if s.get("rg") else "") + f'{e(s["t"])} · 建议停留 {s["dur"]} 分钟' + (f' · 营业：{e(s["hours"])}' if s.get("hours") else "") + (f' · {e(s["stay"])}' if s.get("stay") else "")
             imp = f'<p class="imp">“{e(s["imp"])}”<small>{"我写的" if s.get("imp_by") == "user" else "AI 根据照片的描写，仅供参考，可修改"}</small></p>' if s.get("imp") else ""
             leg = f'<div class="leg">下一站：{e(s["leg"])}</div>' if s.get("leg") else ""
             pages.append(f'<div class="pg"><div class="sh"><h3><b>{s["n"]}</b>{e(s["name"])}</h3></div><div class="sm">{meta}</div>{area}{_facts_html(s.get("facts") or [])}{imp}{leg}</div>')
 
+    if afterword and not (spending and spending.get("count")):
+        pages.append(f'<div class="pg"><div class="k">AFTERWORD</div><h2 class="t">后记</h2><p style="white-space:pre-wrap;font-size:11pt">{e(afterword)}</p></div>')
     if spending and spending.get("count"):
+        aw_p = '<p style="white-space:pre-wrap;font-size:11pt">' + e(afterword) + "</p>" if afterword else ""
         cats = "".join(f'<li><span>{e(k)}</span><b>{v:g} 元</b></li>' for k, v in sorted(spending["by_category"].items(), key=lambda kv: -kv[1]))
-        pages.append(f'<div class="pg"><div class="k">AFTERWORD</div><h2 class="t">后记 · 这一趟的花费</h2><div class="tot">{spending["total"]:g}<small> 元 · {spending["count"]} 笔</small></div><ul class="sp">{cats}</ul></div>')
+        pages.append(f'<div class="pg"><div class="k">AFTERWORD</div><h2 class="t">后记 · 这一趟的花费</h2>{aw_p}<div class="tot">{spending["total"]:g}<small> 元 · {spending["count"]} 笔</small></div><ul class="sp">{cats}</ul></div>')
     pages.append(f'<div class="pg col"><b>{e(trip_name)}</b><div>由 TripSight 整理 · 照片来自本机相册 · 营业时间等信息出发前请再核实</div></div>')
 
     out = []

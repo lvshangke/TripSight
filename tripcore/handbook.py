@@ -108,18 +108,22 @@ THEMES = {      # 只换配色、字体和相框角度，都是浅色底
 
 EDIT_JS = """<style>[data-ed]{outline:none;cursor:text;border-radius:4px}[data-ed]:hover{background:rgba(196,85,58,.1)}[data-ed]:focus{background:rgba(196,85,58,.16);box-shadow:0 0 0 2px rgba(196,85,58,.4)}[data-ed]:empty:before{content:"点这里写几句…";color:#aaa;font-style:normal}
 .rzh{position:absolute;right:-8px;bottom:-8px;width:18px;height:18px;border-radius:50%;background:#c4553a;border:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:3;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.stop figure,.polaroid{position:relative}.pbar{position:absolute;left:6px;top:6px;display:flex;gap:3px;z-index:4;opacity:0;transition:opacity .15s}[data-pid]:hover>.pbar,.polaroid:hover>.pbar{opacity:1}.pbar button{font:12px sans-serif;border:0;border-radius:99px;background:rgba(40,40,40,.8);color:#fff;padding:2px 8px;cursor:pointer}.pbar button:hover{background:#c4553a}
 .ed-tip{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;background:rgba(40,40,40,.85);color:#fff;font:13px sans-serif;padding:6px 12px;border-radius:14px;z-index:9}</style>
-<div class="ed-tip">可编辑预览：点标题/文字直接改，拖照片右下角的红点调大小</div>
+<div class="ed-tip">可编辑预览：点景点名、标题、文字直接改；鼠标放到照片上能设封面、挪位置、不放进手册；拖右下角的红点调大小</div>
 <script>(function(){const send=m=>parent.postMessage(Object.assign({tripsight:1},m),'*');
 document.querySelectorAll('[data-ed]').forEach(el=>{el.contentEditable='true';el.spellcheck=false;let v=el.textContent;
 el.addEventListener('focus',()=>{v=el.textContent});
 el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur()}});
 el.addEventListener('blur',()=>{const t=el.textContent.trim();if(t!==v.trim()){const a=el.dataset.ed.split(':');send({k:a[0],id:a[1],text:t})}})});
+document.querySelectorAll('[data-pid]').forEach(box=>{const bar=document.createElement('div');bar.className='pbar';[['front','★ 封面'],['left','←'],['right','→'],['hide','✕ 不放进']].forEach(([to,t])=>{const b=document.createElement('button');b.textContent=t;b.onclick=e=>{e.stopPropagation();send({k:'photo',id:box.dataset.pid,to:to})};bar.appendChild(b)});box.appendChild(bar)});
 document.querySelectorAll('[data-rz]').forEach(box=>{const h=document.createElement('span');h.className='rzh';h.title='拖动调整大小';box.appendChild(h);
 h.addEventListener('pointerdown',e=>{e.preventDefault();h.setPointerCapture(e.pointerId);const w0=box.getBoundingClientRect().width,base=parseFloat(box.dataset.rz)||100,x0=e.clientX;let now=0;
 const mv=ev=>{now=Math.max(40,Math.min(160,Math.round(base*(w0+(ev.clientX-x0))/w0)));box.style.setProperty('--s',now/100)};
 const up=()=>{h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);if(now){box.dataset.rz=now;send({k:'scale',id:box.dataset.pid,scale:now})}};
 h.addEventListener('pointermove',mv);h.addEventListener('pointerup',up)})});})();</script>"""
+
+EDIT_JS_CARD = re.sub(r'<div class="ed-tip">.*?</div>', '', EDIT_JS)
 
 
 def theme_css(name: str) -> str:
@@ -158,6 +162,7 @@ CSS = """
 .rg{background:var(--tape);color:var(--ink);border-radius:99px;padding:0 8px;font-size:12px}
 .facts{margin:10px 0 0 18px;font-size:14px;color:var(--ink)}.facts small,.imp small{color:var(--sub);font-size:12px}.facts a{color:var(--sub)}
 .imp{margin-top:10px;padding:8px 12px;border-left:3px solid var(--acc);background:#fbf5ea;font-size:15px;font-style:italic}.imp small{display:block;font-style:normal;margin-top:2px}
+.sub{margin-top:10px;font-size:17px;font-style:italic;color:var(--ink)}.dsum{margin:8px 0 0;font-size:15px;color:var(--ink);font-style:italic}.stay{color:var(--ink)}.after{margin:10px 0 0;font-size:16px;white-space:pre-wrap}
 .foot{margin-top:40px;text-align:center;color:var(--sub);font-size:13px}
 """
 JS = """<script>document.querySelectorAll('.tabs').forEach(t=>{const box=t.previousElementSibling.firstElementChild;t.querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -178,17 +183,21 @@ def _fig(ph: dict, name: str, edit: bool) -> str:
     return f'<figure{_scale_attrs(ph, edit)}><img src="photos/{ph["file"]}" alt="{cap}" loading="lazy"></figure>'
 
 
-def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None, title="", ps: float = 1.0) -> str:
+def _card_html(trip_name, idx, d, vs, km, legs, pic, bm=None, style="手账", pins=None, title="", ps: float = 1.0, sub: str = "", cap: str = "", edit: bool = False) -> str:
     ps = max(0.6, min(float(ps or 1.0), 1.5))                    # 卡片上照片整体放大/缩小（小 0.75 / 中 1 / 大 1.3）
     n_st = len(vs)
     many = n_st > 12                                   # 站点太多：照片拼贴让位，名字分两列排，字号随数量缩小，保证每一站都写得下
-    rows_h = min(96, 640 // max(1, (n_st + 1) // 2 if many else n_st))
+    rows_h = min(96, (580 if (cap or edit) else 640) // max(1, (n_st + 1) // 2 if many else n_st))
     fs = max(18, int(min(38, rows_h * 0.4)))
     items = f'<div class="rl{" two" if many else ""}" style="--rh:{rows_h}px;--fs:{fs}px;--rows:{(n_st + 1) // 2}">' + "".join(f'<div class="r"><b>{i + 1}</b><i>{_hm(v.arrive)}</i><span>{e(v.place.name)}</span></div>' for i, v in enumerate(vs)) + "</div>"
     pics = [x for x in (pic if isinstance(pic, list) else ([pic] if pic else []))][:5] if len(vs) <= 12 else []
     n = len(pics)
     pic_html = f'<div class="col n{n}">' + "".join(f'<div class="ph p{i}"><img src="{q}"></div>' for i, q in enumerate(pics)) + "</div>" if n else ""
     date = f"{d.month}月{d.day}日 周{WEEK[d.weekday()]} · " if d else ""
+    ed_cap = ' data-ed="ccap:%d"' % (idx + 1) if edit else ""
+    uc_html = f'<div class="uc"{ed_cap}>{e(cap)}</div>' if (cap or edit) else ""
+    ed_sub = ' data-ed="csub:%d"' % (idx + 1) if edit else ""
+    ed_ttl = ' data-ed="ctitle:%d"' % (idx + 1) if edit else ""
     return f"""<!doctype html><meta charset="utf-8"><style>{CSS}{theme_css(style)}
 body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-size:30px;letter-spacing:.3em;color:var(--acc)}}
 .t{{font-size:84px;font-weight:700;margin:14px 0 4px}}.s{{font-size:30px;color:var(--sub)}}.route{{margin:30px 0;height:330px}}
@@ -199,9 +208,9 @@ body{{width:1080px;height:1440px;overflow:hidden}}.c{{padding:70px}}.h{{font-siz
 .col.n1 .ph{{transform:rotate(3deg)}}.col.n2 .ph:nth-child(1){{transform:rotate(-2deg)}}.col.n2 .ph:nth-child(2){{transform:rotate(2.5deg)}}
 .col.n2{{width:{round(370 * ps)}px}}.col.n3,.col.n4,.col.n5{{grid-template-columns:1fr 1fr;width:{round(420 * ps)}px}}.col.n3 .ph img,.col.n4 .ph img,.col.n5 .ph img{{aspect-ratio:3/2}}.col.n3 .ph:first-child,.col.n5 .ph:first-child{{grid-column:1/3}}.col.n3 .ph,.col.n4 .ph,.col.n5 .ph{{padding:8px 8px 22px}}
 .col.n3 .ph:nth-child(1){{transform:rotate(-1.5deg)}}.col.n3 .ph:nth-child(2){{transform:rotate(2deg)}}.col.n3 .ph:nth-child(3){{transform:rotate(-2deg)}}.col.n4 .ph:nth-child(odd),.col.n5 .ph:nth-child(odd){{transform:rotate(-1.5deg)}}.col.n4 .ph:nth-child(even),.col.n5 .ph:nth-child(even){{transform:rotate(2deg)}}
-.f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}</style>
-<div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t" style="font-size:{max(46, min(84, 840 // max(1, len(title)))) if title else 84}px">{e(title) if title else f"第 {idx + 1} 天"}</div><div class="s">{f"第 {idx + 1} 天 · " if title else ""}{date}{len(vs)} 站 · {km} km</div>
-{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}"""
+.f{{position:absolute;left:70px;bottom:50px;font-size:24px;color:var(--sub)}}.uc{{position:absolute;left:70px;bottom:96px;max-width:520px;font-size:34px;line-height:1.35;font-style:italic;color:var(--ink);border-left:5px solid var(--acc);padding-left:18px}}</style>
+<div class="c"><div class="h">TRIPSIGHT · {e(trip_name)}</div><div class="t"{ed_ttl} style="font-size:{max(46, min(84, 840 // max(1, len(title)))) if title else 84}px">{e(title) if title else f"第 {idx + 1} 天"}</div><div class="s"{ed_sub}>{e(sub) if sub else (f"第 {idx + 1} 天 · " if title else "") + date + f"{len(vs)} 站 · {km} km"}</div>
+{_route_svg([(v.place.lat, v.place.lon) for v in vs], legs, 940, 330, bm=bm, pins=pins)}{items}</div>{pic_html}{uc_html}{EDIT_JS_CARD if edit else ""}"""
 
 
 def card_photo_count(card_photos: int, nth: int, avail: int) -> int:
@@ -213,7 +222,7 @@ def card_photo_count(card_photos: int, nth: int, avail: int) -> int:
 
 def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] = None, photo_dir: Optional[Path] = None,
                    show_photos: bool = True, videos: Optional[dict[str, Path]] = None, cards: bool = True,
-                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 0, card_size: float = 1.0, day_titles: Optional[dict[str, str]] = None, edit: bool = False) -> dict[str, Any]:
+                   stories: Optional[dict[str, Any]] = None, basemap: Any = None, pdf: bool = False, style: str = "手账", regions: Optional[dict[str, str]] = None, spending: Optional[dict[str, Any]] = None, thumb_pins: bool = False, card_preview: Optional[list] = None, card_photos: int = 0, card_size: float = 1.0, day_titles: Optional[dict[str, str]] = None, htext: Optional[dict[str, Any]] = None, edit: bool = False) -> dict[str, Any]:
     """返回 {"folder", "files", "skipped"}。videos = {place_id: 视频文件}，只有 show_photos 或给了 videos 时才会出现对应素材。"""
     if trip.plan is None or not trip.plan.days:
         raise ValueError("行程还没有排好，无法生成手册")
@@ -254,6 +263,9 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     days_html, card_jobs, km_all, stops_all = [], [], 0.0, 0
     book_days: list[dict] = []
     dt = {str(k): v for k, v in (day_titles or {}).items() if v}
+    ht = htext or {}
+    ht_days, ht_stops, ht_cards = ht.get("days") or {}, ht.get("stops") or {}, ht.get("cards") or {}
+    ids_file = {ph["id"]: ph["file"] for lst in by_place.values() for ph in lst if ph.get("id")}
     rg = regions or {}
     for day in trip.plan.days:
         vs, _ = day_visits(trip, day)
@@ -269,6 +281,10 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         wx = (trip.weather or {}).get(d.isoformat()) if d else None
         if wx is not None and getattr(wx, "day_weather", ""):
             head += f'<div class="wx">天气预报：{e(wx.day_weather)} {round(wx.day_temp)}°C（预报，非实况）</div>'
+        dsum = (ht_days.get(str(day.index + 1)) or {}).get("summary", "")
+        if dsum or edit:
+            ed_ds = ' data-ed="dsum:%d"' % (day.index + 1) if edit else ""
+            head += f'<p class="dsum"{ed_ds}>{e(dsum)}</p>'
         parts = [head, _route_svg([(v.place.lat, v.place.lon) for v in vs], st.legs, bm=basemap, pins=[pin_of.get(v.place.id) for v in vs] if thumb_pins else None)]
         first_pic = None
         bk_stops: list[dict] = []
@@ -276,7 +292,11 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             p = v.place
             rgtag = f'<span class="rg">{e(rg[p.id])}</span> · ' if rg.get(p.id) else ''
             hours_sep = f" · 营业：{e(p.opening_hours)}" if p.opening_hours else ""
-            body = f'<div class="stop"><h3><b>{i + 1}</b>{e(p.name)}</h3><div class="meta">{rgtag}{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟{hours_sep}</div>'
+            stay = (ht_stops.get(p.id) or {}).get("stay", "")
+            ed_st = ' data-ed="stay:%s"' % e(p.id) if edit else ""
+            ed_nm = ' data-ed="name:%s"' % e(p.id) if edit else ""
+            stay_html = f' · <span class="stay"{ed_st}>{e(stay)}</span>' if (stay or edit) else ""
+            body = f'<div class="stop"><h3><b>{i + 1}</b><span{ed_nm}>{e(p.name)}</span></h3><div class="meta">{rgtag}{_hm(v.arrive)}–{_hm(v.leave)} · 建议停留 {p.duration_min} 分钟{hours_sep}{stay_html}</div>'
             views, tabs = "", []
             pics = by_place.get(p.id, [])[:MAX_PHOTOS]
             if pics:
@@ -306,7 +326,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
             body += "</div>"
             bk_stops.append({"n": i + 1, "name": p.name, "rg": rg.get(p.id, ""), "t": f"{_hm(v.arrive)}–{_hm(v.leave)}", "dur": p.duration_min, "hours": p.opening_hours,
                              "pics": [(x["file"], x.get("caption", "")) for x in by_place.get(p.id, [])[:MAX_PHOTOS]], "facts": list(sty.get("facts") or []), "imp": sty.get("impression", ""), "imp_by": sty.get("by", ""),
-                             "leg": (f"{(st.legs[i].note or st.legs[i].mode)} · {st.legs[i].distance_km} km · {st.legs[i].minutes} 分钟" + ("（估算）" if st.legs[i].detail_level == "estimate" else "")) if i < len(st.legs) else ""})
+                             "stay": stay, "leg": (f"{(st.legs[i].note or st.legs[i].mode)} · {st.legs[i].distance_km} km · {st.legs[i].minutes} 分钟" + ("（估算）" if st.legs[i].detail_level == "estimate" else "")) if i < len(st.legs) else ""})
             parts.append(body)
             if i < len(st.legs):
                 lg = st.legs[i]
@@ -315,13 +335,16 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
         days_html.append("".join(parts))
         book_days.append({"idx": day.index, "title": dtitle, "date": (f"{d.month}月{d.day}日 周{WEEK[d.weekday()]}" if d else ""),
                           "wx": (f"天气预报：{wx.day_weather} {round(wx.day_temp)}°C（预报，非实况）" if wx is not None and getattr(wx, "day_weather", "") else ""),
-                          "km": km, "svg": parts[1], "stops": bk_stops})
+                          "km": km, "summary": dsum, "svg": parts[1], "stops": bk_stops})
         pool = [list(by_place.get(v.place.id, [])) for v in vs]
         picked: list[str] = []
         want = card_photo_count(card_photos, len(card_jobs), sum(len(x) for x in pool))
+        mine = [ids_file[i] for i in ((ht_cards.get(str(day.index + 1)) or {}).get("photos") or []) if i in ids_file][:5]   # 用户给这张卡片单独挑了照片
+        if mine:
+            picked = [f"../photos/{f}" for f in mine]
         for r in range(MAX_PHOTOS):                       # 轮流从每一站取，最多 want 张，让一天的卡片尽量覆盖不同地方
             for lst in pool:
-                if r < len(lst) and len(picked) < want:
+                if not mine and r < len(lst) and len(picked) < want:
                     picked.append(f"../photos/{lst[r]['file']}")
         card_jobs.append((day.index, d, vs, km, st.legs, picked))
 
@@ -336,14 +359,24 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
     chap_html = '<div class="m">' + ' → '.join(e(c) for c in chs) + '</div>' if len(chs) > 1 else ''
     foot = '<div class="foot">营业时间来自地图服务，出发前请再核实。</div>' if any(p.opening_hours for p in trip.places) else ""
     title = e(trip.meta.name)
+    sub_t = ht.get("subtitle", "")
+    sub_html = (f'<div class="sub"{" data-ed=sub:cover" if edit else ""}>{e(sub_t)}</div>' if (sub_t or edit) else "")
+    aw = ht.get("afterword", "")
+    aw_html = (f'<section class="day"><div class="dh"><h2>后记</h2></div><p class="after"{" data-ed=after:book" if edit else ""}>{e(aw)}</p></section>' if (aw or edit) else "")
     page = (f'<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · 行程手册</title><style>{CSS}{theme_css(style)}</style>'
-            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(days_html)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}</div>'
-            f'{"".join(days_html)}{sp_html}{foot}</div>{JS}{EDIT_JS if edit else ""}</html>')
+            f'<div class="wrap"><div class="cover"><div class="k">TRIPSIGHT · 行程手册</div><h1>{title}</h1><div class="m">{len(days_html)} 天 · {stops_all} 站 · 约 {round(km_all, 1)} km</div>{chap_html}{sub_html}</div>'
+            f'{"".join(days_html)}{aw_html}{sp_html}{foot}</div>{JS}{EDIT_JS if edit else ""}</html>')
     (root / "index.html").write_text(page, encoding="utf-8"); files.append("index.html")
 
-    if card_preview is not None and card_jobs:                  # 只要第一天卡片的 HTML 给预览用，不渲染图
-        idx, d, vs, km, legs, pic = card_jobs[0]
-        card_preview.append(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), ""), card_size))
+    def _card(idx, d, vs, km, legs, pic, ed=False):
+        cx = ht_cards.get(str(idx + 1)) or {}
+        st_name = cx.get("style") if cx.get("style") in THEMES else style          # 这张卡片单独选了风格就用它
+        return _card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, st_name, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), ""), card_size,
+                          cx.get("subtitle", ""), cx.get("caption", ""), ed)
+
+    if card_preview is not None and card_jobs:                  # 每天一张卡片的 HTML 给预览用（可编辑时带编辑脚本），不渲染图
+        for idx, d, vs, km, legs, pic in card_jobs:
+            card_preview.append(_card(idx, d, vs, km, legs, pic, edit))
     if cards:
         from . import share as _share
         try:
@@ -353,7 +386,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 pg = b.new_page(viewport={"width": 1080, "height": 1440})
                 for idx, d, vs, km, legs, pic in card_jobs:
                     f = root / "cards" / f"day{idx + 1}.html"
-                    f.write_text(_card_html(trip.meta.name, idx, d, vs, km, legs, pic, basemap, style, [pin_of.get(v.place.id) for v in vs] if thumb_pins else None, dt.get(str(idx + 1), ""), card_size), encoding="utf-8")
+                    f.write_text(_card(idx, d, vs, km, legs, pic), encoding="utf-8")
                     pg.goto(f.resolve().as_uri()); pg.wait_for_timeout(200)
                     pg.screenshot(path=str(f.with_suffix(".png"))); f.unlink(); files.append(f"cards/day{idx + 1}.png")
                 b.close()
@@ -372,7 +405,7 @@ def build_handbook(trip: Trip, out_root: Path, *, photos: Optional[list[dict]] =
                 bf = root / "_book.html"
                 hero = next((f"photos/{x[0]}" for dd in book_days for ss in dd["stops"] for x in ss["pics"]), "")
                 bf.write_text(build_book_html(trip.meta.name, book_days, theme_css=theme_css(style), base_css=CSS, km_all=km_all, stops_all=stops_all,
-                                              chapters=" → ".join(chs), spending=spending, hero=hero), encoding="utf-8")
+                                              chapters=" → ".join(chs), spending=spending, hero=hero, subtitle=sub_t, afterword=aw), encoding="utf-8")
                 pg.goto(bf.resolve().as_uri()); pg.wait_for_timeout(500)
                 pg.pdf(path=str(root / f"{base}.pdf"), prefer_css_page_size=True, print_background=True)
                 bf.unlink()

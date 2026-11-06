@@ -22,6 +22,7 @@ TEMPLATE = r"""<!doctype html>
 #fmap{height:calc(100vh - 360px);min-height:420px;border-radius:14px;border:1px solid #e3dac8;background:#eef3e8;overflow:hidden}
 .fpin{background:none!important;border:0!important}.fpin .fp{width:46px;height:46px;border-radius:50%;border:3px solid var(--c);background:var(--c) var(--img) center/cover;box-shadow:0 2px 8px rgba(0,0,0,.35);position:relative}.fpin .fp b{position:absolute;right:-7px;top:-7px;min-width:20px;height:20px;border-radius:10px;background:var(--c);color:#fff;font:700 11px/16px sans-serif;text-align:center;border:2px solid #fff;padding:0 3px;box-sizing:border-box}
 .fpop{min-width:170px;font-size:13px}.fpop b{display:block;font-size:14px}.fpop span{color:#8a8374;font-size:12px}.fpop .th{display:flex;gap:4px;margin-top:6px}.fpop .th img{width:56px;height:56px;object-fit:cover;border-radius:6px}.fpop .it{padding:3px 0;border-top:1px dotted #e3dac8}
+.cph{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.cph button{position:relative;padding:0;border:2px solid #e3dac8;border-radius:8px;overflow:hidden;width:72px;height:72px;background:#fff;cursor:pointer}.cph button img{width:100%;height:100%;object-fit:cover;display:block}.cph button.on{border-color:#c4553a}.cph button b{position:absolute;right:2px;top:2px;min-width:18px;height:18px;border-radius:9px;background:#c4553a;color:#fff;font:700 11px/18px sans-serif;text-align:center}
 .vtip{color:#7a7468;font-size:12px;margin:4px 0}.vdvid{display:block;max-width:100%;max-height:70vh;margin:10px auto;border-radius:12px;background:#000}
 </style>
 <style>
@@ -331,7 +332,10 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <div id="hb_merge" class="hbimp" style="display:none"><b>合并所选</b> <input id="hb_mname" placeholder="合并后的名字（可不填）" style="width:200px"><button id="hb_mgo">合并</button><span class="tlnote">只能合并同一天的</span> <button id="hb_an" title="名字还是“停留点”或“区县 · 时间”的点，用高德（你自己的 key，只发坐标）重新查地名；你手动改过的不动">重新起名</button> <button id="hb_fp" title="有些点还没有照片（早先的版本总共只放 200 张）：从原文件夹/相册里给它们补上最清晰的几张">补照片</button> <button id="hb_rg" title="把各点坐标发给高德（你自己的 key）查所在城市/区，手册用来分章">标注城市/区</button></div>
 <div id="hb_list"></div>
 <div class="hbexp"><b>确定最终版并导出</b> <span class="hbimp" id="hb_dir" style="display:inline-flex"><span>保存到：<code id="hb_dirp">…</code></span><button class="pk" id="hb_dirpick">选择文件夹</button><button class="pk" id="hb_dirdef" style="display:none">恢复默认</button></span>  <label>风格 <select id="hb_style"><option>手账</option><option>杂志</option><option>清新</option><option>胶片</option><option>海边</option></select></label>
-<div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card">小红书卡片（第 1 天）</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="" title="卡片预览"></iframe></div></div><div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点每天的标题或“我的话”改文字，拖照片右下角的红点调大小，改完自动保存。</div></div>
+<div id="hb_pvw"><div class="pvt"><button data-k="page" class="on">网页手册</button><button data-k="card" id="hb_cardtab">小红书卡片</button><span class="tlnote" id="hb_pvn"></span></div><div class="pvf"><iframe id="hb_pvf" sandbox="allow-scripts" title="手册预览"></iframe><div id="hb_pvc"><iframe id="hb_pvcf" sandbox="allow-scripts" title="卡片预览"></iframe></div></div>
+<div id="hb_ctool" style="display:none"><div class="hvrow"><label>第几天 <select id="hb_cday"></select></label><label title="只让这一天的卡片用另一个风格">这张卡片的风格 <select id="hb_cst"><option value="">跟随上面选的风格</option></select></label><button id="hb_cauto" title="这张卡片的照片恢复成自动挑">照片恢复自动</button></div>
+<div class="tlnote">点卡片上的标题、副标题、底部“点这里写几句…”直接改（一句话只用你写的）；下面点照片选这张卡片用哪几张（最多 5 张，按点的先后排）。</div><div id="hb_cph" class="cph"></div></div>
+<div class="tlnote">预览用你现在选的风格和照片生成，不含高德底图；导出出来的就是这个样子。网页手册预览里可以直接改：点景点名、每天的标题、“我的话”、封面副标题、每天一句话、停留说明、后记；鼠标放到照片上能设封面、挪位置、不放进手册；拖照片右下角的红点调大小。改完自动保存。</div></div>
 <div class="hvrow"><label title="手册封面、文件夹名里用的名字；改了会同时改这个行程的名字">手册标题 <input id="hb_title" maxlength="40" style="width:240px" placeholder="如：台州三日游"></label></div>
 <label><input type="checkbox" class="hbf" value="html" checked> 网页文件夹</label><label><input type="checkbox" class="hbf" value="cards" checked> 小红书卡片图</label>
 <label><input type="checkbox" class="hbf" value="pdf" title="A5 书的版式：封面、目录、每天一个章首页、每个景点一页"> PDF（书的版式）</label><label><input type="checkbox" class="hbf" value="obsidian"> Obsidian 笔记</label>
@@ -897,14 +901,41 @@ function photoRow(row, pid) {
 
 // ---- 导出前预览 ----
 let pvSeq = 0, pvTimer = null;
-async function hbStylePreview() {
+let CARDS = [], CARDD = [], CFG = {}, CARDI = 0;
+function hbCardShow() {
+  const sel = $('hb_cday'); if (sel.options.length !== CARDD.length) sel.innerHTML = CARDD.map((d, i) => '<option value="' + i + '">第 ' + d + ' 天</option>').join('');
+  sel.value = CARDI; const day = CARDD[CARDI], cf = CFG[String(day)] || {};
+  $('hb_pvcf').srcdoc = CARDS[CARDI] || '<p style="padding:40px">没有可预览的卡片</p>';
+  $('hb_cardtab').textContent = '小红书卡片（第 ' + (day || 1) + ' 天）';
+  if ($('hb_cst').options.length === 1) $('hb_cst').innerHTML += [...$('hb_style').options].map(o => '<option>' + esc(o.value) + '</option>').join('');
+  $('hb_cst').value = cf.style || '';
+  const sel_ids = cf.photos || [], ph = ((HB.data && HB.data.stops) || []).filter(x => x.day === day).flatMap(x => (x.photos || []).filter(p => !p.hide));
+  $('hb_cph').innerHTML = ph.length ? ph.map(p => { const k = sel_ids.indexOf(p.id); return '<button data-id="' + esc(p.id) + '" class="' + (k >= 0 ? 'on' : '') + '"><img src="' + p.thumb + '">' + (k >= 0 ? '<b>' + (k + 1) + '</b>' : '') + '</button>'; }).join('') : '<span class="tlnote">这一天还没有照片。</span>';
+  $('hb_cph').querySelectorAll('button').forEach(b => b.onclick = async () => {
+    const cur = ((CFG[String(day)] || {}).photos || []).slice(), i = cur.indexOf(b.dataset.id);
+    if (i >= 0) cur.splice(i, 1); else if (cur.length < 5) cur.push(b.dataset.id); else { toast('一张卡片最多 5 张照片', true); return; }
+    await hbCardSet('card_photos', cur.join(','), day);
+  });
+}
+async function hbCardSet(kind, text, day) {
+  try { await api('hb_text', {kind: kind, text: text, day: day}); hbStylePreview('cards'); } catch (e) { toast(e.message, true); }
+}
+$('hb_cday').onchange = () => { CARDI = +$('hb_cday').value; hbCardShow(); };
+$('hb_cst').onchange = () => hbCardSet('card_style', $('hb_cst').value, CARDD[CARDI]);
+$('hb_cauto').onclick = () => hbCardSet('card_photos', '', CARDD[CARDI]);
+async function hbStylePreview(only) {
   const my = ++pvSeq; $('hb_pvn').textContent = '正在生成预览…';
-  try { const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, edit: true}); if (my !== pvSeq) return; $('hb_pvf').srcdoc = r.page; $('hb_pvcf').srcdoc = r.card || '<p style="padding:40px">没有可预览的卡片</p>'; $('hb_pvn').textContent = ''; }
+  try {
+    const r = await api('hb_style_preview', {style: $('hb_style').value, photos: $('hb_ph').checked, card_photos: +$('hb_cp').value, card_size: +$('hb_cs').value, edit: true}); if (my !== pvSeq) return;
+    CARDS = r.cards || []; CARDD = r.card_days || []; CFG = r.cards_cfg || {}; if (CARDI >= CARDS.length) CARDI = 0;
+    if (only !== 'cards') $('hb_pvf').srcdoc = r.page;
+    hbCardShow(); $('hb_pvn').textContent = '';
+  }
   catch (e) { if (my === pvSeq) $('hb_pvn').textContent = e.message; }
 }
 const hbPvSoon = () => { clearTimeout(pvTimer); if ($('rp_body').dataset.s === '5' || $('mo').classList.contains('on')) pvTimer = setTimeout(hbStylePreview, 250); };
 $('hb_style').onchange = hbPvSoon; $('hb_cp').onchange = hbPvSoon; $('hb_cs').onchange = hbPvSoon; $('hb_ph').addEventListener('change', hbPvSoon);
-document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; });
+document.querySelectorAll('.pvt button').forEach(b => b.onclick = () => { document.querySelectorAll('.pvt button').forEach(x => x.classList.toggle('on', x === b)); $('hb_pvf').style.display = b.dataset.k === 'page' ? '' : 'none'; $('hb_pvc').style.display = b.dataset.k === 'card' ? 'block' : 'none'; $('hb_ctool').style.display = b.dataset.k === 'card' ? '' : 'none'; });
 
 document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (!t) return; const r = t.getBoundingClientRect(), p = $('ptip'); p.textContent = t.dataset.tip; p.style.left = Math.max(8, r.left + r.width / 2 - p.offsetWidth / 2) + 'px'; p.style.top = (r.top - 34) + 'px'; p.className = 'on'; });
 document.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('[data-tip]')) $('ptip').className = ''; });
@@ -1305,10 +1336,19 @@ $('hb_pv').onclick = async () => {
 };
 $('hb_r').onchange = () => { if ($('hb_pvo').innerHTML && $('hb_folder').value) $('hb_pv').click(); };
 window.addEventListener('message', async ev => {
-  const m = ev.data; if (!m || !m.tripsight || ev.source !== $('hb_pvf').contentWindow) return;
+  const m = ev.data; if (!m || !m.tripsight || (ev.source !== $('hb_pvf').contentWindow && ev.source !== $('hb_pvcf').contentWindow)) return;
+  const T = (kind, extra) => api('hb_text', Object.assign({kind: kind, text: m.text}, extra));
   try {
-    if (m.k === 'title') { const r = await api('hb_day_title', {day: +m.id, title: m.text}); toast(r.message); }
+    if (m.k === 'title' || m.k === 'ctitle') { const r = await api('hb_day_title', {day: +m.id, title: m.text}); toast(r.message); hbStylePreview(m.k === 'title' ? 'cards' : undefined); }
     else if (m.k === 'imp') { const t = m.text.replace(/^[“"]|[”"]$/g, ''); await api('hb_edit', {place_id: m.id, impression: t}); toast(t ? '已保存“我的话”' : '已清除这段话'); }
+    else if (m.k === 'name') { await api('hb_edit', {place_id: m.id, name: m.text}); toast(m.text ? '已改名' : '名字不能为空，没有改'); hbStylePreview('cards'); }
+    else if (m.k === 'stay') { const r = await T('stay_note', {place_id: m.id}); toast(r.message); }
+    else if (m.k === 'sub') { const r = await T('subtitle'); toast(r.message); }
+    else if (m.k === 'after') { const r = await T('afterword'); toast(r.message); }
+    else if (m.k === 'dsum') { const r = await T('day_summary', {day: +m.id}); toast(r.message); }
+    else if (m.k === 'csub') { const r = await T('card_subtitle', {day: +m.id}); toast(r.message); }
+    else if (m.k === 'ccap') { const r = await T('card_caption', {day: +m.id}); toast(r.message); }
+    else if (m.k === 'photo') { await api('hb_photo_move', {id: m.id, to: m.to}); toast(m.to === 'hide' ? '这张照片不放进手册了（在第 4 步的列表里能放回来）' : '已调整'); hbStylePreview(); }
     else if (m.k === 'scale') { await api('hb_photo_scale', {id: m.id, scale: m.scale}); toast('照片大小已保存（' + m.scale + '%）'); }
     hbLoad();
   } catch (e) { toast(e.message, true); hbPvSoon(); }

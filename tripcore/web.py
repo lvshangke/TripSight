@@ -1071,6 +1071,14 @@ def photo_edit(body: dict) -> dict[str, Any]:
     return {"ok": True, "path": str(path)}
 
 
+def hb_text(body: dict) -> dict[str, Any]:
+    """手册封面副标题、后记、每天一句话、停留说明，以及每张卡片的副标题/一句话/风格/照片（和聊天里的 edit_handbook 是同一个）。"""
+    try:
+        return {"message": ms.edit_handbook(str(body.get("kind") or ""), str(body.get("text") or ""), int(body.get("day") or 0), str(body.get("place_id") or ""))}
+    except (ms.ToolError, ValueError) as e:
+        raise HttpError(400, str(e))
+
+
 def hb_style_preview(body: dict) -> dict[str, Any]:
     """导出前预览：按选的风格在临时文件夹里生成手册，返回内嵌了缩小照片的网页和第一天卡片的网页；不写进导出文件夹、不联网（不含高德底图）。"""
     import base64, re, tempfile
@@ -1087,7 +1095,7 @@ def hb_style_preview(body: dict) -> dict[str, Any]:
     try:
         with tempfile.TemporaryDirectory() as td:
             res = build_handbook(trip, Path(td), photos=items, photo_dir=ms._photo_dir(), show_photos=show, cards=False, stories=ms._load_json_file(ms._stories_path()),
-                                 style=style, regions=ms._chapter_labels(), card_preview=cards, card_photos=max(0, min(int(body.get("card_photos") or 0), 5)), card_size=float(body.get("card_size") or 1), day_titles=ms._day_titles(), edit=bool(body.get("edit")))
+                                 style=style, regions=ms._chapter_labels(), card_preview=cards, card_photos=max(0, min(int(body.get("card_photos") or 0), 5)), card_size=float(body.get("card_size") or 1), day_titles=ms._day_titles(), htext=ms._htext(), edit=bool(body.get("edit")))
             root = Path(res["folder"])
 
             def inline(m):
@@ -1102,10 +1110,15 @@ def hb_style_preview(body: dict) -> dict[str, Any]:
                     return 'src=""'
             pat = re.compile(r'src="(?:\.\./)?photos/([^"]+)"')
             page = pat.sub(inline, (root / "index.html").read_text(encoding="utf-8"))
-            card = pat.sub(inline, cards[0]) if cards else ""
+            cards_out = [pat.sub(inline, c) for c in cards]
+            card = cards_out[0] if cards_out else ""
     except (OSError, ValueError) as e:
         raise HttpError(400, str(e))
-    return {"page": page, "card": card}
+    days = []
+    for i, c in enumerate(cards):
+        m = re.search(r'ctitle:(\d+)', c)
+        days.append(int(m.group(1)) if m else i + 1)
+    return {"page": page, "card": card, "cards": cards_out, "card_days": days, "cards_cfg": ms._htext().get("cards", {})}
 
 
 def reveal_exports(body: dict) -> dict[str, Any]:
@@ -1472,7 +1485,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "video_status": video_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_pdf": share_pdf, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "video_edit": video_edit, "video_groups": video_groups_now, "fp_build": fp_build, "fp_data": fp_data}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "hb_text": hb_text, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "video_edit": video_edit, "video_groups": video_groups_now, "fp_build": fp_build, "fp_data": fp_data}
 
 
 def make_handler(token: str, state: dict):
