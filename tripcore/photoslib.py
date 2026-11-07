@@ -110,6 +110,33 @@ def read_album(album: str) -> tuple[list[Photo], list[tuple[str, Any]], dict[str
     return out, untagged, stats
 
 
+def album_video_points(album: str) -> tuple[list[Any], dict[str, int]]:
+    """相册里的视频 → (带时间和位置的 Photo[file=原文件绝对路径], 统计)。位置和时间取自照片库本身，不需要 ffmpeg。只读。"""
+    from .video import VIDEO_EXT
+    db = _open_db()
+    if album not in {x["name"] for x in list_albums_from(db)}:
+        raise PhotosLibError(f"照片 App 里没有叫「{album}」的相册（先用 list_photo_albums 看看有哪些）。")
+    st = {"videos": 0, "video_with_gps": 0, "video_no_gps": 0, "video_missing": 0}
+    out: list[Any] = []
+    for p in db.photos(albums=[album], images=False, movies=True):
+        if getattr(p, "hidden", False) or getattr(p, "intrash", False):
+            continue
+        st["videos"] += 1
+        f = getattr(p, "path", None)
+        d = getattr(p, "date", None)
+        if not (f and Path(f).is_file() and Path(f).suffix.lower() in VIDEO_EXT) or d is None:
+            st["video_missing"] += 1                   # 只在 iCloud 上、或没有拍摄时间
+            continue
+        lat, lon = getattr(p, "latitude", None), getattr(p, "longitude", None)
+        if lat is None or lon is None or (lat == 0 and lon == 0):
+            st["video_no_gps"] += 1
+            continue
+        st["video_with_gps"] += 1
+        out.append(Photo(str(f), d.replace(tzinfo=None), float(lat), float(lon)))
+    out.sort(key=lambda x: (x.taken, x.file))
+    return out, st
+
+
 def album_videos(album: str) -> tuple[list[Path], int]:
     """相册里的视频 → (本机有原文件的路径列表, 只在 iCloud 上没下载的个数)。只读，不复制、不改照片库。"""
     from .video import VIDEO_EXT

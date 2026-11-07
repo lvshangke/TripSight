@@ -25,6 +25,7 @@ description: 恢复行程与手册：用户想把拍过的照片（文件夹或 
 6.5. **手册和卡片上用户自己的话**（可选）：用户想给封面写副标题、给每天写一句话总结、给某个景点写停留说明、写后记，或给某一天的小红书卡片写一句话、改副标题、单独换风格、挑照片，用 `edit_handbook(kind, text, day, place_id)`（kind：subtitle / afterword / day_summary / stay_note / card_subtitle / card_caption / card_style / card_photos）。**这些文字只用用户说的原话，不要替用户写**；清除就传空串。卡片标题就是每天的标题，用 `set_day_title` 改。网页预览里用户也能直接点着改，两边是同一份记录。
 7. **导出**：问风格（手账/杂志/清新/胶片/海边）、要哪些格式（网页、小红书卡片、PDF、Obsidian）、卡片放几张图（1~5）、是否带照片/花费。人像要带出去前先确认。然后 `export_handbook`（Obsidian 用 `export_notes`），把文件夹位置告诉用户。导出位置由用户在 TripSight 页面里选，默认 `~/Documents/TripSight`。
 
+   > 视频和照片一样是来源：`import_photo_trip` 会读视频自带的拍摄时间和位置，和照片一起聚成停留点；全是视频的文件夹/相册也能恢复（只有视频的点用视频截图当缩略图）。没有位置的视频不聚点，做短片时按拍摄时间归类。不想要视频参与聚点就传 `include_videos=false`。
 8. **旅行短片（可选）**：照片来源里有视频时（`restore_status` 会写“视频 N 段”）问用户要不要剪一条旅行短片。要的话：`scan_videos()`（不用给路径，默认用读照片的那个相册/文件夹）把分组一句话说给用户（几段归到哪几个景点、有几段没归上），这一步用户可以改：页面上每段视频能预览原视频、选用/不用、换景点、只取某几秒、调顺序、写字幕，聊天里同样能做——`video_clips()` 看每段现在的状态，`video_set(file, use / place / start_s+end_s / position / clear_trim / reset)` 改选用、景点、裁剪和顺序，`video_note(file, note)` 写字幕（只写用户说的话）。景点名和文件名照 `video_clips` 里写的用，没把握就先问用户。确认长度（默认约 60 秒）和风格（用页面上选的），再 `export_rough_cut()`；路线卡想用高德地图和驾车路径示意时才加 `basemap=true`（会联网，先说明并等用户同意）。成片在 `~/Documents/TripSight/短片/`，含人脸或路人的画面提醒用户发布前自己看。短片用的景点名和每天标题就是前面起好、改好的，所以先做完起名和标题再剪。
 
 ## 需要拖动、预览、改图时

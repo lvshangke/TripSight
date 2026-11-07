@@ -737,3 +737,38 @@ def test_is_mainland_knows_japan_korea_and_borders():
         assert m(lat, lon), (lat, lon)
     for lat, lon in [(35.0, 135.77), (35.7, 139.7), (34.7, 135.5), (33.6, 130.4), (37.5, 127.0), (21.0, 105.8), (18.8, 99.0), (27.7, 85.3), (47.9, 106.9), (25.0, 121.5), (22.3, 114.2)]:
         assert not m(lat, lon), (lat, lon)
+
+
+def test_video_only_album_restores_like_photos(tmp_path, monkeypatch):
+    """全是视频的相册也能走同一套“聚点 → 恢复”：视频的时间和位置当作素材。"""
+    from datetime import datetime
+    from tripcore import phototrip as pt, photoslib as pl, video as vd
+    t0 = datetime(2026, 5, 1, 10, 0)
+    vs = []
+    for i, (la, lo, dm) in enumerate([(35.0116, 135.7681, 0), (35.0117, 135.7682, 5), (35.0118, 135.7683, 9), (34.6687, 135.5013, 300), (34.6688, 135.5014, 305), (34.6689, 135.5015, 309)]):
+        f = tmp_path / f"v{i}.mov"
+        f.write_bytes(b"x")
+        vs.append(pt.Photo(str(f), t0.replace(hour=10 + dm // 60 if dm >= 60 else 10, minute=dm % 60), la, lo))
+    monkeypatch.setattr(pl, "read_album", lambda a: ([], [], {"images": 0, "with_gps": 0, "no_gps": 0, "no_time": 0, "heic_skipped": 0, "unreadable": 0}))
+    monkeypatch.setattr(pl, "album_video_points", lambda a: (vs, {"videos": 6, "video_with_gps": 6, "video_no_gps": 0, "video_missing": 0}))
+    monkeypatch.setattr(pl, "album_videos", lambda a: ([Path(v.file) for v in vs], 0))
+    monkeypatch.setattr(vd, "poster", lambda src, out, at=1.0: (Image.new("RGB", (64, 48), (9, 9, 9)).save(out) or True))
+    monkeypatch.setattr(s, "_stop_names", lambda keep, budget_s=0.0, overseas_ok=False, **kw: ([f"点{i}" for i in range(len(keep))], 0))
+    out = s.import_photo_trip(album="mate40_video", min_photos=3)
+    assert "6 段带位置的视频" in out and "聚成 2 个停留点" in out
+    t = s._load()
+    assert len(t.places) == 2
+    assert len(s._ph.load(s._photo_index())) == 2           # 只有视频的点用视频截图当缩略图
+
+
+def test_read_media_folder_mixes_photos_and_videos(tmp_path, monkeypatch):
+    from tripcore import video as vd
+    _album(tmp_path)
+    (tmp_path / "m.mov").write_bytes(b"x")
+    t = datetime(2026, 6, 19, 10, 6)
+    monkeypatch.setattr(vd, "scan_files", lambda ps: ([vd.Clip("m.mov", str(ps[0]), 5.0, t, 28.70, 121.40)], 0))
+    photos2_, _u0, _s0, _r0 = s.read_media(str(tmp_path), include_videos=False)
+    photos, untagged, st, root = s.read_media(str(tmp_path))
+    assert st["videos"] == 1 and st["video_with_gps"] == 1
+    assert any(p.file == "m.mov" for p in photos) and len(photos) == len(photos2_) + 1
+    assert "videos" not in _s0

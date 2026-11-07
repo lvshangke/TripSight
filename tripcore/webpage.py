@@ -1326,18 +1326,18 @@ $('hb_pv').onclick = async () => {
       pts = r.stops.map(s => ({x: 40 + (s.lon - Math.min(...lo)) * k * sc, y: H - 40 - (s.lat - Math.min(...la)) * sc})); }
     const svg = '<div class="pvmap"><svg viewBox="0 0 ' + W + ' ' + H + '">' + (r.basemap ? '<image href="' + r.basemap + '" width="' + W + '" height="' + H + '"/>' : '') +
       r.stops.map((s, i) => '<circle data-i="' + i + '" cx="' + pts[i].x.toFixed(0) + '" cy="' + pts[i].y.toFixed(0) + '" r="' + (6 + Math.min(14, Math.sqrt(s.n) * 1.6)).toFixed(0) + '" fill="#c4553a77" stroke="#c4553a" stroke-width="2.5" data-tip="' + esc(s.day + ' ' + s.start + '–' + s.end + ' · ' + s.n + ' 张') + '"></circle>').join('') + '</svg></div>';
-    $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
+    $('hb_pvo').innerHTML = '<div class="tlnote">按这个大小会得到 <b>' + r.kept + '</b> 处（另有 ' + r.dropped + ' 个照片太少的路过点不放进行程）；读到 ' + r.photos + ' 张带位置的照片' + (r.video_points ? '和 ' + r.video_points + ' 段带位置的视频' : '') + (r.untagged ? '，' + r.untagged + ' 张没有定位' + (r.guessed ? '（其中 ' + r.guessed + ' 张可按拍摄时间推测挂靠）' : '') : '') + '。点一个圆看那里的照片（只有视频的点没有缩略图）；觉得太碎就换“大景区”再预览。' + (r.basemap_note ? ' <b>' + esc(r.basemap_note) + '</b>' : '') + '</div>' + svg +
       (r.span_days > 30 ? '<div class="tlnote">这些照片从 ' + esc(r.first) + ' 到 ' + esc(r.last) + '，跨了 ' + r.span_days + ' 天：会按拍摄日期分成一天天，没照片的日子不显示。只想恢复其中一段？在上面选“只恢复这段日期”，或点照片多的月份：' +
         r.months.slice().sort((a, b) => b.n - a.n).slice(0, 12).map(m => '<button class="pk hbm" data-m="' + m.m + '">' + m.m + '（' + m.n + '）</button>').join(' ') + '</div>' : '') +
       (r.videos ? '<div class="tlnote">同时在' + ($('hb_src').value === 'album' ? '这个相册' : '这个文件夹（只看这一层）') + '里发现 <b>' + r.videos + '</b> 段视频：恢复行程后，在导出那一步可以剪成一条旅行短片；视频不会放进手册。</div>' : '') +
       '<div class="pvd" id="hb_pvd"><span class="tlnote">点右边地图上的图钉，这里会显示那处的时间和照片。</span></div>';
     $('hb_pvo').querySelectorAll('.hbm').forEach(b => b.onclick = () => { const [y, m] = b.dataset.m.split('-'); $('hb_d1').value = b.dataset.m + '-01'; $('hb_d2').value = b.dataset.m + '-' + String(new Date(+y, +m, 0).getDate()).padStart(2, '0'); $('hb_pv').click(); });
     $('hb_pvo').querySelectorAll('circle').forEach(c => c.onclick = () => { const s = r.stops[+c.dataset.i]; $('hb_pvo').querySelectorAll('circle').forEach(x => x.classList.toggle('sel', x === c));
-      $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
+      $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 个素材<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); });
     $('rmap_chip').className = 'pv'; $('rmap_chip').textContent = '预览：' + r.kept + ' 处，还没有恢复成行程（现有行程不受影响）';
     { const days = [...new Set(r.stops.map(x => x.day))].sort();
       rmapDraw(r.stops.filter(x => x.pos).map((x, i) => ({pos: x.pos, n: i + 1, day: days.indexOf(x.day) + 1, tip: x.day + ' ' + x.start + '–' + x.end + ' · ' + x.n + ' 张', _s: x})), p => { const s = p._s;
-        $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 张照片<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); }); }
+        $('hb_pvd').innerHTML = '<b>' + esc(s.day) + ' ' + esc(s.start) + '–' + esc(s.end) + '</b> · ' + s.n + ' 个素材<br>' + (s.thumbs.length ? s.thumbs.map(u => '<img src="' + esc(u) + '" alt="">').join('') : '<span class="tlnote">（这处没有可预览的缩略图）</span>'); }); }
     if (window.rsDone) rsPreviewing(false, r);
   } catch (e) { $('hb_pvo').textContent = e.message; if (window.rsDone) rsPreviewing(false, null, e.message); }
 };

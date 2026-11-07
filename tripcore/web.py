@@ -1172,15 +1172,11 @@ def hb_preview(body: dict) -> dict[str, Any]:
     except (TypeError, ValueError):
         raise HttpError(400, "半径要是数字。")
     try:
-        if album:
-            from . import photoslib as _pl
-            photos, untagged, st = _pl.read_album(album)
-        else:
-            photos, untagged, st = _pt.read_all(folder)
-    except (ValueError, ms_photoslib_error()) as e:
+        photos, untagged, st, _root = ms.read_media(str(folder) if not album else "", album, True)
+    except ms.ToolError as e:
         raise HttpError(400, str(e))
     if not photos:
-        raise HttpError(400, f"没有找到带位置的照片（统计：{st}）。")
+        raise HttpError(400, f"没有找到带位置的照片或视频（统计：{st}）。")
     months: dict[str, int] = {}
     for p in photos:
         months[f"{p.taken:%Y-%m}"] = months.get(f"{p.taken:%Y-%m}", 0) + 1
@@ -1197,13 +1193,13 @@ def hb_preview(body: dict) -> dict[str, Any]:
     root = Path("/") if album else folder
     rows = []
     for x in keep[:80]:
-        names = sorted(x.files)[:3] if x.files else []
+        names = sorted(f for f in x.files if not ms._is_video_name(f))[:3]
         rows.append({"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"),
                      "thumbs": [u for u in (_ph.thumb_uri(root, f, 120, 60) for f in names) if u]})
     rows += [{"lat": x.lat, "lon": x.lon, "pos": _gcj_pos(x.lat, x.lon), "n": x.n, "day": x.day.isoformat(), "start": x.start.strftime("%H:%M"), "end": x.end.strftime("%H:%M"), "thumbs": []} for x in keep[80:]]
     _save_draft(folder, album, radius, mn, len(stops), len(keep), len(photos), keep)
-    out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos),
-           "untagged": len(untagged), "guessed": guessed, "stats": st, "stops": rows, "basemap": None, "basemap_note": "",
+    out = {"radius_m": radius, "total": len(stops), "kept": len(keep), "dropped": len(stops) - len(keep), "photos": len(photos) - sum(1 for p in photos if ms._is_video_name(p.file)),
+           "untagged": len(untagged), "guessed": guessed, "stats": st, "video_points": sum(1 for p in photos if ms._is_video_name(p.file)), "stops": rows, "basemap": None, "basemap_note": "",
            "videos": _album_video_count(album) if album else _video_count(str(folder)),
            "first": min(p.taken for p in photos).date().isoformat(), "last": max(p.taken for p in photos).date().isoformat(),
            "span_days": (max(p.taken for p in photos).date() - min(p.taken for p in photos).date()).days + 1,

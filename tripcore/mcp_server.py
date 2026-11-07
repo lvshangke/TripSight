@@ -1944,19 +1944,85 @@ def _stop_names(keep: list, budget_s: float = 0.0, overseas_ok: bool = False) ->
     return [f"{nm} {sp.start:%H:%M}" if cnt[nm] > 1 and found else nm for nm, sp in zip(names, keep)], found
 
 
-def _attach_photos(items: list, root: Path, stops: list, per: int, link: bool) -> tuple[int, int]:
-    """给每个点挂照片，按“每个点先 1 张，再每个点第 2 张……”轮着来：不管总量上限多少，前面的点不会把后面的点的名额占光。"""
+def _is_video_name(name: str) -> bool:
+    from .video import VIDEO_EXT
+    return Path(name).suffix.lower() in VIDEO_EXT
+
+
+def read_media(folder: str = "", album: str = "", include_videos: bool = True):
+    """读来源里的照片和视频（视频当作和照片一样的带时间、位置的素材）。
+    返回 (photos, untagged, stats, root)：photos 里照片和视频混在一起按时间排好，视频的 file 也是文件名（文件夹）或绝对路径（相册）。
+    stats 里多了 videos / video_with_gps / video_no_gps / video_missing；没有 ffmpeg 又在读文件夹时视频跳过，stats["video_skipped"]=数量。"""
     from . import phototrip as _pt
-    ranked = [(pid, _pt.best_files(root, files, per)) for pid, files in stops]
+    if album:
+        from . import photoslib as _pl
+        root = Path("/")
+        try:
+            photos, untagged, st = _pl.read_album(album)
+            vph, vst = (_pl.album_video_points(album) if include_videos else ([], {}))
+        except _pl.PhotosLibError as e:
+            raise ToolError(str(e))
+    else:
+        if not folder:
+            raise ToolError("要给照片文件夹 folder，或者（Mac 上）照片 App 的相册名 album。")
+        root = Path(folder).expanduser()
+        if not root.is_dir():
+            raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
+        try:
+            photos, untagged, st = _pt.read_all(root)
+        except ValueError as e:
+            raise ToolError(str(e))
+        vph, vst = [], {}
+        if include_videos:
+            from . import video as _v
+            vids = [p for p in sorted(root.iterdir()) if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in _v.VIDEO_EXT]
+            if vids:
+                try:
+                    clips, bad = _v.scan_files(vids)
+                except _v.VideoError:
+                    vst = {"videos": len(vids), "video_skipped": len(vids), "video_with_gps": 0, "video_no_gps": 0, "video_missing": 0}
+                else:
+                    withg = [c for c in clips if c.start and c.lat is not None and c.lon is not None]
+                    vph = [_pt.Photo(c.file, c.start, c.lat, c.lon) for c in withg]
+                    vst = {"videos": len(vids), "video_with_gps": len(withg), "video_no_gps": len(clips) - len(withg), "video_missing": bad}
+    st = {**st, **vst}
+    if vph:
+        photos = sorted(photos + vph, key=lambda x: (x.taken, x.file))
+    return photos, untagged, st, root
+
+
+def _attach_photos(items: list, root: Path, stops: list, per: int, link: bool) -> tuple[int, int]:
+    """给每个点挂照片，按“每个点先 1 张，再每个点第 2 张……”轮着来：不管总量上限多少，前面的点不会把后面的点的名额占光。
+    只有视频的点（没有照片）用视频的一帧当缩略图。"""
+    import tempfile
+    from . import phototrip as _pt
+    from . import video as _v
+    ranked = []
+    for pid, files in stops:
+        imgs = [f for f in files if not _is_video_name(f)]
+        ranked.append((pid, _pt.best_files(root, imgs, per) if imgs else [], [f for f in files if _is_video_name(f)]))
     attached = failed = 0
     for r in range(per):
-        for pid, lst in ranked:
+        for pid, lst, _vf in ranked:
             if r >= len(lst):
                 continue
             if len(items) >= _ph.MAX_TOTAL:
                 return attached, failed
             try:
                 (_ph.add_ref if link else _ph.add)(_photo_dir(), items, str(root / lst[r]), pid, None, "")
+                attached += 1
+            except _ph.PhotoError:
+                failed += 1
+    for pid, lst, vf in ranked:                       # 只有视频的点：截第一段视频的一帧
+        if lst or not vf or len(items) >= _ph.MAX_TOTAL:
+            continue
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "poster.jpg"
+            if not _v.poster(root / vf[0], out):
+                failed += 1
+                continue
+            try:
+                _ph.add(_photo_dir(), items, str(out), pid, None, "视频截图")
                 attached += 1
             except _ph.PhotoError:
                 failed += 1
@@ -1976,7 +2042,7 @@ def fill_stop_photos(per_stop: int = 3, link_photos: bool = False) -> str:
     have_places = {p.id for p in trip.places}
     items = _ph.load(_photo_index())
     has = {x.get("place_id") for x in items}
-    todo = [(r["place_id"], r["files"]) for r in side["stops"] if r["place_id"] in have_places and r["place_id"] not in has and r.get("files")]
+    todo = [(r["place_id"], list(r.get("files") or []) + list(r.get("vfiles") or [])) for r in side["stops"] if r["place_id"] in have_places and r["place_id"] not in has and (r.get("files") or r.get("vfiles"))]
     if not todo:
         return "每个点都已经有照片了，没有要补的。"
     attached, failed = _attach_photos(items, root, todo, max(1, min(int(per_stop), 6)), link_photos)
@@ -1988,7 +2054,7 @@ def fill_stop_photos(per_stop: int = 3, link_photos: bool = False) -> str:
 def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, include_passing: bool = False,
                       radius_m: int = 300, photos_per_stop: int = 6, album: str = "",
                       track: str = "", tz_hours: float = 8.0, link_photos: bool = False, auto_name: bool = True,
-                      start_date: str = "", end_date: str = "") -> str:
+                      start_date: str = "", end_date: str = "", include_videos: bool = True) -> str:
     """从用户的一个照片文件夹还原一段已经走过的旅程：读照片的拍摄时间和 GPS，同一天、300 米内、时间连续的照片聚成"停留点"，
     每个点（默认 3 张以上）变成一个景点，按实际拍摄时间排进对应的天。folder 必须是用户给出的文件夹路径（不要自己去找用户的相册；
     macOS 照片 App 要先"导出未修改原片"并勾选位置信息）。只在本机读取，不联网；会新建并切换到一个新行程，原行程仍在（调用前先让用户确认）。
@@ -2002,23 +2068,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     每个点会挑最清晰的 photos_per_stop 张挂到景点上（重新编码、去掉定位）。返回摘要，不返回逐张照片。聚类参数只是经验值，结果要给用户确认。"""
     from . import phototrip as _pt
     from .models import DayItem, DayPlan, Plan, PlaceStatus
-    if album:
-        from . import photoslib as _pl
-        root = Path("/")                       # 相册模式下 Photo.file 是绝对路径，Path("/") / 绝对路径 就是它本身
-        try:
-            photos, untagged, st = _pl.read_album(album)
-        except _pl.PhotosLibError as e:
-            raise ToolError(str(e))
-    else:
-        if not folder:
-            raise ToolError("要给照片文件夹 folder，或者（Mac 上）照片 App 的相册名 album。")
-        root = Path(folder).expanduser()
-        if not root.is_dir():
-            raise ToolError(f"文件夹不存在：{folder}（请让用户确认路径；不会自动查找）。")
-        try:
-            photos, untagged, st = _pt.read_all(root)
-        except ValueError as e:
-            raise ToolError(str(e))
+    photos, untagged, st, root = read_media(folder, album, include_videos)
     photos, untagged = date_filter(photos, untagged, start_date, end_date)
     tracked_n = 0
     if track and untagged:
@@ -2031,7 +2081,7 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
         tracked_n = len(got)
         photos = sorted(photos + got, key=lambda x: (x.taken, x.file))
     if not photos:
-        raise ToolError(f"没有找到带拍摄时间和位置的照片（统计：{st}）。照片要有 GPS，导出时记得勾选位置信息。")
+        raise ToolError(f"没有找到带拍摄时间和位置的照片或视频（统计：{st}）。照片和视频要有 GPS，导出时记得勾选位置信息。")
     stops = _pt.cluster(photos, radius_m=max(50, min(int(radius_m), 2000)))
     guessed_n = _pt.assign_untagged(stops, untagged)
     keep = [s for s in stops if include_passing or s.n >= max(1, int(min_photos))]
@@ -2074,16 +2124,26 @@ def import_photo_trip(folder: str = "", name: str = "", min_photos: int = 3, inc
     vids = 0
     if album:
         try:
+            from . import photoslib as _pl
             _pv, _miss = _pl.album_videos(album)
             vids = len(_pv) + _miss
         except Exception:
             vids = 0
+    elif include_videos:
+        vids = sum(1 for p in root.iterdir() if p.is_file() and not p.name.startswith(".") and _is_video_name(p.name))
     _photo_trip_path().write_text(json.dumps({"folder": str(root), "album": album, "videos": vids, "radius_m": int(radius_m), "start_date": start_date or "", "end_date": end_date or "", "stops": [
-        {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n, "files": sp.files, "guessed": sp.guessed}
+        {"place_id": pid, "day": sp.day.isoformat(), "start": sp.start.isoformat(), "end": sp.end.isoformat(), "n": sp.n,
+         "files": [f for f in sp.files if not _is_video_name(f)], "vfiles": [f for f in sp.files if _is_video_name(f)], "guessed": sp.guessed}
         for pid, sp in zip(ids, keep)]}, ensure_ascii=False), encoding="utf-8")
-    lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos)} 张带位置的照片"
+    nvid = sum(1 for ph_ in photos if _is_video_name(ph_.file))
+    lines = [f"已从照片还原行程（已新建并切换到它，之前的行程都还在）：读到 {len(photos) - nvid} 张带位置的照片"
+             + (f"和 {nvid} 段带位置的视频" if nvid else "") +
              f"（另有无定位 {st['no_gps']}、缺时间 {st['no_time']}、HEIC 未解码 {st['heic_skipped']}、读不了 {st['unreadable']}），"
              f"聚成 {len(stops)} 个停留点，保留 {len(keep)} 个（自动起名 {named} 个）；挂上照片 {attached} 张" + (f"（{failed} 张没挂上）" if failed else "") + "。"]
+    if st.get("video_no_gps"):
+        lines.append(f"另有 {st['video_no_gps']} 段视频没有位置，没参与聚点；它们会在做短片时按拍摄时间归到时间上最近的景点。")
+    if st.get("video_skipped"):
+        lines.append(f"文件夹里有 {st['video_skipped']} 段视频，但没找到 ffmpeg，视频没参与聚点（brew install ffmpeg 后重新恢复）。")
     if auto_name and keep and named < len(keep) and not _NAME_ERR:
         lines.append(f"为避免超时，地名只先查了一部分（{named}/{len(keep)} 个查到）；其余的调用 autoname_stops 接着查（可能要调几次，直到它说全部处理完）。")
     if auto_name and not named and _NAME_ERR:
@@ -2242,6 +2302,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
     keep, rest = ids[0], ids[1:]
     allrec = [recs[i] for i in ids]
     files = [f for r in allrec for f in r["files"]]
+    vfiles = [f for r in allrec for f in r.get("vfiles", [])]
     guessed = [f for r in allrec for f in r.get("guessed", [])]
     n = sum(r["n"] for r in allrec)
     start = min(r["start"] for r in allrec)
@@ -2271,7 +2332,7 @@ def merge_stops(place_ids: list[str], name: str = "") -> str:
         if x.get("place_id") in rest:
             x["place_id"] = keep
     _ph.save(_photo_index(), photos)
-    recs[keep].update({"files": files, "guessed": guessed, "n": n, "start": start, "end": end})
+    recs[keep].update({"files": files, "vfiles": vfiles, "guessed": guessed, "n": n, "start": start, "end": end})
     side["stops"] = [x for x in side["stops"] if x["place_id"] not in rest]
     _photo_trip_path().write_text(json.dumps(side, ensure_ascii=False), encoding="utf-8")
     stories = _load_json_file(_stories_path())

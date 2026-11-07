@@ -115,9 +115,22 @@ def probe(path: Path) -> Optional[Clip]:
             pass
     if abs(rot) % 180 == 90:
         w, h = h, w
-    pos = _iso6709(tags.get("com.apple.quicktime.location.iso6709", ""))
+    pos = next((q for q in (_iso6709(tags.get(k, "")) for k in ("com.apple.quicktime.location.iso6709", "location", "location-eng")) if q), None)
     return Clip(path.name, str(path), dur, _when(tags), pos[0] if pos else None, pos[1] if pos else None, w, h,
                 any(s.get("codec_type") == "audio" for s in streams))
+
+
+def poster(path: Path, out: Path, at: float = 1.0) -> bool:
+    """截视频的一帧存成 JPEG（给只有视频的停留点当缩略图）；失败返回 False。"""
+    try:
+        for t in (at, 0.0):
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t}", "-i", str(path), "-frames:v", "1", "-vf", "scale=1280:-2", str(out)],
+                           capture_output=True, timeout=60)
+            if out.is_file() and out.stat().st_size > 0:
+                return True
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return False
 
 
 def scan(folder: Path) -> tuple[list[Clip], int]:
