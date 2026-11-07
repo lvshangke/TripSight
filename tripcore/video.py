@@ -687,20 +687,63 @@ def jianying_draft(segs: list[Seg], size: tuple[int, int], drafts_dir: Path, nam
         else:                                                           # 新版接口：先建轨道，后面按类型自动放
             for tt in (jy.TrackType.video, jy.TrackType.text):
                 script.append_track(jy.TrackSpec(tt))
-        t = 0.0
+        us = lambda sec: int(round(float(sec) * 1_000_000))              # 全部用整数微秒：用字符串秒数时起点和时长各自四舍五入，相邻段会差 1 毫秒而被判“重叠”
+        T = jy.Timerange
+        t = 0
         for i, sg in enumerate(segs):
+            dur = us(sg.secs)
             if sg.kind == "card":
                 png = work / f"jycard{i:03d}.png"
                 card_png(sg, size, png)
-                script.add_segment(jy.VideoSegment(str(png), trange(f"{t:.3f}s", f"{sg.secs:.3f}s")))
+                script.add_segment(jy.VideoSegment(str(png), T(t, dur)))
             else:
-                script.add_segment(jy.VideoSegment(sg.clip.path, trange(f"{t:.3f}s", f"{sg.secs:.3f}s"),
-                                                   source_timerange=trange(f"{sg.offset:.3f}s", f"{sg.secs:.3f}s")))
-                script.add_segment(jy.TextSegment(sg.lower, trange(f"{t:.3f}s", f"{min(LOWER_SECS, sg.secs):.3f}s"),
+                script.add_segment(jy.VideoSegment(sg.clip.path, T(t, dur), source_timerange=T(us(sg.offset), dur)))
+                script.add_segment(jy.TextSegment(sg.lower, T(t, min(us(LOWER_SECS), dur)),
                                                   style=jy.TextStyle(size=6.0, color=(1.0, 1.0, 1.0)),
                                                   clip_settings=jy.ClipSettings(transform_y=-0.8)))
-            t += sg.secs
+            t += dur
         script.save()
     except Exception as e:                                             # 库版本/剪映版本不匹配
         raise VideoError(f"生成剪映草稿失败：{e}")
     return str(drafts_dir / name)
+
+
+def check_jianying_draft(draft_dir: Path) -> tuple[list[str], str]:
+    """自检刚生成的剪映草稿（不需要剪映）：能不能读、轨道里的片段有没有重叠、素材文件在不在、
+    取的片段有没有超出原视频长度、总时长对不对。返回 (问题列表, 一句话概况)。问题列表为空才算通过；
+    这只能证明“草稿文件结构正常”，能不能在你的剪映版本里打开，还是要在剪映里点开看一眼。"""
+    f = Path(draft_dir) / "draft_content.json"
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return [f"读不了 draft_content.json（{type(e).__name__}）：可能是剪映版本把草稿加密了，或没生成成功"], ""
+    problems: list[str] = []
+    mats = {m.get("id"): m for m in (d.get("materials") or {}).get("videos", [])}
+    end_all = 0
+    n_video = n_text = 0
+    for tr in d.get("tracks") or []:
+        segs = sorted(tr.get("segments") or [], key=lambda x: x["target_timerange"]["start"])
+        prev_end = 0
+        for sg in segs:
+            tt = sg["target_timerange"]
+            a, b = int(tt["start"]), int(tt["start"]) + int(tt["duration"])
+            if tr.get("type") == "video":
+                n_video += 1
+                if a < prev_end:
+                    problems.append(f"视频轨有重叠：{prev_end / 1e6:.2f}s 处")
+                prev_end = max(prev_end, b)
+                m = mats.get(sg.get("material_id")) or {}
+                path = m.get("path") or ""
+                if path and not Path(path).exists():
+                    problems.append(f"素材不存在：{path}")
+                src = sg.get("source_timerange") or {}
+                if src and m.get("duration") and int(src.get("start", 0)) + int(src.get("duration", 0)) > int(m["duration"]) + 1000 and m.get("type") == "video":
+                    problems.append(f"取的片段超出原视频长度：{Path(path).name}")
+            elif tr.get("type") == "text":
+                n_text += 1
+            end_all = max(end_all, b)
+    if not n_video:
+        problems.append("草稿里没有视频轨")
+    if abs(int(d.get("duration") or 0) - end_all) > 1000:
+        problems.append(f"总时长对不上（草稿写 {int(d.get('duration') or 0) / 1e6:.1f}s，片段合计 {end_all / 1e6:.1f}s）")
+    return problems, f"{n_video} 段画面（含卡片）、{n_text} 条字幕、总长约 {end_all / 1e6:.0f} 秒"

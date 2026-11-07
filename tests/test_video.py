@@ -240,3 +240,22 @@ def test_video_edit_tools_and_web_roundtrip(tmp_path, monkeypatch):
     assert jpg[:2] == b"\xff\xd8"
     res = s.export_rough_cut(str(vids), clip_max=2)
     assert "已生成旅行短片" in res
+
+
+@pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")
+def test_jianying_draft_has_no_overlaps_and_passes_selfcheck(tmp_path):
+    """相邻段的起点和时长各自四舍五入，曾经会差 1 毫秒，被剪映库判成“重叠”而整份草稿生成失败；改成整数微秒后不会。"""
+    pytest.importorskip("pyJianYingDraft")
+    clips = []
+    for k, t in enumerate(["02:05", "02:20", "02:40", "03:10"]):
+        _mk(tmp_path / f"a{k}.mp4", f"2026-06-19T{t[:2]}:{t[3:]}:00Z")
+        c = v.probe(tmp_path / f"a{k}.mp4"); c.stop = "p1"; clips.append(c)
+    segs = v.plan(clips, _order(), clip_max=1.7)
+    drafts = tmp_path / "drafts"; drafts.mkdir()
+    p = v.jianying_draft(segs, (1920, 1080), drafts, "测试", tmp_path / "w")
+    probs, brief = v.check_jianying_draft(Path(p))
+    assert probs == [] and "字幕" in brief
+    (tmp_path / "a0.mp4").unlink()                                   # 素材被删了，自检要能发现
+    probs2, _ = v.check_jianying_draft(Path(p))
+    assert any("素材不存在" in x for x in probs2)
+    assert v.check_jianying_draft(tmp_path / "没有")[0]

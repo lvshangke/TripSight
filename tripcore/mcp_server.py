@@ -1673,6 +1673,10 @@ def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bo
         msg += f"\n另有 {len(clips) - n} 段没归到景点，没放进去。"
     if draft:
         msg += f"\n剪映草稿：{draft}"
+        if not draft.startswith("（"):
+            probs, brief = _v.check_jianying_draft(Path(draft))
+            msg += ("\n草稿自检通过：" + brief + "（只证明文件结构正常；能不能在你的剪映版本里打开，要在剪映里点开看一眼，打不开就用上面的 mp4 + 字幕）。"
+                    if not probs else "\n草稿自检发现问题：" + "；".join(probs[:3]) + "（先别用这份草稿，用上面的 mp4 + 字幕，并告诉我）。")
     if basemap:
         msg += "\n" + (bm_note or "路线卡用了高德底图和驾车路径示意。")
     msg += "\n没有配乐和特效，需要的话在剪映里再加；视频若含人脸或路人，发布前提醒用户。"
