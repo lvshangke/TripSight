@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
 <img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-90-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/MCP%20tools-91-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -46,7 +46,7 @@ TripSight is an **all-in-one travel assistant**. It is not a "one-click guide ge
 **The agent's role** (and the design principle of the whole project):
 
 - **The LLM only understands intent:** it hears "move Guanqian Street to the last day" or "rebuild my January photos into a trip", picks the tool, and explains in plain words. It never invents coordinates, hours or prices.
-- **Deterministic code does the work:** day splitting, rule checks, routes, weather, photo clustering and exports are done by MCP tools (86 in total); facts come only from tools or you, and unknowns are marked "to verify".
+- **Deterministic code does the work:** day splitting, rule checks, routes, weather, photo clustering and exports are done by MCP tools (91 in total); facts come only from tools or you, and unknowns are marked "to verify".
 - **You decide:** changes are proposals first; the assistant never books, pays or installs; trips are local JSON, the workbench listens on `127.0.0.1` only, API keys live in your own config.
 - **Not tied to one model or agent:** any MCP-capable agent works (nanobot, WorkBuddy, Claude Code… see Quick start).
 

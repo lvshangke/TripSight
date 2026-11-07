@@ -16,7 +16,7 @@
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
 <img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-90-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/MCP%20tools-91-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -55,7 +55,7 @@ TripSight 是一个**全流程旅行助手**：它不是“一键生成攻略”
 **Agent 在其中的角色**（也是整个项目的设计原则）：
 
 - **LLM 只理解意图**：听懂“把观前街挪到最后一天”“把旧手机里 1 月的照片整理成行程”，决定该调哪个工具，并向你说明；它不编坐标、营业时间和价格。
-- **确定性代码做事**：分天排程、规则检查、查路线和天气、聚类照片、渲染导出，都由 MCP 工具（共 90 个）完成；事实只来自工具或你，查不到就写“待核实”。
+- **确定性代码做事**：分天排程、规则检查、查路线和天气、聚类照片、渲染导出，都由 MCP 工具（共 91 个）完成；事实只来自工具或你，查不到就写“待核实”。
 - **你保留决定权**：修改先成为提案；助手**不订票、不付款、不安装程序**；行程是本机 JSON，网页工作台只监听 `127.0.0.1`，API key 只放在你自己的配置里。
 - **不绑定模型和 Agent**：任何支持 MCP 的聊天 Agent 都能接（[nanobot](https://github.com/HKUDS/nanobot)、WorkBuddy、Claude Code 等，见下方“快速开始”）。
 
