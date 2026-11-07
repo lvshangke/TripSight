@@ -50,15 +50,18 @@ def _open_db() -> Any:
 
 
 def list_albums() -> list[dict[str, Any]]:
+    """相册列表：照片和视频分开数，只有视频的相册（如 mate40_video）也要列出来。"""
     db = _open_db()
     out = []
     for a in getattr(db, "album_info", []) or []:
         try:
-            n = len([p for p in a.photos if getattr(p, "isphoto", True)])
-            out.append({"name": a.title, "count": n})
+            items = list(a.photos)
+            vids = len([p for p in items if getattr(p, "ismovie", False)])
+            n = len([p for p in items if getattr(p, "isphoto", True) and not getattr(p, "ismovie", False)])
+            out.append({"name": a.title, "count": n, "videos": vids})
         except Exception:
             continue
-    return sorted((x for x in out if x["count"]), key=lambda x: x["name"])
+    return sorted((x for x in out if x["count"] or x["videos"]), key=lambda x: x["name"])
 
 
 def _usable_path(p: Any) -> Optional[str]:

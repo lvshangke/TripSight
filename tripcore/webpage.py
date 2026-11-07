@@ -1311,7 +1311,7 @@ const hbSrc = o => Object.assign(o, $('hb_src').value === 'album' ? {album: $('h
 function hbSrcUi() { const a = $('hb_src').value === 'album'; $('hb_folder').style.display = a ? 'none' : ''; document.querySelectorAll('[data-to=hb_folder]').forEach(x => x.style.display = a ? 'none' : ''); $('hb_album').style.display = a ? '' : 'none'; $('hb_al').style.display = a ? '' : 'none'; }
 $('hb_src').onchange = hbSrcUi;
 $('hb_al').onclick = async () => {
-  try { const r = await api('hb_albums', {}); $('hb_album').innerHTML = r.albums.map(a => '<option value="' + esc(a.name) + '">' + esc(a.name) + '（' + a.count + ' 张）</option>').join('') || '<option value="">没有相册</option>'; }
+  try { const r = await api('hb_albums', {}); $('hb_album').innerHTML = r.albums.map(a => '<option value="' + esc(a.name) + '">' + esc(a.name) + '（' + a.count + ' 张' + (a.videos ? '、' + a.videos + ' 段视频' : '') + '）</option>').join('') || '<option value="">没有相册</option>'; }
   catch (e) { $('hb_pvo').textContent = e.message; }
 };
 const bmOn = () => { try { return localStorage.getItem('tsRpBm') !== '0'; } catch (e) { return true; } };

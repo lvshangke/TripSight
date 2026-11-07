@@ -72,3 +72,14 @@ def test_unavailable_gives_clear_message(monkeypatch):
         s.list_photo_albums()
     with pytest.raises(Exception, match="folder"):
         s.import_photo_trip()
+
+
+def test_list_albums_keeps_video_only_album(monkeypatch):
+    mv = lambda: NS(isphoto=False, ismovie=True)
+    db = NS(album_info=[NS(title="mate40_video", photos=[mv(), mv()]),
+                        NS(title="mate40-camera", photos=[NS(isphoto=True, ismovie=False)]),
+                        NS(title="空", photos=[])])
+    monkeypatch.setattr(pl, "_open_db", lambda: db)
+    r = {x["name"]: x for x in pl.list_albums()}
+    assert r["mate40_video"]["videos"] == 2 and r["mate40_video"]["count"] == 0
+    assert r["mate40-camera"]["count"] == 1 and "空" not in r

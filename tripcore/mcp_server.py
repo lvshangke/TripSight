@@ -2674,7 +2674,7 @@ def list_photo_albums() -> str:
         raise ToolError(str(e))
     if not rows:
         return "照片 App 里没有找到有照片的相册。"
-    return "照片 App 里的相册：\n" + "\n".join(f"- {r['name']}（{r['count']} 张）" for r in rows)
+    return "照片 App 里的相册：\n" + "\n".join(f"- {r['name']}（{r['count']} 张照片" + (f"、{r['videos']} 段视频" if r.get('videos') else "") + "）" for r in rows)
 
 
 def _ledger_path() -> Path:
