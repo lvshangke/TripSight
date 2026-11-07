@@ -229,7 +229,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 | Agent | 做法 | 状态 |
 |---|---|---|
 | [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
-| [WorkBuddy](https://www.workbuddy.ai) | 在“连接 → 自定义连接 → Configure MCP”里登记 `tripcore-mcp`，再把 `skills/` 装进 `~/.workbuddy/skills`，详见 [docs/WORKBUDDY.md](docs/WORKBUDDY.md) | 按其官方 MCP 配置方式整理，**未在真实环境验证** |
+| [WorkBuddy](https://www.workbuddy.ai) | 在“专家技能 → 连接器 → 新增连接器”里填入 `tripcore-mcp` 的 JSON 配置（`~/.workbuddy-ai/mcp.json`），再把 `skills/` 装进 `~/.workbuddy-ai/skills`，详见 [docs/WORKBUDDY.md](docs/WORKBUDDY.md) | 连接器入口和配置文件位置已在真实环境确认，其余步骤请以界面为准 |
 | Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 91 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
 
 `tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。

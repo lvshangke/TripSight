@@ -148,7 +148,7 @@ tripcore demo   # full demo on the sample data, no keys needed
 
 **Use it in chat:** follow [docs/SETUP.md](docs/SETUP.md) (Chinese) to connect nanobot, run `nanobot`, then just say where you want to go. When you want to drag things around, see the map or export, tell the assistant **"open the workbench"** — it returns a URL with a one-time token; open it in a browser on the same computer.
 
-**Other MCP agents:** TripSight is a standard stdio MCP server (command `tripcore-mcp`, put your own `AMAP_KEY` in its `env`) plus skills in `skills/` (`python scripts/install_skills.py --dest <your agent's skills dir>`). For WorkBuddy see [docs/WORKBUDDY.md](docs/WORKBUDDY.md) (Chinese; based on WorkBuddy's documented MCP config, **not yet verified on a real install**). Claude Code / Claude Desktop / Cursor follow the same pattern, untested one by one.
+**Other MCP agents:** TripSight is a standard stdio MCP server (command `tripcore-mcp`, put your own `AMAP_KEY` in its `env`) plus skills in `skills/` (`python scripts/install_skills.py --dest <your agent's skills dir>`). For WorkBuddy: Expert skills → Connectors → Add connector, paste the `mcpServers` JSON (it edits `~/.workbuddy-ai/mcp.json`), then install `skills/` into `~/.workbuddy-ai/skills`; see [docs/WORKBUDDY.md](docs/WORKBUDDY.md) (Chinese; the connector entry and config path are confirmed on a real install, other steps follow the UI). Claude Code / Claude Desktop / Cursor follow the same pattern, untested one by one.
 
 **Workbench only:** no chat needed — `tripcore web --open`.
 
