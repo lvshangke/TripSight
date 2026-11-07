@@ -891,15 +891,16 @@ def activity(body: dict) -> dict[str, Any]:
 
 
 def hb_title(body: dict) -> dict[str, Any]:
-    """改行程名字（手册封面和导出文件夹用它）。可以 undo。"""
-    name = str(body.get("title") or "").strip()
+    """改行程名字（手册封面和导出文件夹用它）。可以 undo。页面顶部的“改名”按钮和手册里的“手册标题”都走这里。"""
+    name = str(body.get("title") or body.get("name") or "").strip()
     if not name:
-        raise HttpError(400, "标题不能为空。")
+        raise HttpError(400, "名字不能为空。")
     if len(name) > 40:
-        raise HttpError(400, "标题请控制在 40 个字以内。")
-    trip = ms._load()
-    if trip.meta.name != name:
-        ms._save(ms.commit(trip, lambda t: setattr(t.meta, "name", name)))
+        raise HttpError(400, "名字请控制在 40 个字以内。")
+    try:
+        ms.rename_trip(name)
+    except ms.ToolError as e:
+        raise HttpError(400, str(e))
     return {"message": "已改名：" + name, "name": name}
 
 
@@ -1485,7 +1486,7 @@ ROUTES_GET = {"state": lambda: snapshot(), "rev": rev, "video_status": video_sta
 ROUTES_POST = {"switch": switch, "trip_delete": trip_delete, "trip_restore": trip_restore, "trip_new_restore": trip_new_restore, "new_trip": new_trip, "add_place": add_place_web, "lookup": lookup,  "preview": preview, "apply": apply, "undo": undo, "dates": dates, "refine": refine,
                "share_preview": share_preview, "share_image": share_image, "share_pdf": share_pdf, "share_gif": share_gif, "photo_add": photo_add, "photo_remove": photo_remove, "photo_full": photo_full,
                "travelogue": travelogue, "travelogue_check": travelogue_check,
-               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "hb_text": hb_text, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "video_edit": video_edit, "video_groups": video_groups_now, "fp_build": fp_build, "fp_data": fp_data}
+               "bills_import": bills_import, "bills_edit": bills_edit, "bills_scan": bills_scan, "bills_range": bills_range, "bills_watch": bills_watch, "hb_preview": hb_preview, "hb_albums": hb_albums, "hb_import": hb_import, "hb_edit": hb_edit, "hb_merge": hb_merge, "hb_regions": hb_regions, "hb_photo_move": hb_photo_move, "hb_stop_delete": hb_stop_delete, "hb_day_title": hb_day_title, "hb_title": hb_title, "trip_rename": hb_title, "hb_text": hb_text, "activity": activity, "hb_photo_scale": hb_photo_scale, "hb_autoname": hb_autoname, "hb_fill_photos": hb_fill_photos, "export_dir": export_dir, "restore_mode": restore_mode, "hb_describe": hb_describe, "hb_export": hb_export, "reveal_exports": reveal_exports, "pick_path": pick_path, "hb_style_preview": hb_style_preview, "photo_edit": photo_edit, "cal_export": cal_export, "video_scan": video_scan, "video_cut": video_cut, "video_edit": video_edit, "video_groups": video_groups_now, "fp_build": fp_build, "fp_data": fp_data}
 
 
 def make_handler(token: str, state: dict):

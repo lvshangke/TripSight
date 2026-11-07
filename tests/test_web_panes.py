@@ -214,3 +214,9 @@ def test_page_scripts_are_valid_javascript(tmp_path):
         f = tmp_path / f"p{i}.js"; f.write_text(code, encoding="utf-8")
         r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True)
         assert r.returncode == 0, r.stderr[:400]
+
+
+def test_page_has_trip_rename_button():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert 'id="trip_ren"' in h and "api('trip_rename'" in h

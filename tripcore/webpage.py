@@ -285,7 +285,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 .nbtn{font-size:13px!important;padding:5px 12px!important;border:1px solid var(--line)!important}#bin{position:absolute;right:16px;top:50px;width:340px;max-height:60vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px;display:none}#bin.on{display:block}#bin .br{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dotted var(--line);font-size:13px}#bin .br span{flex:1}
 </style></head><body>
 <div id="toast"></div><div id="ptip"></div>
-<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
+<nav id="topnav"><b>TripSight</b><button data-pg="plan" class="on">计划行程</button><button data-pg="restore">恢复行程</button><button data-pg="bill">花费</button><button data-pg="fp">足迹</button><span class="nsp"></span><label class="tripsel">当前行程 <select id="trip" title="切换行程"></select></label><button id="trip_ren" class="nbtn" title="给当前行程改名（计划、恢复都可以，可撤销）">✎ 改名</button><button id="trip_del" class="nbtn" title="删除当前行程（移到回收区，可恢复）">🗑 删除</button><button id="trip_bin" class="nbtn" title="看看删除过的行程，可以恢复">回收区</button><div id="bin"></div></nav>
 <div id="app"><div id="side">
 <header><span id="rev" style="font-size:12px;color:#777"></span><button id="ctoggle">💬 助手</button><button id="refine" title="给还没查过的路段查真实路线（会联网查高德，用你自己的 key）">更新路线</button><button id="edit">编辑</button><button id="more" title="分享长图、写游记、查看全部能力">更多</button></header>
 <div id="msg"></div>
@@ -441,6 +441,12 @@ $('trip_del').onclick = async () => {
   const cur = r.trips.find(t => t.slug === r.current); if (!cur) return;
   if (!(await ask('删除「' + cur.name + '」？\n它会被移到回收区，文件不会真正删掉，之后可以在“回收区”里恢复。'))) return;
   try { const x = await api('trip_delete', {slug: cur.slug}); toast(x.message); await load(); if (PGCUR !== 'plan') pgShow(PGCUR); } catch (e) { toast(e.message, true); }
+};
+$('trip_ren').onclick = async () => {
+  const r = TRIPS_R; const cur = r && r.trips.find(t => t.slug === r.current); if (!cur) return toast('还没有行程可以改名。', true);
+  const v = window.prompt('把「' + cur.name + '」改名为（最多 40 个字）：', cur.name); if (v === null) return;
+  const t = v.trim(); if (!t || t === cur.name) return;
+  try { const x = await api('trip_rename', {name: t}); toast(x.message); await loadTrips(); try { await load(); } catch (e) {} if (HB.data) { HB.data.name = t; $('hb_title').value = t; } } catch (e) { toast(e.message, true); }
 };
 $('trip_bin').onclick = e => { e.stopPropagation(); const b = $('bin'); if (b.classList.contains('on')) return b.classList.remove('on'); binRender(); b.classList.add('on'); };
 document.addEventListener('click', e => { if (!e.target.closest('#bin')) $('bin').classList.remove('on'); });

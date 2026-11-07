@@ -3529,6 +3529,27 @@ def list_trips() -> str:
     return "\n".join(lines) + (f"\n（另有 {arch} 个已归档行程，在 trips/_archive/ 里，文件都还在）" if arch else "")
 
 
+def rename_trip(name: str) -> str:
+    """改当前行程的名字（手册封面、分享页标题、导出文件夹都用它）。只改名字，行程内容和照片不动，可 undo；
+    不会改文件夹，所以之前导出的文件不受影响。名字最多 40 个字，不能和别的行程重名。
+    用户说“名字起错了/想改个名字”时调用；计划行程和恢复行程都一样。"""
+    new = (name or "").strip()
+    if not new:
+        raise ToolError("名字不能为空。")
+    if len(new) > 40:
+        raise ToolError("名字请控制在 40 个字以内。")
+    trip = _load()
+    old = trip.meta.name
+    if new == old:
+        return f"名字已经是「{old}」，没有改。"
+    if not _single_file_mode():
+        root = _root_dir()
+        if any(i["name"] == new and not i["active"] for i in _ws.list_trips(root)):
+            raise ToolError(f"已经有一个叫「{new}」的行程，换个名字，或先给那个改名。")
+    _save(commit(trip, lambda t: setattr(t.meta, "name", new)))
+    return f"已把「{old}」改名为「{new}」（行程内容没变；之前导出的文件还在原来的文件夹里；说“撤销”可以改回去）。"
+
+
 def switch_trip(name: str) -> str:
     """切换到另一个行程（按行程名或目录名，名字相近时需要说得更具体）。切换后所有工具都作用于这个行程；
     待确认的提案、候选景点、地图文件都是各行程自己的，不会串。需要用户明确要求切换才调用。"""
@@ -4185,7 +4206,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 TOOLS = [
     new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, edit_handbook, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
-    set_dates, open_workbench, set_provider, list_trips, switch_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
+    set_dates, open_workbench, set_provider, list_trips, switch_trip, rename_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
     video_clips, video_set, video_note,
 ]

@@ -175,7 +175,7 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 
 ## 🏗️ Architecture and capability split
 
-**90 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
+**91 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
 
 | Stage | Tools | Skills | Highlights |
 |---|---|---|---|
@@ -185,7 +185,7 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 | **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
 
 ```
-tripcore/   core library and MCP server (mcp_server.py: 90 tools; scheduler / validator / changes;
+tripcore/   core library and MCP server (mcp_server.py: 91 tools; scheduler / validator / changes;
             amap / routemap / weather; phototrip / photoslib / stays; handbook / share / video; web + webpage: workbench)
 skills/     manuals for the agent
 nanobot/    example config (no secrets)

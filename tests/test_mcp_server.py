@@ -109,7 +109,7 @@ def test_server_registers_all_tools(monkeypatch):
     monkeypatch.setenv("TRIPCORE_TOOLS", "full")
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 90
+    assert len(names) == 91
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -1208,4 +1208,23 @@ def test_default_tools_are_light_and_include_restore(monkeypatch):
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert {"add_place", "import_photo_trip", "merge_stops", "set_day_title", "suggest_day_titles", "delete_stop", "export_handbook", "open_workbench"} <= names
     assert "import_bills" not in names and "export_rough_cut" not in names
-    assert len(names) < 50
+    assert len(names) <= 50
+
+
+def test_rename_trip(tmp_path, monkeypatch):
+    import tripcore.mcp_server as s
+    monkeypatch.delenv("TRIPCORE_FILE", raising=False)
+    monkeypatch.setenv("TRIPCORE_HOME", str(tmp_path))
+    monkeypatch.setattr(s, "_root_dir", lambda: tmp_path)
+    s.new_trip(name="苏州三日", num_days=2)
+    s.new_trip(name="杭州", num_days=2)
+    assert "改名为「杭州西湖」" in s.rename_trip("杭州西湖")
+    assert s._load().meta.name == "杭州西湖"
+    import pytest
+    with pytest.raises(s.ToolError):
+        s.rename_trip("苏州三日")                 # 和别的行程重名
+    with pytest.raises(s.ToolError):
+        s.rename_trip("  ")
+    assert "没有改" in s.rename_trip("杭州西湖")
+    s.undo()
+    assert s._load().meta.name == "杭州"

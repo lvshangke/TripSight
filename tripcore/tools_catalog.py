@@ -22,6 +22,7 @@ CATALOG: dict[str, tuple[str, str, str, str]] = {
     "set_travelers": (_C[0], "change", "设置出行人数，门票和餐饮按人数估算。", "一共 3 个人去"),
     "list_trips": (_C[0], "read", "列出所有行程。", "我有哪些行程"),
     "switch_trip": (_C[0], "change", "切换到另一个行程。", "切换到杭州那个行程"),
+    "rename_trip": (_C[0], "change", "改当前行程的名字（计划、恢复都行，可撤销，内容不动）。", "这个行程名字起错了，改成“台州三日”"),
     "archive_trip": (_C[0], "change", "把行程归档（不删除文件，可手动移回）。", "把去年的行程归档"),
     "open_workbench": (_C[0], "read", "打开 TripSight 页面（拖动调整、预览手册、直接改图片和文字）。", "打开 TripSight 看看"),
     "show_trip": (_C[0], "read", "查看当前行程：每天的景点、交通、未安排项、粗略费用。", "看看现在的行程"),

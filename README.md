@@ -176,7 +176,7 @@ https://github.com/user-attachments/assets/a79f8dfb-fa7b-42a9-b066-899d5f822277
 
 ## 🏗️ 架构与能力分布
 
-**90 个 MCP 工具 · 9 份 skill · 570+ 个自动化测试**，覆盖计划、路上、恢复、记录、足迹五个阶段。LLM 只负责听懂和提议，工具确定性地做事，skill 规定什么时候用哪些工具、哪些事不能自己编。
+**91 个 MCP 工具 · 9 份 skill · 570+ 个自动化测试**，覆盖计划、路上、恢复、记录、足迹五个阶段。LLM 只负责听懂和提议，工具确定性地做事，skill 规定什么时候用哪些工具、哪些事不能自己编。
 
 | 阶段 | 工具数 | 对应 skill | 代表功能 |
 |---|---|---|---|
@@ -189,7 +189,7 @@ https://github.com/user-attachments/assets/a79f8dfb-fa7b-42a9-b066-899d5f822277
 
 ```
 tripcore/                核心库与 MCP 服务
-├─ mcp_server.py         90 个工具的入口
+├─ mcp_server.py         91 个工具的入口
 ├─ scheduler.py · validator.py · changes.py   分天排程 / 规则检查 / 版本与撤销
 ├─ amap.py · routemap.py · weather.py         高德路线与地图、天气
 ├─ phototrip.py · photoslib.py · stays.py     照片聚类成停留点、读 Mac 照片 App
@@ -230,7 +230,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 |---|---|---|
 | [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
 | [WorkBuddy](https://www.workbuddy.ai) | 在“连接 → 自定义连接 → Configure MCP”里登记 `tripcore-mcp`，再把 `skills/` 装进 `~/.workbuddy/skills`，详见 [docs/WORKBUDDY.md](docs/WORKBUDDY.md) | 按其官方 MCP 配置方式整理，**未在真实环境验证** |
-| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 90 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
+| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 91 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
 
 `tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
 
@@ -249,7 +249,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 - [docs/features.md](docs/features.md)：功能详解与“满配效果”
 - [docs/reference.md](docs/reference.md)：命令行、行程数据格式、代码结构、MCP 工具与接口详解
 - [docs/limitations.md](docs/limitations.md)：已知局限与后续计划
-- [docs/TOOLS.md](docs/TOOLS.md)：全部 90 个工具清单
+- [docs/TOOLS.md](docs/TOOLS.md)：全部 91 个工具清单
 - [DESIGN.md](DESIGN.md)：设计原则与算法
 
 ## 📄 许可证
