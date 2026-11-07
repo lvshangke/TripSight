@@ -757,6 +757,9 @@ def _gcj_pos(lat: float, lon: float) -> list[float]:
     return [round(g[0], 6), round(g[1], 6)]
 
 
+from .region import is_mainland as _is_mainland
+
+
 def hb_state() -> dict[str, Any]:
     from . import vision as _vi
     trip = ms._load()
@@ -783,6 +786,7 @@ def hb_state() -> dict[str, Any]:
         r["region"] = labels.get(r["id"], "")
     return {"name": trip.meta.name, "stops": rows, "restored": bool(recs), "folder": side.get("folder", ""), "album": side.get("album", ""),
             "radius_m": side.get("radius_m") or 0, "start_date": side.get("start_date", ""), "end_date": side.get("end_date", ""),
+            "abroad": sum(1 for r in rows if r["restored"] and not _is_mainland(trip.place(r["id"]).lat, trip.place(r["id"]).lon)),
             "vision": bool(_vi.config()), "max_photos": 6, "day_titles": ms._day_titles(),
             "videos": (int(side.get("videos") or 0) if side.get("album") else (_video_count(side["folder"]) if side.get("folder") else 0)), "album_videos": bool(side.get("album"))}
 
@@ -846,7 +850,7 @@ def hb_edit(body: dict) -> dict[str, Any]:
 
 def hb_regions(body: dict) -> dict[str, Any]:
     try:
-        return {"message": ms.tag_regions(budget_s=0)}
+        return {"message": ms.tag_regions(budget_s=0, overseas_ok=bool(body.get("overseas_ok")))}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 
@@ -952,7 +956,7 @@ def hb_fill_photos(body: dict) -> dict[str, Any]:
 
 def hb_autoname(body: dict) -> dict[str, Any]:
     try:
-        return {"message": ms.autoname_stops(budget_s=0, retry_failed=bool(body.get("retry")))}
+        return {"message": ms.autoname_stops(budget_s=0, retry_failed=bool(body.get("retry")), overseas_ok=bool(body.get("overseas_ok")))}
     except ms.ToolError as e:
         raise HttpError(400, str(e))
 

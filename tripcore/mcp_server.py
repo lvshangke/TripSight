@@ -19,7 +19,7 @@ import time
 import os
 import sys
 import secrets
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -31,7 +31,7 @@ from .weather import bad_weather, fmt_snap, weather_spots
 from .candidates import pick_hit as _pick_hit, similar_name as _similar_name, validate_items as _validate_items
 from .geo import estimate_leg, haversine_km
 from .hours import hours_for_date
-from .geocode import GeocodeError, geocode as _geocode
+from .geocode import GeocodeError, geocode as _geocode, reverse as _osm_reverse
 from .gpx import build_gpx
 from .mapview import build_map_data, build_map_html, day_marker_links, marker_link
 from . import importplan as _importplan
@@ -45,7 +45,7 @@ from .connections import day_window, is_night, leave_by, ready_time, terminal_de
 from . import prefs as _prefs
 from . import workspace as _ws
 from .gmaps import GoogleMapsClient
-from .region import BACKENDS, pick_backend, trip_region
+from .region import BACKENDS, is_mainland, pick_backend, trip_region
 from . import review as _rv
 from .dates import apply_dates as _apply_dates
 from .textview import build_text as _build_text, guard_text as _guard_text
@@ -1879,7 +1879,22 @@ def _load_json_file(p: Path) -> dict:
 _NAME_ERR: list[str] = []      # 最近一次起名遇到的第一个错误原因（给用户看，不是猜）
 
 
-def _stop_names(keep: list, budget_s: float = 0.0) -> tuple[list[str], int]:
+def _osm_where(lat: float, lon: float) -> Optional[dict[str, str]]:
+    """境外的点：用 OpenStreetMap 反查（只发这一个坐标，每秒最多 1 次，结果缓存）。每次实际联网都记进 amap_calls.log，用户可以查。"""
+    cache = _root_dir() / "osm_reverse_cache.json"
+    try:
+        r = _osm_reverse(lat, lon, cache_path=cache)
+    except GeocodeError as e:
+        raise AmapError(str(e))
+    try:
+        with open(_root_dir() / "amap_calls.log", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat(timespec='seconds')} | nominatim.openstreetmap.org/reverse | {lat:.4f},{lon:.4f}\n")
+    except OSError:
+        pass
+    return r
+
+
+def _stop_names(keep: list, budget_s: float = 0.0, overseas_ok: bool = False) -> tuple[list[str], int]:
     """给每个停留点起名：高德反查（景区/小区/最近地标/街道）；没有 key 或查不到就写“区县 · 时间”，不猜。
     同名的点加上时间区分。返回 (名字列表, 查到真实名字的个数)。只发每个点的坐标，不发照片。"""
     client = None
@@ -1888,7 +1903,7 @@ def _stop_names(keep: list, budget_s: float = 0.0) -> tuple[list[str], int]:
     except Exception:
         client = None
     _NAME_ERR.clear()
-    if client is None:
+    if client is None and any(is_mainland(sp.lat, sp.lon) for sp in keep):
         _NAME_ERR.append(f"这个 tripcore 进程（pid {os.getpid()}，{sys.executable}）的环境变量和 ~/.nanobot/config.json 里都读不到 AMAP_KEY；如果你用的不是 nanobot，要在你那个 agent 的 MCP 配置里给 tripcore 加 env AMAP_KEY，改完重启")
     names: list[str] = []
     found = 0
@@ -1896,7 +1911,15 @@ def _stop_names(keep: list, budget_s: float = 0.0) -> tuple[list[str], int]:
     t_end = time.time() + budget_s if budget_s > 0 else None
     for sp in keep:
         w = None
-        if client is not None and fails < 3 and (t_end is None or time.time() < t_end):               # 连着 3 次报错（key 不对、额度用完）就别再一个个试了
+        abroad = not is_mainland(sp.lat, sp.lon)
+        if abroad:                                                      # 境外：高德没数据，只有用户同意了才用 OpenStreetMap 反查
+            if overseas_ok:
+                try:
+                    w = _osm_where(sp.lat, sp.lon)
+                except Exception as ex:
+                    if not _NAME_ERR:
+                        _NAME_ERR.append(str(ex))
+        elif client is not None and fails < 3 and (t_end is None or time.time() < t_end):               # 连着 3 次报错（key 不对、额度用完）就别再一个个试了
             try:
                 w = client.where(sp.lat, sp.lon)
                 fails = 0
@@ -2332,14 +2355,14 @@ def _job_line() -> str:
     return ""
 
 
-def _naming_worker() -> None:
+def _naming_worker(overseas_ok: bool = False) -> None:
     from .activity import Tracked
     try:
         with Tracked(_activity_path(), "run_naming_job", {}) as t:
-            a = autoname_stops(budget_s=0)
+            a = autoname_stops(budget_s=0, overseas_ok=overseas_ok)
             _job_write(step="标注城市/区", done=0, total=0)
             try:
-                b = tag_regions(budget_s=0)
+                b = tag_regions(budget_s=0, overseas_ok=overseas_ok)
             except ToolError as e:
                 b = f"标注城市/区没做：{e}"
             t.result = a + "\n" + b
@@ -2348,17 +2371,20 @@ def _naming_worker() -> None:
         _job_write(state="err", message=str(e)[:300])
 
 
-def run_naming_job() -> str:
+def run_naming_job(overseas_ok: bool = False) -> str:
     """在后台把所有点的“查地名”和“标注城市/区”一次做完（调用马上返回，不会超时）：点多（上百个）时用这个，
     不要自己一批一批地调 autoname_stops / tag_regions，也不用中途问用户。之后反复调 wait_restore_job（每次最多等 25 秒）直到它说完成。
-    只把各点坐标发给高德（用户自己的 key）；没有 key 会直接说明原因。后台运行期间不要合并/删除点。"""
+    只把各点坐标发给高德（用户自己的 key）；没有 key 会直接说明原因。后台运行期间不要合并/删除点。
+    境外的点（日本等）：先问用户同意把坐标发给 OpenStreetMap，同意后 overseas_ok=true（每秒查 1 个，点多会慢一些，名字可能是日文）。"""
     if _job_running():
         return "后台已经在做了：" + _job_line()
-    if not amap_key():
+    trip0 = _load()
+    only_abroad = bool(trip0.places) and all(not is_mainland(p.lat, p.lon) for p in trip0.places)
+    if not amap_key() and not (only_abroad and overseas_ok):
         raise ToolError("没有可用的高德 key，没法查地名（这个 tripcore 进程的环境变量和 ~/.nanobot/config.json 里都读不到 AMAP_KEY）。不要改用其他服务反查。")
     import threading
     _job_write(state="running", step="查地名", done=0, total=0, message="", started=time.time())
-    threading.Thread(target=_naming_worker, daemon=True, name="tripcore-naming").start()
+    threading.Thread(target=_naming_worker, args=(overseas_ok,), daemon=True, name="tripcore-naming").start()
     return "已在后台开始查地名并标注城市/区，调用不会超时。接着调 wait_restore_job，直到它说完成；中间不用问用户。"
 
 
@@ -2370,11 +2396,12 @@ def wait_restore_job(max_wait_s: float = 25.0) -> str:
     return _job_line() or "没有后台任务在跑。"
 
 
-def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
+def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False, overseas_ok: bool = False) -> str:
     """给名字还是“…停留点”（旧版还原留下的）或“区县 · 时间”的还原点重新起名：高德反查（你自己的 key，只发坐标）。
     没有 key 或查不到就改成“区县 · 时间”，不猜。用户手动改过的名字不会动。
     点多时一次只做约 budget_s 秒（默认 20，避免 agent 的工具超时），做完的先保存；结果里写“还剩 N 个”时就再调一次接着做，直到没有剩余。
-    查过但没查到的点不会反复查；retry_failed=true 才重新查它们（比如刚配好 key 之后）。"""
+    查过但没查到的点不会反复查；retry_failed=true 才重新查它们（比如刚配好 key 之后）。
+    境外的点（日本等）高德查不了：先告诉用户“会把这些点的坐标发给 OpenStreetMap（免费，每秒 1 个，名字可能是日文），问他同意吗”，同意后 overseas_ok=true 再调；没同意就不查，名字写成日期时间。"""
     from types import SimpleNamespace as NS
     import datetime as _dt
     side = _load_json_file(_photo_trip_path())
@@ -2398,7 +2425,7 @@ def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
         chunk = pending[i:i + 10]
         keep = [NS(lat=p.lat, lon=p.lon, start=_dt.datetime.fromisoformat(recs[p.id]["start"])) for p in chunk]
         err0 = list(_NAME_ERR)
-        names, f = _stop_names(keep)
+        names, f = _stop_names(keep, overseas_ok=overseas_ok)
         mp = {p.id: nm for p, nm in zip(chunk, names)}
 
         def mutate(t: Trip, mp=mp) -> None:
@@ -2407,17 +2434,19 @@ def autoname_stops(budget_s: float = 20.0, retry_failed: bool = False) -> str:
                     p.name = mp[p.id]
         _save(commit(_load(), mutate))
         if f or not _NAME_ERR:                       # 没 key / 报错没查到的不算“查过”，配好 key 后直接再调就行
-            tried |= set(mp)
+            tried |= {pid for pid in mp if overseas_ok or is_mainland(trip.place(pid).lat, trip.place(pid).lon)}      # 没同意反查的境外点不算“查过”
             tried_f.write_text(json.dumps({"ids": sorted(tried)}), encoding="utf-8")
         done += len(chunk); found += f
         _job_write(step="查地名", done=done, total=len(pending))
         if _NAME_ERR and not f:                      # 这一批一个都没查到而且有报错（key 不对、额度用完）：别再往下试了
             break
     left = len(pending) - done
+    n_abroad = 0 if overseas_ok else sum(1 for p in pending[:done] if not is_mainland(p.lat, p.lon))
+    note = f"\n其中 {n_abroad} 个点在境外，高德查不了；要查的话先问用户同意把它们的坐标发给 OpenStreetMap，再用 overseas_ok=true 重新调用。" if n_abroad else ""
     tail = f"还剩 {left} 个没查，请再调用一次 autoname_stops 接着做（每次只做约 {int(budget_s)} 秒，避免超时）。" if left > 0 else "全部处理完了。"
     if found:
-        return f"本次处理 {done} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。{tail}"
-    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名" + (f"。原因：{_NAME_ERR[0]}" if _NAME_ERR else "（高德没有返回名字）") + "。先写成“区县 · 时间”或日期时间，可以手动改；原因解决后用 retry_failed=true 重查。具体每次请求在 amap_calls.log 里（不含 key）。" + (f"（还有 {left} 个没处理）" if left > 0 else "")
+        return f"本次处理 {done} 个点，其中 {found} 个查到了真实地名，其余写成“区县 · 时间”（可以手动改）。{tail}{note}"
+    return f"重新起名 {len(todo)} 个点，但一个都没查到真实地名" + (f"。原因：{_NAME_ERR[0]}" if _NAME_ERR else "（高德没有返回名字）") + "。先写成“区县 · 时间”或日期时间，可以手动改；原因解决后用 retry_failed=true 重查。具体每次请求在 amap_calls.log 里（不含 key）。" + (f"（还有 {left} 个没处理）" if left > 0 else "") + note
 
 
 def _day_titles_path() -> Path:
@@ -2560,16 +2589,19 @@ def _chapter_labels() -> dict[str, str]:
     return chapter_labels(_load_json_file(_regions_path()))
 
 
-def tag_regions(budget_s: float = 20.0) -> str:
+def tag_regions(budget_s: float = 20.0, overseas_ok: bool = False) -> str:
     """给行程里每个景点标上所在的城市/区县，手册用它分章（比如临海、仙居、天台）。用高德坐标反查：只把每个点的坐标发给高德（用户自己的 key），
     结果存在本机，已查过的不再查。没有 key 或某个点查不到就不标、不猜，手册照常按天排。调用前告诉用户会把各点坐标发给高德。
-    点多时一次只做约 budget_s 秒（默认 20，避免 agent 的工具超时），查到的随时保存；结果写“还剩 N 个”就再调一次接着做。"""
+    点多时一次只做约 budget_s 秒（默认 20，避免 agent 的工具超时），查到的随时保存；结果写“还剩 N 个”就再调一次接着做。
+    境外的点高德查不了：要查，先告诉用户“会把这些点的坐标发给 OpenStreetMap（免费，每秒 1 个）”，他同意后 overseas_ok=true；没同意就跳过这些点。"""
     from .regions import chapter_labels, order_of_appearance
     trip = _load()
     client = _amap()
-    if client is None or _is_google(client):
-        raise ToolError("没有可用的高德 key，不能反查城市/区县；手册会按天分，不会乱猜。key 要用户在自己的配置里设置，不要发给我。")
     ids = [it.place_id for d in (trip.plan.days if trip.plan else []) for it in d.items]
+    has_amap = client is not None and not _is_google(client)
+    abroad_ids = {pid for pid in ids if not is_mainland(trip.place(pid).lat, trip.place(pid).lon)}
+    if not has_amap and not (overseas_ok and abroad_ids):
+        raise ToolError("没有可用的高德 key，不能反查城市/区县；手册会按天分，不会乱猜。key 要用户在自己的配置里设置，不要发给我。" + ("境外的点可以在用户同意后用 overseas_ok=true 走 OpenStreetMap。" if abroad_ids else ""))
     cache = _load_json_file(_regions_path())
     new = fail = streak = 0
     err = ""
@@ -2577,7 +2609,8 @@ def tag_regions(budget_s: float = 20.0) -> str:
     failed_f = _regions_path().with_name("regions_failed.json")
     failed = set(_load_json_file(failed_f).get("ids") or [])          # 查过但没结果的点（境外、海上等）：不反复查
     t_end = time.time() + budget_s if budget_s and budget_s > 0 else None
-    todo = [pid for pid in ids if pid not in cache and pid not in failed]
+    todo = [pid for pid in ids if pid not in cache and pid not in failed and (overseas_ok or pid not in abroad_ids) and (has_amap or pid in abroad_ids)]
+    skipped_abroad = 0 if overseas_ok else len([1 for pid in ids if pid in abroad_ids and pid not in cache])
 
     def save() -> None:
         try:
@@ -2593,7 +2626,11 @@ def tag_regions(budget_s: float = 20.0) -> str:
         pl = trip.place(pid)
         done += 1
         try:
-            r = client.regeo(pl.lat, pl.lon)
+            if pid in abroad_ids:
+                o = _osm_where(pl.lat, pl.lon) or {}
+                r = {"province": o.get("province", ""), "city": o.get("city") or o.get("province", ""), "district": o.get("district", "")} if (o.get("city") or o.get("province") or o.get("district")) else None
+            else:
+                r = client.regeo(pl.lat, pl.lon)
         except AmapError as ex:
             fail += 1; streak += 1; err = err or str(ex)
             if "ABROAD" in str(ex) or "境外" in str(ex):
@@ -2619,6 +2656,7 @@ def tag_regions(budget_s: float = 20.0) -> str:
     tail = (f"连续报错已停止，原因：{err}。" if stuck else
             f"还剩 {left} 个没查，请再调用一次 tag_regions 接着做（每次只做约 {int(budget_s)} 秒，避免超时）。" if left > 0 else "")
     return (f"已标注 {new} 个点" + (f"，{fail} 个没查到" if fail else "") + "。" + tail +
+            (f"有 {skipped_abroad} 个境外点没查（高德没数据）：问用户同意后可用 overseas_ok=true 走 OpenStreetMap。" if skipped_abroad else "") +
             ("章节：" + " → ".join(chapters) + "。" if chapters else "还没有可用的章节。"))
 
 

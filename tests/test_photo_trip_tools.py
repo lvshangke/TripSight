@@ -252,7 +252,7 @@ def test_delete_stop_removes_locked_stop_photos_and_record(tmp_path):
 
 def test_autoname_renames_old_stop_names_without_touching_manual_ones(tmp_path, monkeypatch):
     from tripcore import web
-    monkeypatch.setattr(s, "_stop_names", lambda keep: (["神仙居"] * 0 + [f"地名{i}" for i in range(len(keep))], len(keep)))
+    monkeypatch.setattr(s, "_stop_names", lambda keep, **kw: (["神仙居"] * 0 + [f"地名{i}" for i in range(len(keep))], len(keep)))
     s.import_photo_trip(str(_album(tmp_path)), auto_name=False)
     t = s._load()
     assert all(p.name.endswith("停留点") for p in t.places)
@@ -696,3 +696,44 @@ def test_restore_map_pin_popup_has_thumbnails():
     from tripcore.webpage import page_html
     h = page_html()
     assert "thumbs: (x.photos || [])" in h and "paddingBottomRight: [80, 170]" in h
+
+
+def test_parse_reverse_picks_landmark_and_regions():
+    from tripcore.geocode import parse_reverse
+    r = parse_reverse({"name": "清水寺", "category": "tourism", "address": {"tourism": "清水寺", "suburb": "東山区", "city": "京都市", "state": "京都府", "country": "日本"}})
+    assert r == {"name": "清水寺", "district": "東山区", "city": "京都市", "province": "京都府", "country": "日本"}
+    r2 = parse_reverse({"name": "", "category": "highway", "address": {"road": "花見小路通", "suburb": "東山区", "city": "京都市", "state": "京都府"}})
+    assert r2["name"] == "花見小路通" and r2["district"] == "東山区"
+
+
+def test_overseas_stops_need_consent_then_use_osm(tmp_path, monkeypatch):
+    t0 = datetime(2026, 4, 1, 9, 0)
+    for i in range(3):
+        for k in range(3):
+            _jpg(tmp_path / f"jp{i}{k}.jpg", t0 + timedelta(hours=3 * i, minutes=2 * k), 35.0 + 0.1 * i, 135.77, color=(5 * i, 9 + k, 9))
+    s.import_photo_trip(str(tmp_path), auto_name=False)
+    calls = []
+
+    def fake(lat, lon, cache_path=None, **kw):
+        calls.append((round(lat, 2), round(lon, 2)))
+        return {"name": f"景点{len(calls)}", "district": "東山区", "city": "京都市", "province": "京都府", "country": "日本"}
+    monkeypatch.setattr(s, "_osm_reverse", fake)
+    monkeypatch.delenv("AMAP_KEY", raising=False)
+    out = s.autoname_stops()
+    assert not calls and "境外" in out and "overseas_ok" in out            # 没同意就不联网
+    out2 = s.autoname_stops(overseas_ok=True)
+    assert len(calls) == 3 and "3 个查到了真实地名" in out2
+    assert {p.name for p in s._load().places} == {"景点1", "景点2", "景点3"}
+    assert "没有需要重新起名" in s.autoname_stops(overseas_ok=True)
+    rg = s.tag_regions(overseas_ok=True)
+    assert "已标注" in rg and "京都市" not in "" and s._chapter_labels()
+    from tripcore import web
+    assert web.hb_state()["abroad"] == 3
+
+
+def test_is_mainland_knows_japan_korea_and_borders():
+    from tripcore.region import is_mainland as m
+    for lat, lon in [(39.9, 116.4), (31.2, 121.5), (18.25, 109.5), (45.8, 126.6), (43.8, 87.6), (39.5, 76.0), (25.0, 102.7), (22.8, 108.3), (36.1, 120.4), (40.1, 124.4), (53.5, 122.4)]:
+        assert m(lat, lon), (lat, lon)
+    for lat, lon in [(35.0, 135.77), (35.7, 139.7), (34.7, 135.5), (33.6, 130.4), (37.5, 127.0), (21.0, 105.8), (18.8, 99.0), (27.7, 85.3), (47.9, 106.9), (25.0, 121.5), (22.3, 114.2)]:
+        assert not m(lat, lon), (lat, lon)

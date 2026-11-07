@@ -1361,7 +1361,7 @@ window.addEventListener('message', async ev => {
   } catch (e) { toast(e.message, true); hbPvSoon(); }
 });
 $('hb_an').onclick = async () => { if (!(await ask('把名字还是“停留点”或“区县 · 时间”的点重新查一次地名？\n会把这些点的坐标发给高德（用你自己的 key）；你手动改过的名字不会动。'))) return;
-  try { say('正在查地名…'); const r = await api('hb_autoname', {}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
+  try { say('正在查地名…'); const ov = await overseasOk(); const r = await api('hb_autoname', {overseas_ok: ov}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_fp').onclick = async () => { $('hb_fp').disabled = true; try { say('正在补照片…'); const r = await api('hb_fill_photos', {per_stop: 3}); say(r.message); toast(r.message); await load(); await hbLoad(); } catch (e) { say(e.message, true); toast(e.message, true); } finally { $('hb_fp').disabled = false; } };
 async function dirLoad(body) { try { const r = await api('export_dir', body || {}); $('hb_dirp').textContent = r.path; $('sh_dirp').textContent = r.path; $('hb_dirdef').style.display = r.custom && !r.locked ? '' : 'none'; $('hb_dirpick').disabled = r.locked; return r; } catch (e) { toast(e.message, true); } }
 $('hb_dirpick').onclick = async () => { try { const r = await api('pick_path', {kind: 'folder', prompt: '请选择导出文件夹'}); if (r.path) { const d = await dirLoad({path: r.path}); if (d) toast('导出文件夹已改为 ' + d.path); } } catch (e) { toast(e.message, true); } };
@@ -1370,12 +1370,16 @@ $('sh_open').onclick = async () => { try { const r = await api('reveal_exports',
 $('sh_pdf').onclick = async () => { $('sh_err').textContent = '正在生成 PDF…'; $('sh_pdf').disabled = true; try { const r = await api('share_pdf', shareOpts()); dl(r.pdf, '行程分享.pdf'); $('sh_err').textContent = ''; } catch (e) { $('sh_err').textContent = e.message; } finally { $('sh_pdf').disabled = false; } };
 $('hb_dirdef').onclick = async () => { const d = await dirLoad({path: ''}); if (d) toast('已恢复默认导出文件夹：' + d.path); };
 dirLoad();
-$('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const r = await api('hb_regions', {}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };
+$('hb_rg').onclick = async () => { try { say('正在查城市/区…'); const ov = await overseasOk(); const r = await api('hb_regions', {overseas_ok: ov}); say(r.message); await hbLoad(); } catch (e) { say(e.message, true); } };
 $('hb_mgo').onclick = async () => {
   try { const r = await api('hb_merge', {place_ids: [...HB.sel], name: $('hb_mname').value}); say(r.message); HB.sel.clear(); $('hb_mname').value = ''; await load(); await hbLoad(); } catch (e) { say(e.message, true); }
 };
 $('hb_sp').onchange = () => { $('hb_spc').style.display = $('hb_sp').checked ? '' : 'none'; };
 $('hb_open').onclick = async () => { try { const r = await api('reveal_exports', {}); $('hb_out').textContent = '已打开：' + r.path; } catch (e) { $('hb_out').textContent = e.message; } };
+async function overseasOk() {
+  const n = HB.data && HB.data.abroad; if (!n) return false;
+  return await ask('这个行程有 ' + n + ' 个点在境外，高德查不了地名。\n要把这些点的坐标（只有坐标，没有照片）发给 OpenStreetMap 反查吗？免费，每秒查 1 个，名字可能是日文，之后可以改。\n选“取消”就不查，名字先写成日期时间。');
+}
 async function hbSaveTitle() {
   const t = $('hb_title').value.trim();
   if (!t || (HB.data && t === HB.data.name)) return;
