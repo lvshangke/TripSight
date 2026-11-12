@@ -6,7 +6,7 @@
 <p><b>TripSight-你的全流程个性化旅行助手：出发前帮你排准行程，路上随时核对，回程后把相册还原成可以一键分享的真实行程手册, 并在地图上记录你的足迹。</b></p>
 
 
-https://github.com/user-attachments/assets/0144aa10-411e-4be7-bccf-11eb6a68b47f
+
 
 
 
