@@ -117,6 +117,7 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 | **Guides → trip** | Paste a travel note or guide → every quote verified against the original text → coordinates verified on the map → you pick → added; walking routes (e.g. a city walk) can be one item |
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
+| **Footprints** | A zoomable footprint map with photo-thumbnail pins; tick "Real routes" to online-query real road routes between same-day stops (your own Amap key, only the two endpoints' coordinates are sent, mainland only, cached); default is straight lines |
 | **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
 | **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 600+ automated tests |
 

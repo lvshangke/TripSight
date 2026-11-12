@@ -357,7 +357,7 @@ input,select,textarea{border-color:var(--line2);border-radius:8px;background:var
 <details style="margin-top:6px"><summary>iPhone 快捷指令（记 Apple Pay 付款）怎么设</summary><ol id="bl_steps" class="tlnote"></ol></details></div></details>
 <div id="bl_rep"></div><div id="bl_mode"></div><div id="bl_sum"></div><div id="bl_list"></div></div>
 <div class="pane" id="pane_fp">
-<div class="hbimp"><b>我的足迹</b><button id="fp_go" class="pri">刷新</button><button id="fp_exp" title="生成一份可以单独打开、发给别人的地图页">导出地图页</button><label title="只影响“导出地图页”：联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 导出的地图页加高德底图（联网）</label>
+<div class="hbimp"><b>我的足迹</b><button id="fp_go" class="pri">刷新</button><button id="fp_exp" title="生成一份可以单独打开、发给别人的地图页">导出地图页</button><label title="只影响“导出地图页”：联网向高德取街道底图，只发地图中心、缩放和图片大小；仅国内，需要你自己的高德 key"><input type="checkbox" id="fp_bm"> 导出的地图页加高德底图（联网）</label><label title="联网用你自己的高德 key，查同一天相邻两个点之间的真实路线（驾车，很近的用步行）：只发这两个点的坐标，只限国内，结果会缓存；境外的点仍用直线"><input type="checkbox" id="fp_real"> 真实路线（联网）</label>
 <div class="tlnote" style="width:100%">只算“去过”的：从照片还原的行程；纯计划不算。每个圆形图钉是那一站自己的照片，附近的会合并成带数字的图钉，点一下展开或看照片。公里数是直线距离累加，只是下限；城市来自“标城市”，没标的不猜。</div></div>
 <div id="fp_tiles" class="fptiles"></div><div id="fp_chips" class="fpchips"></div>
 <div id="fmap"></div><div class="tlnote" id="fp_note" style="margin:6px 0"></div><pre id="fp_msg" class="tlnote" style="white-space:pre-wrap;margin:8px 0"></pre></div>
@@ -1167,7 +1167,7 @@ $('hv_go').onclick = async () => {
   try { await api('video_cut', {target_seconds: +$('hv_t').value, clip_max: +$('hv_m').value, cards: $('hv_c').checked, intro_outro: $('hv_io').checked, basemap: $('hv_bm').checked, style: $('hb_style').value, jianying_dir: $('hv_jy').value}); hvPoll(); }
   catch (e) { $('hv_out').textContent = e.message; $('hv_go').disabled = false; $('hv_bar').style.display = 'none'; $('hv_st').textContent = ''; }
 };
-const FP = {map: null, tile: null, layer: null, data: null, off: new Set(), fit: true};
+const FP = {map: null, tile: null, layer: null, data: null, off: new Set(), fit: true, routes: {}};
 function fpInit() {
   if (!FP.map) { FP.map = L.map('fmap', {zoomControl: false}); L.control.zoom({position: 'bottomright'}).addTo(FP.map); FP.map.setView([32, 108], 4); FP.map.on('zoomend', fpDraw); }
   const t = S && S.map && S.map.tiles;
@@ -1181,7 +1181,9 @@ function fpDraw() {
   const shown = FP.data.trips.filter(t => !FP.off.has(t.slug)), all = [];
   shown.forEach(t => {
     const byDay = {}; t.pins.forEach(p => (byDay[p.day] = byDay[p.day] || []).push(p));
-    Object.values(byDay).forEach(g => { if (g.length > 1) L.polyline(g.map(p => p.pos), {color: t.color, weight: 3, opacity: .7, dashArray: '2 8'}).addTo(FP.layer); });
+    Object.entries(byDay).forEach(([day, g]) => { for (let i = 0; i + 1 < g.length; i++) { const rt = FP.routes[t.slug + '|' + day + '|' + i];
+      if (rt) L.polyline(rt.path, {color: t.color, weight: 4, opacity: .85}).addTo(FP.layer);
+      else L.polyline([g[i].pos, g[i + 1].pos], {color: t.color, weight: 3, opacity: .7, dashArray: '2 8'}).addTo(FP.layer); } });
     t.pins.forEach(p => all.push({t: t, p: p}));
   });
   const cl = [];                                                    // 屏幕上挨得近的合并成一个图钉
@@ -1209,7 +1211,21 @@ async function fpLoad() {
     fpDraw();
   } catch (e) { $('fp_msg').textContent = e.message; }
 }
-$('fp_go').onclick = () => fpLoad();
+async function fpRoutes() {
+  if (!$('fp_real').checked) { FP.routes = {}; fpDraw(); return; }
+  const base = $('fp_msg').textContent;
+  try {
+    for (let k = 0; k < 40; k++) {
+      $('fp_msg').textContent = '正在向高德查真实路线…（只发相邻两点的坐标）';
+      const r = await api('fp_routes', {});
+      r.routes.forEach(x => FP.routes[FP.data.trips.find(t => t.slug === x.trip).slug + '|' + x.day + '|' + x.i] = x);
+      fpDraw();
+      if (r.done) { $('fp_msg').textContent = '真实路线已画出' + (r.abroad ? '；境外 ' + r.abroad + ' 段仍是直线' : '') + (r.failed ? '；' + r.failed + ' 段没查到，仍是直线' : ''); return; }
+    }
+  } catch (e) { $('fp_msg').textContent = e.message; $('fp_real').checked = false; FP.routes = {}; fpDraw(); }
+}
+$('fp_real').onchange = () => fpRoutes();
+$('fp_go').onclick = () => fpLoad().then(() => { if ($('fp_real').checked) fpRoutes(); });
 $('fp_exp').onclick = async () => { $('fp_msg').textContent = '正在生成地图页…'; try { const r = await api('fp_build', {basemap: $('fp_bm').checked}); $('fp_msg').textContent = r.message; } catch (e) { $('fp_msg').textContent = e.message; } };
 document.querySelectorAll('#mo .tabs button').forEach(b => b.onclick = () => moShow(b.dataset.t));
 ['sh_l', 'sh_c', 'sh_p', 'sh_t', 'sh_b'].forEach(id => $(id).onchange = shareRefresh);

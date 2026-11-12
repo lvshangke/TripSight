@@ -1771,6 +1771,66 @@ def footprint_data() -> dict:
     return out
 
 
+def footprint_routes(budget_s: float = 20.0) -> dict:
+    """足迹页「真实路线」：同一天相邻两个点之间，用高德查真实路线（驾车；很近的用步行），按坐标缓存。
+    只向高德发这两点的坐标（用用户自己的 key，调用记在 amap_calls.log），只限国内；境外的点对不查，页面上仍是直线。
+    一次最多查 budget_s 秒，没查完返回 done=False，页面会接着调。返回 {"routes": [{"trip","day","i","path"(GCJ-02 [[纬,经]…]),"mode"}], "done", "left", "abroad", "failed"}。"""
+    import time as _t
+    from .coords import wgs84_to_gcj02 as _gcj
+    from . import footprint as _fp
+    from .region import is_mainland as _mainland
+    client = AmapClient.from_env(log_path=_root_dir() / "amap_calls.log")
+    if client is None:
+        raise ToolError("没有高德 key，查不了真实路线（key 只放在你自己的配置里）。")
+    data = footprint_data()
+    cache_path = _root_dir() / "fp_route_cache.json"
+    cache = _load_json_file(cache_path)
+    t0 = _t.time()
+    routes, left, abroad, failed, dirty = [], 0, 0, 0, False
+    for t in data["trips"]:
+        by_day: dict[int, list] = {}
+        for p in t["pins"]:
+            by_day.setdefault(p["day"], []).append(p)
+        for day, g in by_day.items():
+            for i in range(len(g) - 1):
+                a, b = g[i]["wgs"], g[i + 1]["wgs"]
+                if a == b:
+                    continue
+                if not (_mainland(a[0], a[1]) and _mainland(b[0], b[1])):
+                    abroad += 1
+                    continue
+                key = f"{a[0]:.5f},{a[1]:.5f}>{b[0]:.5f},{b[1]:.5f}"
+                hit = cache.get(key)
+                if hit is None:
+                    if _t.time() - t0 > float(budget_s):
+                        left += 1
+                        continue
+                    try:
+                        near = _fp_km(a, b) < 1.0
+                        r = client.route("walk" if near else "drive", a[0], a[1], b[0], b[1])
+                    except Exception:
+                        failed += 1
+                        continue
+                    if not r.path or len(r.path) < 2:
+                        failed += 1
+                        continue
+                    hit = {"mode": r.mode, "path": [[round(x, 6), round(y, 6)] for x, y in (_gcj(la, lo) for la, lo in r.path)]}
+                    cache[key] = hit
+                    dirty = True
+                routes.append({"trip": t["slug"], "day": day, "i": i, "path": hit["path"], "mode": hit["mode"]})
+    if dirty:
+        try:
+            cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+    return {"routes": routes, "done": left == 0, "left": left, "abroad": abroad, "failed": failed}
+
+
+def _fp_km(a, b) -> float:
+    from .phototrip import haversine_m
+    return haversine_m((a[0], a[1]), (b[0], b[1])) / 1000.0
+
+
 def footprint(basemap: bool = False) -> str:
     """足迹统计与地图：把去过的行程合起来——几趟、几天、到过几个城市、大约走了多少公里，并生成一张所有去过的地方的地图页（~/.tripcore/足迹.html）。
     只算“去过”的：用“恢复行程”从照片还原的行程；计划行程和复盘不算。公里数是每天按先后顺序的直线距离累加，只是下限；

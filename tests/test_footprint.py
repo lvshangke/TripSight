@@ -100,3 +100,55 @@ def test_footprint_data_photo_pins_and_real_days():
     html = (d / "足迹.html")
     s.footprint()
     assert "<image" in html.read_text(encoding="utf-8")                                                          # 导出的地图页也用照片图钉
+
+
+def _two_stop_trip():
+    d = _trip("台州", [("甲", 28.70, 121.40), ("乙", 28.80, 121.50)])
+    ids = [p.id for p in s._load().places]
+    (d / "photo_trip.json").write_text(json.dumps({"stops": [{"place_id": ids[0], "start": "2024-01-18T09:00:00"}, {"place_id": ids[1], "start": "2024-01-18T11:00:00"}]}), encoding="utf-8")
+    return d
+
+
+def test_footprint_routes_real_path_cached_and_domestic_only(monkeypatch):
+    from tripcore import amap as am
+    _two_stop_trip()
+    calls = []
+
+    class FakeClient:
+        def route(self, mode, a, b, c, d, **kw):
+            calls.append(mode)
+            return am.RouteResult(mode, 15.0, 25, path=[(a, b), ((a + c) / 2, (b + d) / 2), (c, d)])
+
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda cls, log_path=None: FakeClient()))
+    out = s.footprint_routes()
+    assert out["done"] and len(out["routes"]) == 1 and calls == ["drive"]
+    r = out["routes"][0]
+    assert r["day"] == 1 and r["i"] == 0 and len(r["path"]) == 3 and r["path"][0] != [28.70, 121.40]   # 已转成高德底图用的坐标
+    out2 = s.footprint_routes()                                                                        # 第二次走缓存，不再联网
+    assert len(out2["routes"]) == 1 and calls == ["drive"]
+    assert "wgs" in s.footprint_data()["trips"][0]["pins"][0]
+
+
+def test_footprint_routes_needs_key(monkeypatch):
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda cls, log_path=None: None))
+    _two_stop_trip()
+    with pytest.raises(s.ToolError, match="高德 key"):
+        s.footprint_routes()
+
+
+def test_footprint_routes_skips_abroad(monkeypatch):
+    s.new_trip(name="京都", num_days=1)
+    s.add_place("甲", 35.01, 135.76)
+    s.add_place("乙", 35.02, 135.77)
+    s.schedule_days()
+    d = s.trip_path().parent
+    ids = [p.id for p in s._load().places]
+    (d / "photo_trip.json").write_text(json.dumps({"stops": [{"place_id": ids[0], "start": "2024-04-01T09:00:00"}, {"place_id": ids[1], "start": "2024-04-01T11:00:00"}]}), encoding="utf-8")
+
+    class Boom:
+        def route(self, *a, **k):
+            raise AssertionError("境外不该联网")
+
+    monkeypatch.setattr(s.AmapClient, "from_env", classmethod(lambda cls, log_path=None: Boom()))
+    out = s.footprint_routes()
+    assert out["abroad"] == 1 and out["routes"] == [] and out["done"]

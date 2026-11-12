@@ -226,7 +226,7 @@ def data(feet: list[TripFoot]) -> dict:
         for k, p in enumerate(f.points):
             la, lo = wgs84_to_gcj02(p[1], p[2])
             info = f.pins[k] if k < len(f.pins) else {}
-            pins.append({"day": p[0] + 1, "pos": [round(la, 6), round(lo, 6)], "name": p[3], "date": info.get("date", ""), "thumbs": info.get("thumbs", [])})
+            pins.append({"day": p[0] + 1, "pos": [round(la, 6), round(lo, 6)], "wgs": [round(p[1], 6), round(p[2], 6)], "name": p[3], "date": info.get("date", ""), "thumbs": info.get("thumbs", [])})
         trips.append({"slug": f.slug, "name": f.name, "start": f.start, "days": f.days, "km": round(f.km), "cities": f.cities, "color": _COLORS[i % len(_COLORS)], "pins": pins})
     cities = sorted({c for f in feet for c in f.cities})
     return {"trips": trips, "totals": {"trips": len(feet), "days": sum(f.days for f in feet), "places": sum(len(f.points) for f in feet), "cities": len(cities), "km": round(sum(f.km for f in feet))}}

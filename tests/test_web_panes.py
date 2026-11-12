@@ -220,3 +220,9 @@ def test_page_has_trip_rename_button():
     from tripcore.webpage import page_html
     h = page_html()
     assert 'id="trip_ren"' in h and "api('trip_rename'" in h
+
+
+def test_footprint_page_has_real_route_option():
+    from tripcore.webpage import page_html
+    h = page_html()
+    assert 'id="fp_real"' in h and "fp_routes" in h and "只限国内" in h
