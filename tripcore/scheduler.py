@@ -64,7 +64,11 @@ def _mean(points: list[Point]) -> Point:
 
 
 def _closed_on(place: Place, day_date: Optional[date]) -> bool:
-    return day_date is not None and day_date.weekday() in place.closed_weekdays
+    if day_date is None:
+        return False
+    if place.event_date and day_date.isoformat() != place.event_date:      # 限定日期的活动：只有那一天能去
+        return True
+    return day_date.weekday() in place.closed_weekdays
 
 
 HOURS_PENALTY = 10        # 到达/停留违反营业时间 1 分钟，折算成多少分钟的交通代价

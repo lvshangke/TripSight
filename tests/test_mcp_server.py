@@ -109,7 +109,7 @@ def test_server_registers_all_tools(monkeypatch):
     monkeypatch.setenv("TRIPCORE_TOOLS", "full")
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert names == {f.__name__ for f in s.TOOLS}
-    assert len(names) == 91
+    assert len(names) == 92
 
 
 def test_wrong_confirm_code_is_rejected():
@@ -1208,7 +1208,7 @@ def test_default_tools_are_light_and_include_restore(monkeypatch):
     names = {t.name for t in asyncio.run(s.build_server().list_tools())}
     assert {"add_place", "import_photo_trip", "merge_stops", "set_day_title", "suggest_day_titles", "delete_stop", "export_handbook", "open_workbench"} <= names
     assert "import_bills" not in names and "export_rough_cut" not in names
-    assert len(names) <= 50
+    assert len(names) <= 51
 
 
 def test_rename_trip(tmp_path, monkeypatch):
@@ -1228,3 +1228,25 @@ def test_rename_trip(tmp_path, monkeypatch):
     assert "没有改" in s.rename_trip("杭州西湖")
     s.undo()
     assert s._load().meta.name == "杭州"
+
+
+def test_add_event_needs_source_date_and_blocks_other_days(tmp_path, monkeypatch):
+    import tripcore.mcp_server as m
+    monkeypatch.setenv("TRIPCORE_HOME", str(tmp_path))
+    m.new_trip("苏州3日", 3)
+    m.set_dates(start_date="2026-12-04", end_date="2026-12-06")
+    m.add_place("拙政园", 31.32, 120.63)
+    with pytest.raises(m.ToolError, match="来源网址"):
+        m.add_event("演唱会", 31.3, 120.7, "2026-12-05", "19:30", "22:00", "")
+    with pytest.raises(m.ToolError, match="不在行程日期"):
+        m.add_event("演唱会", 31.3, 120.7, "2026-12-20", "19:30", "22:00", "https://example.com/t")
+    with pytest.raises(m.ToolError, match="HH:MM"):
+        m.add_event("演唱会", 31.3, 120.7, "2026-12-05", "晚上", "22:00", "https://example.com/t")
+    out = m.add_event("某某演唱会", 31.3, 120.7, "2026-12-05", "19:30", "22:00", "https://example.com/t", kind="演出", confirmed=True)
+    assert "已确认" in out
+    m.schedule_days()
+    t = m._load()
+    ev = next(p for p in t.places if p.event_date)
+    days = [i for i, d in enumerate(t.plan.days) if any(it.place_id == ev.id for it in d.items)]
+    assert days == [1]                                  # 12-05 是第 2 天，只会排在这一天
+    assert ev.hours_source == "https://example.com/t" and "event" in ev.tags and "查询于" in ev.notes

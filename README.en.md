@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
 <img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-91-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/MCP%20tools-92-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -46,7 +46,7 @@ TripSight is an **all-in-one travel assistant**. It is not a "one-click guide ge
 **The agent's role** (and the design principle of the whole project):
 
 - **The LLM only understands intent:** it hears "move Guanqian Street to the last day" or "rebuild my January photos into a trip", picks the tool, and explains in plain words. It never invents coordinates, hours or prices.
-- **Deterministic code does the work:** day splitting, rule checks, routes, weather, photo clustering and exports are done by MCP tools (91 in total); facts come only from tools or you, and unknowns are marked "to verify".
+- **Deterministic code does the work:** day splitting, rule checks, routes, weather, photo clustering and exports are done by MCP tools (92 in total); facts come only from tools or you, and unknowns are marked "to verify".
 - **You decide:** changes are proposals first; the assistant never books, pays or installs; trips are local JSON, the workbench listens on `127.0.0.1` only, API keys live in your own config.
 - **Not tied to one model or agent:** any MCP-capable agent works (nanobot, WorkBuddy, Claude Code… see Quick start).
 
@@ -175,17 +175,17 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 
 ## 🏗️ Architecture and capability split
 
-**91 MCP tools · 9 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
+**92 MCP tools · 10 skills · 570+ automated tests**, covering plan, on the road, restore, record and footprints. The LLM only understands and proposes, tools do the work deterministically, and skills say when to use which tools and what must never be invented.
 
 | Stage | Tools | Skills | Highlights |
 |---|---|---|---|
-| **Before · Plan** | 45 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
+| **Before · Plan** | 47 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-events` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
 | **After · Restore** | 17 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook` `edit_handbook`…) |
 | **Record & share** | 13 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
 | **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
 
 ```
-tripcore/   core library and MCP server (mcp_server.py: 91 tools; scheduler / validator / changes;
+tripcore/   core library and MCP server (mcp_server.py: 92 tools; scheduler / validator / changes;
             amap / routemap / weather; phototrip / photoslib / stays; handbook / share / video; web + webpage: workbench)
 skills/     manuals for the agent
 nanobot/    example config (no secrets)

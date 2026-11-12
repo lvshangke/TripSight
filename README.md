@@ -16,7 +16,7 @@
 <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License">
 <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python">
 <img src="https://img.shields.io/badge/tests-570%2B%20passing-brightgreen" alt="Tests">
-<img src="https://img.shields.io/badge/MCP%20tools-91-8A2BE2" alt="MCP tools">
+<img src="https://img.shields.io/badge/MCP%20tools-92-8A2BE2" alt="MCP tools">
 </p>
 
 <p>
@@ -55,7 +55,7 @@ TripSight 是一个**全流程旅行助手**：它不是“一键生成攻略”
 **Agent 在其中的角色**（也是整个项目的设计原则）：
 
 - **LLM 只理解意图**：听懂“把观前街挪到最后一天”“把旧手机里 1 月的照片整理成行程”，决定该调哪个工具，并向你说明；它不编坐标、营业时间和价格。
-- **确定性代码做事**：分天排程、规则检查、查路线和天气、聚类照片、渲染导出，都由 MCP 工具（共 91 个）完成；事实只来自工具或你，查不到就写“待核实”。
+- **确定性代码做事**：分天排程、规则检查、查路线和天气、聚类照片、渲染导出，都由 MCP 工具（共 92 个）完成；事实只来自工具或你，查不到就写“待核实”。
 - **你保留决定权**：修改先成为提案；助手**不订票、不付款、不安装程序**；行程是本机 JSON，网页工作台只监听 `127.0.0.1`，API key 只放在你自己的配置里。
 - **不绑定模型和 Agent**：任何支持 MCP 的聊天 Agent 都能接（[nanobot](https://github.com/HKUDS/nanobot)、WorkBuddy、Claude Code 等，见下方“快速开始”）。
 
@@ -157,6 +157,7 @@ https://github.com/user-attachments/assets/a79f8dfb-fa7b-42a9-b066-899d5f822277
 | **核查** | 闭馆日、到达时已关门、过了最晚进入、停留超过闭馆、太赶、路上太久、没预约、超预算、住宿太远、天气不适合户外 |
 | **地图与路线** | 高德 / Google Maps / OpenStreetMap；真实路线时间、换乘与步行距离、跨城路段提示、机场车站接驳（含夜间改打车） |
 | **住宿与用餐** | 按每晚/每段推荐住在哪一带（跨城市自动分段）、候选酒店按通勤排序、沿途餐厅搜索、指定店铺就近安排、每天缺几顿饭的提醒 |
+| **特色活动** | 日期确定后，按出行日期搜当地的演唱会、体育赛事（如花样滑冰）、灯会、展览、美食节，列给你挑；必须有来源网址，查不到不编；选中的作为「限定日期」的一站只排在那一天，并检查赶不赶得上，不替你订票 |
 | **攻略转行程** | 粘贴游记/攻略 → 原文逐字核对 → 提交时自动查高德（已匹配/有歧义/没找到）并附跳转链接 → 你挑选后加入；识别“第N天/Day N”，可对照或照搬游记的分天；每个景点带可展开的游记原文；顺路路线（如 citywalk）可整条作为一项 |
 | **大交通与天气** | 记录到达/离开的航班或火车并推算首末日可玩时间；机票/火车票/酒店参考价（只读查询）；高德与 Open-Meteo 天气预报（工作台打开时，预报范围内的天自动后台查，每天顶部、分享页、手册、日历都带天气）|
 | **带走行程** | 想在路上用，就导出成下面这些（都在本机生成，不用登录）：<br>· 手机地图页：单个 HTML/PDF 文件，用手机浏览器打开，每天一张路线图和景点列表，不用联网也能看<br>· 高德 App 地图：把每天的路线补全成一个闭环，在高德 App 里按天打开导航<br>· 日历文件（.ics）：双击导入手机日历，带每天的时间和天气<br>· GPX 轨迹：导入运动类或其他地图类 App |
@@ -176,11 +177,11 @@ https://github.com/user-attachments/assets/a79f8dfb-fa7b-42a9-b066-899d5f822277
 
 ## 🏗️ 架构与能力分布
 
-**91 个 MCP 工具 · 9 份 skill · 570+ 个自动化测试**，覆盖计划、路上、恢复、记录、足迹五个阶段。LLM 只负责听懂和提议，工具确定性地做事，skill 规定什么时候用哪些工具、哪些事不能自己编。
+**92 个 MCP 工具 · 10 份 skill · 570+ 个自动化测试**，覆盖计划、路上、恢复、记录、足迹五个阶段。LLM 只负责听懂和提议，工具确定性地做事，skill 规定什么时候用哪些工具、哪些事不能自己编。
 
 | 阶段 | 工具数 | 对应 skill | 代表功能 |
 |---|---|---|---|
-| **出发前 · 计划行程** | 45 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-sources` `flyai-search` | 行程基础、景点与住宿、排程与检查、路线与交通、餐食、攻略与导入（`schedule_days` `check_plan` `refine_routes` `submit_candidates`…） |
+| **出发前 · 计划行程** | 47 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-events` `trip-sources` `flyai-search` | 行程基础、景点与住宿、排程与检查、路线与交通、餐食、攻略与导入（`schedule_days` `check_plan` `refine_routes` `submit_candidates`…） |
 | **回来后 · 恢复行程** | 17 | `trip-restore` | 照片还原、起名、标区县、起标题、手册（`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…） |
 | **记录与分享** | 13 | `trip-export` | 手机地图、微信文字、高德 App 地图、日历、GPX、分享长图、旅行短片 |
 | **长期积累** | 15 | `trip-review` | 足迹、账单与花费、复盘、游记（12）；偏好记忆（3） |
@@ -189,7 +190,7 @@ https://github.com/user-attachments/assets/a79f8dfb-fa7b-42a9-b066-899d5f822277
 
 ```
 tripcore/                核心库与 MCP 服务
-├─ mcp_server.py         91 个工具的入口
+├─ mcp_server.py         92 个工具的入口
 ├─ scheduler.py · validator.py · changes.py   分天排程 / 规则检查 / 版本与撤销
 ├─ amap.py · routemap.py · weather.py         高德路线与地图、天气
 ├─ phototrip.py · photoslib.py · stays.py     照片聚类成停留点、读 Mac 照片 App
@@ -230,7 +231,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 |---|---|---|
 | [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
 | [WorkBuddy](https://www.workbuddy.ai) | 在“专家技能 → 连接器 → 新增连接器”里填入 `tripcore-mcp` 的 JSON 配置（`~/.workbuddy-ai/mcp.json`），再把 `skills/` 装进 `~/.workbuddy-ai/skills`，详见 [docs/WORKBUDDY.md](docs/WORKBUDDY.md) | 连接器入口和配置文件位置已在真实环境确认，其余步骤请以界面为准 |
-| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 91 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
+| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在它的 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 92 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
 
 `tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
 
@@ -249,7 +250,7 @@ tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演
 - [docs/features.md](docs/features.md)：功能详解与“满配效果”
 - [docs/reference.md](docs/reference.md)：命令行、行程数据格式、代码结构、MCP 工具与接口详解
 - [docs/limitations.md](docs/limitations.md)：已知局限与后续计划
-- [docs/TOOLS.md](docs/TOOLS.md)：全部 91 个工具清单
+- [docs/TOOLS.md](docs/TOOLS.md)：全部 92 个工具清单
 - [DESIGN.md](DESIGN.md)：设计原则与算法
 
 ## 📄 许可证

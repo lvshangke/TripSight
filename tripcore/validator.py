@@ -168,6 +168,9 @@ def validate(trip: Trip) -> list[Issue]:
                     f"{label}「{names.get(leg.from_id, leg.from_id)}」→「{names.get(leg.to_id, leg.to_id)}」" + intercity_hint(leg.distance_km, leg.mode),
                     day.index))
         for p in st.places:
+            if d is not None and p.event_date and d.isoformat() != p.event_date:
+                issues.append(Issue("EVENT_WRONG_DAY", "error",
+                                    f"{label}（{d.isoformat()}）安排了「{p.name}」，但它只在 {p.event_date} 举行。", day.index, p.id))
             if d is not None and d.weekday() in p.closed_weekdays:
                 issues.append(
                     Issue(

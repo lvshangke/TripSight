@@ -101,6 +101,9 @@ class Place(BaseModel):
     source_name: str = Field(default="", description="来自哪篇游记（候选的 source）；空表示不是游记来的")
     source_day: Optional[int] = Field(default=None, ge=1, le=30, description="游记里这个景点在第几天（从 1 开始，由代码识别原文里的分天标记）")
 
+    event_date: str = Field(default="", description="限定日期的活动（演出、赛事、灯会等）：只在这一天（YYYY-MM-DD）能去；其他天排程会避开，检查会报错")
+    event_kind: str = Field(default="", description="活动类型：演出 / 体育赛事 / 节庆灯会展览 / 美食市集 等；空表示不是活动")
+
     @model_validator(mode="after")
     def _check_weekdays(self) -> "Place":
         for d in self.closed_weekdays:

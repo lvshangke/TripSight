@@ -52,7 +52,7 @@ from .textview import build_text as _build_text, guard_text as _guard_text
 from .checklist import build_checklist as _build_checklist, render as _render_checklist
 from .metrics import intercity_hint
 from .stays import hint_text as _stay_hint
-from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, Trip, TripMeta, Waypoint, WeatherSnap
+from .models import Stay, Connection, DateMode, Leg, Lodging, Meal, Pace, Place, PlaceStatus, Trip, TripMeta, Waypoint, WeatherSnap
 from .proposals import (
     InvalidOperationError,
     LockedItemError,
@@ -388,6 +388,67 @@ def add_place(
     new = commit(trip, lambda t: t.places.append(place))
     _save(new)
     return f"已添加景点「{name}」(id={pid})，当前共 {len(new.places)} 个景点。还没分天的话请调用 schedule_days。"
+
+
+def add_event(
+    name: str,
+    lat: float,
+    lon: float,
+    date: str,
+    start: str,
+    end: str,
+    source_url: str,
+    kind: str = "",
+    venue: str = "",
+    ticket_price: float = 0,
+    ticket_source: str = "",
+    confirmed: bool = False,
+    notes: str = "",
+) -> str:
+    """把一场限定日期的活动（演唱会、体育赛事如花样滑冰、灯会、展览、美食节等）加进行程，只在这一天、这个时段能去。
+    必须有 source_url（官方或售票页网址，查不到来源就不要加，不要凭印象说“应该有”）、日期 date（YYYY-MM-DD，必须在行程日期范围内，
+    所以行程要先 set_dates）、start/end（HH:MM，当地时间）。lat/lon 必须来自 lookup_coords（用场馆名查）或用户，不能编。
+    排程会把它只放在那一天，并按时段检查赶不赶得上、和前后景点冲不冲突。是否要去由用户决定：用户确认再传 confirmed=True，否则只作为候选；
+    不替用户订票、付款。活动信息会变，备注里记了查询日期，出发前请用户再确认。"""
+    import datetime as _dt
+    import re as _re
+    trip = _load()
+    if not _re.match(r"^https?://", (source_url or "").strip()):
+        raise ToolError("活动必须有来源网址 source_url（官方或售票页，以 http 开头）。查不到来源就不要加。")
+    if ticket_price and not ticket_source:
+        raise ToolError("填票价必须同时填来源 ticket_source（网址 / user）。")
+    try:
+        d = _dt.date.fromisoformat(date)
+    except ValueError:
+        raise ToolError("date 要写成 YYYY-MM-DD。")
+    first = trip.day_date(0)
+    if first is None:
+        raise ToolError("行程还没有确定的日期，先用 set_dates 设好再加活动（活动只在特定日期举行）。")
+    last = trip.day_date(trip.meta.num_days - 1)
+    if not (first <= d <= last):
+        raise ToolError(f"{date} 不在行程日期 {first} 到 {last} 内。要去的话先调整日期。")
+    m1, m2 = _re.match(r"^(\d{1,2}):(\d{2})$", start or ""), _re.match(r"^(\d{1,2}):(\d{2})$", end or "")
+    if not (m1 and m2):
+        raise ToolError("start / end 要写成 HH:MM（如 19:30）。")
+    a, b = int(m1.group(1)) * 60 + int(m1.group(2)), int(m2.group(1)) * 60 + int(m2.group(2))
+    if not (0 <= a < 24 * 60 and 0 < b <= 24 * 60) or b <= a:
+        raise ToolError("结束时间要晚于开始时间（都在当天内）。")
+    pid = _next_id("p", [p.id for p in trip.places])
+    note = (notes + " " if notes else "") + f"[活动信息查询于 {_dt.date.today().isoformat()}，出发前请再确认日期、时间和票务]"
+    try:
+        place = Place(
+            id=pid, name=name, lat=lat, lon=lon, duration_min=max(10, min(720, b - a)),
+            status=PlaceStatus.CONFIRMED if confirmed else PlaceStatus.SHORTLIST, priority=4 if confirmed else 3,
+            ticket_price=ticket_price, ticket_source=ticket_source, ticket_date=_dt.date.today().isoformat() if ticket_price else "",
+            reservation_required=True, notes=note, source=source_url.strip(),
+            opening_hours=f"{a // 60:02d}:{a % 60:02d}-{b // 60:02d}:{b % 60:02d}", hours_source=source_url.strip(),
+            tags=["event"] + ([kind] if kind else []), event_date=date, event_kind=kind, category=f"活动;{kind}" if kind else "活动",
+        )
+    except ValidationError as e:
+        raise ToolError(f"活动参数不合法：{e}")
+    _save(commit(trip, lambda t: t.places.append(place)))
+    return (f"已加入活动「{name}」(id={pid})：{date} {start}–{end}" + (f"，{venue}" if venue else "") + f"，状态：{'已确认' if confirmed else '候选（用户确认后再设为确认）'}。"
+            "接着调用 schedule_days：它只会排在这一天；再 check_plan 看赶不赶得上。")
 
 
 def add_lodging(
@@ -4307,7 +4368,7 @@ def follow_source_days(source: str, day_map: Optional[dict[str, int]] = None) ->
 # ---------------------------------------------------------------------------
 
 TOOLS = [
-    new_trip, add_place, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
+    new_trip, add_place, add_event, update_place, remove_place, add_lodging, lookup_coords, refine_routes,
     set_transport_prefs, set_leg_mode, export_text, export_share, draft_travelogue, check_travelogue, add_photo, remove_photo, compare_transport, fill_hours, suggest_food, find_food, choose_food, search_links, remove_food, set_connection, clear_connection, set_travelers, export_map, export_gpx, export_notes, export_handbook, export_calendar, footprint, scan_videos, export_rough_cut, check_trip_changes, import_photo_trip, fill_stop_photos, run_naming_job, wait_restore_job, list_photo_albums, import_bills, spending_summary, scan_bills, set_bills_watch, tag_regions, merge_stops, new_restore_trip, restore_status, delete_stop, autoname_stops, set_day_title, edit_handbook, suggest_day_titles, view_stop, save_stop_story, personal_map_payload, create_amap_map, get_weather, schedule_days, relaxed_alternative, check_plan,
     set_dates, open_workbench, set_provider, list_trips, switch_trip, rename_trip, archive_trip, record_review, record_actual_cost, show_review, final_check, remember_preference, list_preferences, forget_preference, suggest_lodging, set_stays, clear_stays, propose_change, apply_proposal, undo, show_trip,
     submit_candidates, list_candidates, drop_candidates, adopt_candidates, add_route_place, compare_with_source, follow_source_days,
