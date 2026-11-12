@@ -82,25 +82,6 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 | Tools do, deterministically | day split, hours/closure/too-rushed checks, real routes, weather, versions & undo | stay-point clustering, place names, photos, handbook/cards/PDF/route animation |
 | You keep control | proposals need confirmation; repeatable `undo`; never books or pays | preview before export; photos can be referenced not copied; AI text only describes what is visible |
 
-### A real WorkBuddy conversation
-
-A real planning chat in WorkBuddy (condensed; text transcribed from the session, not a screenshot). The user only said "Suzhou, 4–6 December, three days". The assistant checked existing trips, created a new one, looked up official information, then listed candidates and waited for a pick:
-
-<details>
-<summary><b>Show the conversation</b></summary>
-
-> **Assistant:** I checked the current trips first and confirmed the dates: Fri 4 Dec – Sun 6 Dec 2026, three days. Created "Suzhou 3 days 12.4–6" (1 traveller, normal pace, public transport for now); your other trips are untouched.
->
-> I verified two **official facts**: **Suzhou Museum** is open Tue–Sun 9:00–17:00 (last entry 16:00), closed Mondays, real-name reservation required up to 7 days ahead (official site) — open on all three days, but book weekend tickets early; **Tianping Mountain** red-maple season runs 1 Oct – 13 Dec, ticket ¥30 (local guide, 2026-11-03) — still in season in early December, colour to be checked closer to the date. **I won't fill in other ticket prices or hours until you pick the places.**
->
-> 12 candidates (about 8–10 fit in 3 days): classical gardens (Humble Administrator's, Lingering, Lion Grove, Master-of-Nets), old streets and canal night views (Pingjiang Rd, Shantang St, Jinji Lake / Eslite), Suzhou Museum (book ahead), autumn scenery (Tiger Hill, Hanshan Temple, Tianping Mountain). Each candidate links to a Xiaohongshu / Dianping search page, labelled as a search entry, not a specific post.
->
-> **Two questions:** ① which ones to add (reply with numbers or "go with your picks"); ② how many travellers, any must-sees or no-gos. After you confirm I'll look up coordinates, add them and plan the routes.
-
-</details>
-
-What to notice: **it reads existing trips first and leaves them alone**; **dates are confirmed first**; **every hour or price it states has a source, and what it hasn't verified it says it won't fill in**; **seasonal info (red-maple season) carries a date and source**; **it lists candidates and waits instead of adding places on its own**.
-
 ## 🖼️ At a glance
 
 **Left: the plan workbench** (itinerary on the left, Amap map in the middle, chat assistant on the right). **Right: the restore edit page** (album → stay points → edit → export; click a pin on the map to see that place's photo thumbnails, and the list on the left jumps to the stop).
@@ -132,7 +113,7 @@ What to notice: **it reads existing trips first and leaves them alone**; **dates
 | **Checks** | Closed days, arriving after closing, past last entry, stay running past closing, overloaded days, long legs, missing reservations, budget, lodging too far, weather vs outdoor sights |
 | **Maps & routes** | Amap / Google Maps / OpenStreetMap; real transit/walk/drive times, transfers, intercity-leg hints, airport/station transfers (late-night legs switch to taxi) |
 | **Lodging & food** | Per-night / per-segment stay-area suggestions (multi-city aware), hotel candidates ranked by commute, restaurants near a stop, a named restaurant placed on the nearest day, "no lunch planned" reminders |
-| **Local events** | Once the dates are fixed, the assistant searches for events during the trip (concerts, sports such as figure skating, lantern festivals, exhibitions, food markets), each with a source URL (nothing is invented; not found = it says so) and lists them for you to pick; chosen ones become date-locked stops, scheduled only on that day and checked for timing conflicts. Never books or pays for you. |
+| **Local events** | Once the dates are fixed, your personal agent automatically searches for events during the trip (concerts, sports such as figure skating, lantern festivals, exhibitions, food markets) following the skill, and lists them for you to pick — the search is the agent's own ability; TripSight itself does not go online for events. When one is added, code enforces a source URL, a date and a time slot; chosen events become date-locked stops, scheduled only on that day and checked for timing conflicts. Never books or pays for you. |
 | **Guides → trip** | Paste a travel note or guide → every quote verified against the original text → coordinates verified on the map → you pick → added; walking routes (e.g. a city walk) can be one item |
 | **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
 | **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
@@ -168,7 +149,7 @@ tripcore demo   # full demo on the sample data, no keys needed
 
 **Use it in chat:** follow [docs/SETUP.md](docs/SETUP.md) (Chinese) to connect nanobot, run `nanobot`, then just say where you want to go. When you want to drag things around, see the map or export, tell the assistant **"open the workbench"** — it returns a URL with a one-time token; open it in a browser on the same computer.
 
-**Other MCP agents:** TripSight is a standard stdio MCP server (command `tripcore-mcp`, put your own `AMAP_KEY` in its `env`) plus skills in `skills/` (`python scripts/install_skills.py --dest <your agent's skills dir>`). For WorkBuddy: Expert skills → Connectors → Add connector, paste the `mcpServers` JSON (it edits `~/.workbuddy-ai/mcp.json`), then install `skills/` into `~/.workbuddy-ai/skills`; see [docs/WORKBUDDY.md](docs/WORKBUDDY.md) (Chinese; verified on a real WorkBuddy install, including a full Suzhou planning chat, see above). Claude Code / Claude Desktop / Cursor follow the same pattern, untested one by one.
+**Other MCP agents:** TripSight is a standard stdio MCP server (command `tripcore-mcp`, put your own `AMAP_KEY` in its `env`) plus skills in `skills/` (`python scripts/install_skills.py --dest <your agent's skills dir>`). For WorkBuddy: Expert skills → Connectors → Add connector, paste the `mcpServers` JSON (it edits `~/.workbuddy-ai/mcp.json`), then install `skills/` into `~/.workbuddy-ai/skills`; see [docs/WORKBUDDY.md](docs/WORKBUDDY.md) (Chinese; verified on a real WorkBuddy install). Claude Code / Claude Desktop / Cursor follow the same pattern, untested one by one.
 
 **Workbench only:** no chat needed — `tripcore web --open`.
 
