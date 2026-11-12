@@ -1451,7 +1451,7 @@ def video_cut(body: dict) -> dict[str, Any]:
         raise HttpError(409, "上一条短片还在生成，等它完成。")
     kw = dict(folder=folder, album=album, target_seconds=target, clip_max=clip_max, cards=body.get("cards", True) is not False,
               intro_outro=body.get("intro_outro", True) is not False, style=str(body.get("style") or "手账"),
-              jianying_dir=str(body.get("jianying_dir") or "").strip(), basemap=bool(body.get("basemap")))
+              jianying_dir=str(body.get("jianying_dir") or "").strip(), basemap=body.get("basemap", True) is not False)
     _VJOB.clear()
     _VJOB.update(state="run", done=0, total=1, message="")
     threading.Thread(target=_video_job, args=(kw,), daemon=True).start()

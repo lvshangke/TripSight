@@ -33,6 +33,7 @@ def _isolated_state(tmp_path, monkeypatch):
     monkeypatch.setenv("TRIPCORE_FILE", str(tmp_path / "trip.json"))
     monkeypatch.setenv("TRIPCORE_NO_AUTO_WEATHER", "1")                              # 测试里不在后台自动查天气
     monkeypatch.setenv("NANOBOT_CONFIG", str(tmp_path / "no-nanobot.json"))        # 不读真实的 nanobot 配置（里面可能有真 key）
+    monkeypatch.delenv("AMAP_KEY", raising=False)                                   # 短片等默认会用高德，测试里不能带真 key 联网
 
 
 @pytest.fixture(autouse=True)

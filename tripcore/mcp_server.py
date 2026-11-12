@@ -1693,7 +1693,7 @@ def _film_basemap_fn():
 
 def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True, intro_outro: bool = True,
               style: str = "手账", jianying_dir: str = "", draft_name: str = "", album: str = "", progress=None,
-              basemap: bool = False) -> dict:
+              basemap: bool = True) -> dict:
     """export_rough_cut 的实现（网页也用它，可以传 progress(done, total) 回调）。返回 {message, mp4, segments}。"""
     _v, clips, bad, n, order = _video_scan(folder, album)
     try:
@@ -1739,20 +1739,26 @@ def make_film(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bo
             msg += ("\n草稿自检通过：" + brief + "（只证明文件结构正常；能不能在你的剪映版本里打开，要在剪映里点开看一眼，打不开就用上面的 mp4 + 字幕）。"
                     if not probs else "\n草稿自检发现问题：" + "；".join(probs[:3]) + "（先别用这份草稿，用上面的 mp4 + 字幕，并告诉我）。")
     if basemap:
-        msg += "\n" + (bm_note or "路线卡用了高德底图和驾车路径示意。")
+        rsegs = [sg for sg in segs if sg.variant == "route"]
+        if bm_note:
+            msg += "\n" + bm_note
+        elif rsegs and all(sg.extra.get("_base") for sg in rsegs):
+            msg += "\n路线卡用了高德底图和驾车路径示意。"
+        elif rsegs:
+            msg += "\n高德底图没取到（网络或 key 的问题），路线卡改用了简化线条图。"
     msg += "\n没有配乐和特效，需要的话在剪映里再加；视频若含人脸或路人，发布前提醒用户。"
     return {"message": msg, "mp4": str(mp4), "seconds": round(total), "clips": sum(1 for s in segs if s.kind == "clip")}
 
 
 def export_rough_cut(folder: str, target_seconds: int = 0, clip_max: int = 8, cards: bool = True,
                      jianying_dir: str = "", draft_name: str = "", album: str = "", style: str = "手账", intro_outro: bool = True,
-                     basemap: bool = False) -> str:
+                     basemap: bool = True) -> str:
     """把用户的视频素材按行程顺序剪成一条旅行短片：片头（行程名、日期、几天几处）→ 每天一张标题卡（有“每天的标题”就用它，并列出当天景点）和一张画线动画的当天路线卡 →
     景点视频（背景模糊填充、统一音量、景点名字幕条）→ 片尾；相邻段交叉淡化。每个景点取中间一段（最多 clip_max 秒）；target_seconds=0 表示不限长度，否则自动缩短每段、必要时每个景点删几段。
     style 是版式色调，和手册风格同名（手账/杂志/清新/胶片/海边）。输出到 ~/Documents/TripSight/短片/：旅行短片.mp4、封面.png、字幕 .srt、片段清单 .md。
     视频在照片 App 相册里时给 album=相册名（不复制）。jianying_dir 是用户剪映的草稿文件夹路径（用户给，不要自己找），给了就同时生成一份剪映草稿（需要 pip install pyJianYingDraft；打不开就用 mp4+srt）。
     basemap=true 让路线卡用高德底图和高德驾车路径（沿真实道路，仅国内、需要用户自己的 AMAP_KEY）：会联网，发给高德的是底图中心点/缩放/图片大小和相邻景点的坐标（不发景点名）；
-    路径只是“驾车路径示意”，不是用户实际走过的；默认关闭，用之前告诉用户并等他同意。
+    路径只是“驾车路径示意”，不是用户实际走过的；默认开启（国内行程且有 AMAP_KEY 时自动用，没有 key 或境外就退回简化线条图并在结果里说明）；用户不想联网就传 basemap=false。
     不加配乐和特效；视频内容不会交给模型，只用拍摄时间、位置和时长。需要本机 ffmpeg，素材多时会跑一会儿。调用前先让用户确认长度。"""
     return make_film(folder, target_seconds, clip_max, cards, intro_outro, style, jianying_dir, draft_name, album, basemap=basemap)["message"]
 
@@ -2345,7 +2351,7 @@ AUTO_FLOW = ("执行模式：【自动执行】用户在页面上打开了自动
              "③同一天里名字相同或明显同属一个景区的点 merge_stops，明显不是景点的零散点 delete_stop；"
              "④suggest_day_titles 后给每天 set_day_title；⑤有图可看的点用 view_stop 看过再 save_stop_story（只写画面里看得到的）；"
              "⑥用户在对话里说了要旅行短片（或“连短片一起做”）且照片来源里有视频（下面会写“视频 N 段”）：scan_videos() 看分组并一句话告诉用户，再 export_rough_cut()"
-             "（不用给路径，默认用读照片的那个来源；长度没说就 60 秒，风格用页面上选的、没有就手账；basemap=true 联网用高德地图，只在用户说要时才开）；用户没提短片就只说一句“视频可以剪成旅行短片”；"
+             "（不用给路径，默认用读照片的那个来源；长度没说就 60 秒，风格用页面上选的、没有就手账；路线卡默认用高德真实道路，国内且有 key 才会联网，用户说不要联网就 basemap=false）；用户没提短片就只说一句“视频可以剪成旅行短片”；"
              "⑦最后不要调用 export_handbook：告诉用户手册预览已准备好，请他在页面第 5 步点“导出”。每一步的结果都以工具返回为准，不编造。")
 CONFIRM_FLOW = "执行模式：【逐步确认】改动前（导入、合并、删除、改名、导出）先和用户确认。"
 

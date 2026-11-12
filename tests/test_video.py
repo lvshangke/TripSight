@@ -92,6 +92,14 @@ def test_mcp_tools_end_to_end(tmp_path):
     mp4 = Path(res.split("已生成旅行短片：")[1].split("（")[0])
     assert mp4.is_file() and (mp4.parent / "旅行短片.srt").is_file() and "另有 1 段没归到景点" in res
     assert "没有配乐" in res
+    assert "没有 AMAP_KEY" in res or "境外" in res                      # 默认要用真实地图；没有 key 就退回线条图并说明
+
+
+def test_film_defaults_to_real_map():
+    import inspect
+    from tripcore import mcp_server as s
+    assert inspect.signature(s.export_rough_cut).parameters["basemap"].default is True
+    assert inspect.signature(s.make_film).parameters["basemap"].default is True
 
 
 @pytest.mark.skipif(not HAS_FF, reason="需要 ffmpeg")
