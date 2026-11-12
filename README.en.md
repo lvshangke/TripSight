@@ -64,7 +64,7 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 
 <p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/restore-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/restore-flow.mp4">Open restore-flow.mp4</a></sub></p>
 
-<sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; then edit and export a handbook, cards, PDF and route animation.</sub>
+<sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; the video ends on the <b>footprint page</b>, zooming from the clustered pins across Asia down to a city and a street, opening a pin to see the local photo thumbnails, with same-day stops joined by dashed straight lines (not real routes); then edit and export a handbook, cards, PDF and route animation.</sub>
 
 <b>3. Restore → Export: the optional "Travel film"</b>
 
