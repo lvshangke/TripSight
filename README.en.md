@@ -56,19 +56,31 @@ In TripSight the **chat assistant is the operator and the web workbench is its w
 
 <b>1. Plan a trip</b>
 
-<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/plan-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/plan-flow.mp4">Open plan-flow.mp4</a></sub></p>
+
+
+https://github.com/user-attachments/assets/021abf3b-b4cb-4fc6-a244-77fc53fa2a7d
+
+
 
 <sub>One sentence becomes lookup → add stops → split into 3 days → check; a late-opening place triggers a <b>proposal</b> you must confirm; lunch and (never booked) hotel; 11 legs become real Amap routes; weather is fetched <b>automatically</b>; then export.</sub>
 
 <b>2. Restore a trip</b>
 
-<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/restore-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/restore-flow.mp4">Open restore-flow.mp4</a></sub></p>
+
+https://github.com/user-attachments/assets/7486875f-0bb5-41d0-9327-a809e9749ecf
 
 <sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; the video ends on the <b>footprint page</b>, zooming from the clustered pins across Asia down to a city and a street, opening a pin to see the local photo thumbnails, then ticking "real routes" joins same-day stops along real roads (mainland China only; abroad stays dashed straight lines); then edit and export a handbook, cards, PDF and route animation.</sub>
 
 <b>3. Restore → Export: the optional "Travel film"</b>
 
-<p align="center"><video src="https://github.com/lvshangke/TripSight/raw/main/docs/videos/film-flow.mp4" width="560" controls></video><br><sub>No player? <a href="docs/videos/film-flow.mp4">Open film-flow.mp4</a></sub></p>
+
+
+https://github.com/user-attachments/assets/53ba3a18-4a96-441a-88b8-791d1fa1167f
+
+
+
+
+
 
 <sub>Videos are a restore source just like photos: videos with a location are clustered into stops together with photos, so **an album or folder that is all videos can be restored too** (video-only stops use a video frame as thumbnail; videos without a location skip clustering and are matched by capture time when the film is made). When the album/folder contains videos, the export step shows an optional "Travel film" block: preview how clips group by stop, then generate. The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and builds an intro (trip name, dates, days/places/km), a title card per day (your titles), animated route cards, place captions, cross-dissolves, the clips' original sound with normalised loudness, all in the handbook style you picked; route cards are drawn by default on the real Amap map along Amap driving paths (mainland trips with your own key: online, only map extent and neighbouring stop coordinates are sent, never stop names; with no key, or abroad, it falls back to the simple line drawing; untick it on the page to stay offline). The demo is driven from chat: say "group my videos by stop" and the page's clip list fills in; say "drop that short one, take only seconds 3–10 of that, caption this one" and the assistant edits clip by clip while the page follows (you can edit on the page too — same record). It ends with the final film (rendered for real from the edited clips) playing in full; the sample link below has sound. You can also ask the assistant in chat: with auto mode on, say "include the travel film" and it scans the clips and generates the film after restoring, naming, tagging districts and day titles (no path needed). No added music; a Jianying draft is optional. <a href="docs/videos/travel-film-sample.mp4"><b>▶ Watch the generated film (51 s, with sound)</b></a></sub>
 
