@@ -63,8 +63,6 @@ TripSight 是一个**全流程旅行助手**：它不是“一键生成攻略”
 - **你保留决定权**：修改先成为提案；助手**不订票、不付款、不安装程序**；行程是本机 JSON，网页工作台只监听 `127.0.0.1`，API key 只放在你自己的配置里。
 - **不绑定模型和 Agent**：任何支持 MCP 的聊天 Agent 都能接（[nanobot](https://github.com/HKUDS/nanobot)、WorkBuddy、Claude Code 等，见下方“快速开始”）。
 
-> 满配效果（真实路线、逐条核对攻略、随时重排、预算与天气、复盘与游记、一键分享）的详细说明见 [docs/features.md](docs/features.md)。
-
 ## 🎬 看它怎么工作
 
 TripSight 里，**聊天助手（Agent）是操作者，网页工作台是它的“工作台面”，可以通过聊天“打开tripsight”打开可视化的工作台**：Agent 只负责听懂你要什么、决定调用哪个工具；排程、检查、查路线、查天气、生成导出这些都由确定性的 MCP 工具完成，每一步都出现在左侧“助手”卡片里，可核对、可撤销。下面是三条完整流程的**演示重放**（完整视频在 [`docs/videos/`](docs/videos/)，点图片可看 mp4）：
@@ -213,7 +211,7 @@ skills/                  给 Agent 的说明书
 nanobot/                 接入配置样例（不含密钥）
 scripts/                 install_skills.py · merge_nanobot_config.py
 tests/                   自动化测试
-docs/                    安装、WorkBuddy 接入、工具清单、功能与限制
+docs/                    安装、WorkBuddy 接入、工具清单、参考手册
 ```
 
 - nanobot 不在本仓库里，由你自己安装；仓库只提供接入所需的技能、配置样例和脚本，升级 nanobot 不会和本项目冲突。
@@ -228,41 +226,23 @@ docs/                    安装、WorkBuddy 接入、工具清单、功能与限
 
 ## 🚀 快速开始
 
-TripSight 是一个标准的 MCP 服务：**模型负责听懂你，TripSight 负责排准、查实、留好退路**。所以先装好它，再接到你用的聊天 Agent 里。
-
-**1. 安装**（需要 Python 3.10 或更新版本）
+需要 Python 3.10+。
 
 ```bash
 git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-pip install -e .   # 装好后有 tripcore、tripcore-mcp 两个命令
-tripcore demo      # 不需要任何 key 和模型，先用示例数据完整演示一遍
+./setup.sh                  # 创建 .venv、安装、接入 nanobot、安装技能、自检
+source .venv/bin/activate
+tripcore demo               # 不需要 key 和模型，用示例数据演示
+tripcore web --open         # 只开网页工作台
 ```
 
-**2. 接到你的聊天 Agent**
-
-| Agent | 做法 | 状态 |
-|---|---|---|
-| [nanobot](https://github.com/HKUDS/nanobot) | 运行 `./setup.sh`：创建环境、登记 tripcore、安装技能、自检（改配置前会先让你确认），详见 [docs/SETUP.md](docs/SETUP.md) | 作者在用，已测试 |
-| [WorkBuddy](https://www.workbuddy.ai) | 在“专家·技能·连接器 → 新增连接器”里填入 `tripcore-mcp` 的 JSON 配置（`~/.workbuddy-ai/mcp.json`），再把 `skills/` 装进 `~/.workbuddy-ai/skills`，详见 [docs/WORKBUDDY.md](docs/WORKBUDDY.md) | 已在真实 WorkBuddy 上接通 |
-| Claude Code / Claude Desktop / Cursor 等支持 MCP 的 Agent | 在 MCP 配置里添加一个 stdio 服务：命令 `tripcore-mcp`，环境变量放你自己的 `AMAP_KEY`；再安装 `skills/` 里的技能（`python scripts/install_skills.py`：`trip-planner` 常驻，其余 6 个按场景触发时才读），助手才知道该按什么流程使用这 92 个工具；嫌工具说明占上下文，可设 `TRIPCORE_TOOLS=core`，其余功能由技能指引、用 `tripcore run` 命令行调用（见 [docs/reference.md](docs/reference.md)） | 按 MCP 标准接入，**未逐个测试** |
-
-`tripcore doctor` 会检查依赖、技能、Agent 和 key 是否就绪（只读，不显示 key）。高德 / Google key 只放在你自己本机的配置里，不要提交到仓库。
-
-**3. 开始用**
-
-运行你的 Agent，直接说想去哪、想怎么玩。想拖动调整、看地图或导出时，对助手说 **“打开工作台”**，它会返回一个带一次性令牌的网址，在这台电脑的浏览器里打开即可。
-
-> 暂时不想接模型？`tripcore web --open` 可以单独打开网页工作台，用于拖动调整、检查和导出；一句话加景点、粘贴攻略这类功能需要接入聊天 Agent。
-
-手动安装、Docker、命令行和代码结构见 [docs/reference.md](docs/reference.md)。
+接入聊天 Agent：[nanobot](docs/SETUP.md) · [WorkBuddy](docs/WORKBUDDY.md) · [Claude Code 等其他 MCP Agent](docs/SETUP.md#其他-mcp-agent)。接好后直接说想去哪；想看地图或导出时说 **“打开工作台”**。
 
 ## 📚 更多文档
 
-- [docs/SETUP.md](docs/SETUP.md)：安装、接入 nanobot、微信、Google Maps
+- [docs/SETUP.md](docs/SETUP.md)：安装、接入 nanobot 与其他 MCP Agent、微信、Google Maps
 - [docs/WORKBUDDY.md](docs/WORKBUDDY.md)：接入 WorkBuddy
-- [docs/features.md](docs/features.md)：功能详解与“满配效果”
-- [docs/reference.md](docs/reference.md)：命令行、行程数据格式、代码结构、MCP 工具与接口详解
-- [docs/limitations.md](docs/limitations.md)：已知局限与后续计划
+- [docs/reference.md](docs/reference.md)：命令行、Docker、行程数据格式、代码结构、MCP 工具与接口详解
 - [docs/TOOLS.md](docs/TOOLS.md)：全部 92 个工具清单
 - [DESIGN.md](DESIGN.md)：设计原则与算法
 

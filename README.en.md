@@ -2,9 +2,11 @@
 
 <h1>🧭 TripSight</h1>
 
+<p><b>TripSight — your end-to-end personal travel assistant: it gets the itinerary right before you leave, keeps it checkable on the road, turns your photo album into a real, shareable trip handbook when you are back, and records your footprints on a map.</b></p>
+
 <p>
 <a href="README.md">中文</a> ·
-<a href="docs/SETUP.md">Setup</a> ·
+<a href="docs/SETUP.md">Setup (Chinese)</a> ·
 <a href="DESIGN.md">Design notes</a>
 </p>
 
@@ -21,82 +23,73 @@
 </a>
 </p>
 
+<p>
+Plug it into your own chat assistant (MCP) and <b>cover the whole trip in one line</b>:<br>
+<b>plan</b> (local events, real routes, opening hours, weather, intercity transport, booking reminders) → <b>check on the road</b> (navigation, calendar, mobile map) →<br>
+<b>rebuild the route you actually took from your album</b> (names, districts, day titles) → <b>handbook · cards · route animation · travel film</b> → <b>footprints and spending</b>.
+</p>
+
+<p>
+<b>Open source · data stays on your machine · every step checkable and undoable · no booking, no payment</b>
+</p>
+
 </div>
-
-**Your all-in-one travel assistant: plan before you go, check on the road, and rebuild the trip from your photo album when you are back.**
-
-Plug it into your own chat assistant and follow the whole trip, from before departure to after you are back:  
-**plan** (real routes, opening hours, weather, arrival/departure transport, booking reminders) → **check on the road** (navigation, calendar, mobile map) → **restore the trip from your photos** (names, districts, day titles) → **handbook · cards · route animation · travel film** → **footprints and spending**.  
-**Open source · data stays on your machine · every step checkable and undoable · no booking, no payment**
-
-> **The LLM only proposes; scheduling, checking and undo are done by code.** Nothing changes until you confirm.
 
 ## ✨ What is TripSight
 
-TripSight is an **all-in-one travel assistant**. It is not a "one-click guide generator" but a toolbox you plug into your own chat assistant: it remembers your preferences and helps you get every step right — before, during and after the trip.
+TripSight is an **end-to-end travel assistant**. It is not a "one-click guide generator" but a toolbox you plug into your own chat assistant: it remembers your preferences and helps you get every step right — before, during and after the trip.
 
-| Stage | You want to… | What the agent + tools do |
+| Stage | You want to… | What the agent + tools in TripSight do |
 |---|---|---|
-| **Before · Plan** | build a reliable itinerary | Stops can come from an LLM, someone else's guide or your own wishes; all are scheduled together. Opening hours, closed days, over-packed days, weather, big transport, hotels and meals are all checked. Changes are proposals you confirm; `undo` works repeatedly |
-| **On the road · Check** | know how to get there, whether it rains | Real routes for every leg (transit / walk / taxi), per-day weather (fetched automatically in the background), departure days ordered realistically (last stop → station → leave → hotel in the destination city); calendar .ics, mobile map, WeChat text, GPX |
-| **After · Restore** | turn an album into the trip you walked | Rebuild stay points from a photo folder or the Mac Photos app; with "auto mode" the assistant names stops, tags city/district, titles each day and fills in photos, then stops at the preview for you |
-| **Record & share** | keep it, post it | 8 share themes, web handbook, 3:4 cards, clickable PDF, per-day route animation, Obsidian notes; an optional travel film in the restore export step — clips matched to stops by time and place, with intro/outro, day title cards and animated route cards, plus an optional Jianying draft |
-| **Long term** | where I went, what I spent | Footprint summary and map; WeChat/Alipay bill import for spending stats; remembered preferences |
+| **Before · Plan** | build a reliable itinerary | Stops can come from anywhere (model suggestions, someone else's guide, places you want to go) and are scheduled together; opening hours, closed days, over-packed days, weather, intercity transport, hotels and meals are all checked; changes are proposals you confirm, and `undo` works repeatedly |
+| **On the road · Check** | know how to get there, whether it will rain | Real routes for every leg (transit / subway / walk / taxi), per-day weather (fetched in the background once the workbench is open); view it as an .ics calendar, mobile map, WeChat text or GPX |
+| **After · Restore** | turn an album into the route you walked | Rebuild stay points from a photo folder or a Mac Photos album; with "auto mode" on, the assistant names stops, tags city/district, titles each day and fills in photos, then stops at the preview for you to confirm or polish |
+| **Record & share** | keep it, post it | 8 share themes, web handbook, travel cards, PDF with clickable navigation links, per-day route animation, Obsidian notes; an optional "travel film" in the restore export: clips grouped by stop using capture time and location, cut into a film with intro/outro, day title cards and route animations, plus an optional Jianying draft |
+| **Long term** | where I went, what I spent | Footprint summary (trips, cities, approximate km) and footprint map; WeChat/Alipay bill import for spending stats; remembers preferences you state and applies them next time |
 
 **The agent's role** (and the design principle of the whole project):
 
-- **The LLM only understands intent:** it hears "move Guanqian Street to the last day" or "rebuild my January photos into a trip", picks the tool, and explains in plain words. It never invents coordinates, hours or prices.
-- **Deterministic code does the work:** day splitting, rule checks, routes, weather, photo clustering and exports are done by MCP tools (92 in total); facts come only from tools or you, and unknowns are marked "to verify".
-- **You decide:** changes are proposals first; the assistant never books, pays or installs; trips are local JSON, the workbench listens on `127.0.0.1` only, API keys live in your own config.
-- **Not tied to one model or agent:** any MCP-capable agent works (nanobot, WorkBuddy, Claude Code… see Quick start).
+- **The LLM only understands intent:** it hears "move Guanqian Street to the last day" or "turn my January photos from the old phone into a trip", picks the tool and explains it to you. It never invents coordinates, opening hours or prices.
+- **Deterministic code does the work:** day splitting, rule checks, routes and weather, photo clustering and exports are done by MCP tools (92 in total); facts come only from tools or you, and anything unknown is marked "to verify".
+- **You keep the final say:** changes are proposals first; the assistant **never books, pays or installs anything**; trips are local JSON, the web workbench listens on `127.0.0.1` only, and API keys live only in your own config.
+- **Not tied to one model or agent:** any MCP-capable chat agent works ([nanobot](https://github.com/HKUDS/nanobot), WorkBuddy, Claude Code… see "Quick start" below).
 
 ## 🎬 See how it works
 
-In TripSight the **chat assistant is the operator and the web workbench is its work surface**; every step shows up in the "Assistant" card on the left — verifiable and undoable. Three flows below are **demo replays** (full videos in [`docs/videos/`](docs/videos/); click a preview to open the mp4):
+In TripSight **the chat assistant (agent) is the operator and the web workbench is its work surface; say "open TripSight" in chat to bring up the visual workbench**. The agent only works out what you want and which tool to call; scheduling, checking, routing, weather and exports are done by deterministic MCP tools, and every step appears in the "Assistant" card on the left — checkable and undoable. Below are **demo replays** of three complete flows (full videos in [`docs/videos/`](docs/videos/)):
 
-<b>1. Plan a trip</b>
-
-
+<b>① Plan a trip: say where you want to go → the assistant schedules, verifies and connects the routes</b>
 
 https://github.com/user-attachments/assets/021abf3b-b4cb-4fc6-a244-77fc53fa2a7d
 
+<sub>What the agent does: splits one sentence into "look up coordinates → add stops → split into 3 days → check"; when Guanqian Street would be reached too early it <b>makes a proposal</b> and only applies it after you reply "confirm"; finds restaurants and records the hotel (recorded, never booked); turns all 11 legs into real Amap routes in one go; fetches weather <b>automatically</b> once the workbench is open; finally exports the share page, PDF and calendar.</sub>
 
-
-<sub>One sentence becomes lookup → add stops → split into 3 days → check; a late-opening place triggers a <b>proposal</b> you must confirm; lunch and (never booked) hotel; 11 legs become real Amap routes; weather is fetched <b>automatically</b>; then export.</sub>
-
-<b>2. Restore a trip</b>
-
+<b>② Restore a trip: rebuild a past journey from an old phone's album</b>
 
 https://github.com/user-attachments/assets/7486875f-0bb5-41d0-9327-a809e9749ecf
 
-<sub>With "auto mode" the agent runs <b>rebuild stops → place names → city/district → day titles → photos</b> and stops at the preview; the video ends on the <b>footprint page</b>, zooming from the clustered pins across Asia down to a city and a street, opening a pin to see the local photo thumbnails, then ticking "real routes" joins same-day stops along real roads (mainland China only; abroad stays dashed straight lines); then edit and export a handbook, cards, PDF and route animation.</sub>
+<sub>What the agent does: with "auto mode" on, it runs <b>rebuild stay points → look up place names → tag city/district → title each day → fill in photos</b> in a row and stops at the preview for you; the video ends on the <b>footprint page</b>, zooming from clustered pins across Asia down to a city and a street, opening a pin to see the local photo thumbnails, and finally ticking "real routes" so same-day stops are joined along real roads; slow steps run in the background so tool timeouts do not interrupt them; afterwards you can keep editing and export a handbook, cards, PDF and route animation.</sub>
 
-<b>3. Restore → Export: the optional "Travel film"</b>
-
-
+<b>③ Restore → the optional "Travel film" in the export step</b>
 
 https://github.com/user-attachments/assets/53ba3a18-4a96-441a-88b8-791d1fa1167f
 
+<sub>Videos are a restore source just like photos: videos with a location are clustered into stay points together with photos (video-only stops use a video frame as thumbnail). In the export step, if the album/folder contains videos, an optional "Travel film" block appears: first see how clips are grouped by stop, then generate in one click. What the agent does: reads only each clip's capture time, location and duration and assigns it to a stop; builds an intro (trip name, dates, days / places / km), one title card per day (your titles), animated route cards, place-name captions and cross-dissolves, keeps each clip's original sound with normalised loudness, and matches the layout and colours to the handbook style you picked; route cards can be drawn on the real Amap map along Amap driving paths; a Jianying draft can be generated too. You can also do it from chat: with "auto mode" on, say "make the travel film too" and after restoring, naming, tagging districts and titling days, the assistant groups the clips and generates the film itself.</sub>
 
+<sub>Demo notes: harness is nanobot; model is qwen3.7-max. Basemap © Amap.</sub>
 
-
-
-
-<sub>Videos are a restore source just like photos: videos with a location are clustered into stops together with photos, so **an album or folder that is all videos can be restored too** (video-only stops use a video frame as thumbnail; videos without a location skip clustering and are matched by capture time when the film is made). When the album/folder contains videos, the export step shows an optional "Travel film" block: preview how clips group by stop, then generate. The agent reads only capture time, location and duration (never the picture), assigns clips to stops, and builds an intro (trip name, dates, days/places/km), a title card per day (your titles), animated route cards, place captions, cross-dissolves, the clips' original sound with normalised loudness, all in the handbook style you picked; route cards are drawn by default on the real Amap map along Amap driving paths (mainland trips with your own key: online, only map extent and neighbouring stop coordinates are sent, never stop names; with no key, or abroad, it falls back to the simple line drawing; untick it on the page to stay offline). The demo is driven from chat: say "group my videos by stop" and the page's clip list fills in; say "drop that short one, take only seconds 3–10 of that, caption this one" and the assistant edits clip by clip while the page follows (you can edit on the page too — same record). It ends with the final film (rendered for real from the edited clips) playing in full; the sample link below has sound. You can also ask the assistant in chat: with auto mode on, say "include the travel film" and it scans the clips and generates the film after restoring, naming, tagging districts and day titles (no path needed). No added music; a Jianying draft is optional. <a href="docs/videos/travel-film-sample.mp4"><b>▶ Watch the generated film (51 s, with sound)</b></a></sub>
-
-
-<sub>These are **demo replays**: data from the real engine or real runs, played back on the real page in the real step order — **not** a live model session. Plan flow = the author's real chat transcript and trip snapshots; restore flow = the author's old-phone album (Hainan, Jan 2024, scenery only). Basemap © Amap.</sub>
+### Two uses, one principle
 
 | | Plan (before the trip) | Restore (after the trip) |
 |---|---|---|
-| You say | "3 days in Suzhou, I want Humble Administrator's Garden…" | "Rebuild my January Hainan trip from my photos" |
-| Agent understands | stops, dates, pace, preferences, what to change | which album/folder, which dates, auto mode or not |
-| Tools do, deterministically | day split, hours/closure/too-rushed checks, real routes, weather, versions & undo | stay-point clustering, place names, photos, handbook/cards/PDF/route animation |
-| You keep control | proposals need confirmation; repeatable `undo`; never books or pays | preview before export; photos can be referenced not copied; AI text only describes what is visible |
+| You say | "3 days in Suzhou, I want the Humble Administrator's Garden, Lion Grove…" | "Turn my January Hainan photos into a trip" |
+| The agent understands | stops, dates, pace, preferences, what to change | which album/folder, which dates, auto mode or not |
+| Tools do, deterministically | day split and ordering, hours / closure / too-rushed checks, real routes, weather, versions and undo | stay-point clustering by time and place, place names, photos, handbook / cards / PDF / route animation |
+| You keep control | proposals need confirmation; repeatable `undo`; never books or pays | preview before export; photos can be referenced, not copied; AI text only describes what is visible, and is labelled |
 
 ## 🖼️ At a glance
 
-**Left: the plan workbench** (itinerary on the left, Amap map in the middle, chat assistant on the right). **Right: the restore edit page** (album → stay points → edit → export; click a pin on the map to see that place's photo thumbnails, and the list on the left jumps to the stop).
+**Left: the plan workbench** (itinerary on the left, real map in the middle, chat assistant on the right; one tab per day, with weather, opening hours, real routes and "what the assistant did" on one page). **Right: the restore edit page** (album → stay points → edit → export; click a pin on the map to see that place's photo thumbnails, and the list on the left jumps to the stop).
 
 <p>
 <a href="docs/images/workbench.png"><img src="docs/images/workbench.png" width="49%" alt="Plan workbench: 3 days in Suzhou with real routes, weather and the chat assistant"></a>&ensp;
@@ -109,83 +102,48 @@ https://github.com/user-attachments/assets/53ba3a18-4a96-441a-88b8-791d1fa1167f
 <p align="center"><img src="docs/images/feat-weather.gif" width="23%" alt="Weather">&emsp;<img src="docs/images/feat-links.gif" width="23%" alt="Click-through navigation">&emsp;<img src="docs/images/feat-tools.gif" width="23%" alt="Tools"></p>
 <p align="center"><img src="docs/images/feat-export.gif" width="23%" alt="One-click export">&emsp;<img src="docs/images/feat-edit.gif" width="23%" alt="Edit handbook and cards in place">&emsp;<img src="docs/images/feat-footprint.gif" width="23%" alt="Footprint map: click a pin for thumbnails"></p>
 
-<sub>Screens use a demo Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap.</sub>
+<sub>Screens use a demo 3-day Suzhou trip (real weather forecast) and the author's old-phone Hainan album (scenery only); basemap © Amap. Screenshots are generated from demo replays.</sub>
 
-**What sharing and exporting look like**: the left three are formats you can take from a planned trip (real exports of the Suzhou demo: share page in HTML/PDF with 8 themes, a single-file phone map page, an .ics calendar — the calendar picture is rendered from the exported .ics as an illustration); the right four are exports of the three-day trip restored from the old-phone album (footprint map, Xiaohongshu card, calendar import, Obsidian note, from real export files). Chat-ready text, a GPX track and a dedicated Amap App map are also available.
+**Sharing and export**:
 
 <p align="center">
 <a href="docs/images/export-all.jpg"><img src="docs/images/export-all.jpg" alt="Share and export: share page, phone map page, calendar; footprint map, card, calendar import, Obsidian note" width="100%"></a>
 </p>
 
+## 🔁 How a plan comes together
+
+1. **Say where you want to go:** destination, dates, group size and pace in chat; or click "New trip" on the web page and fill in the form.
+2. **Collect places:** once the dates are set, your personal agent **automatically looks up** local **events** and weather for those days (concerts, sports, lantern festivals, exhibitions, food markets, with source URLs) and lists them for you to pick; only chosen ones are added, scheduled on the day they happen. You can also name places directly, ask the assistant to **recommend**, paste **someone else's guide or travel note** to be checked item by item, or add **anywhere you want to go**. All sources are scheduled together.
+3. **Automatic day split:** places are assigned to days and ordered by location and opening hours.
+4. **Check and refine:** real Amap routes, checks for too rushed / closed / no reservation, pick a hotel, find restaurants, weather is fetched automatically.
+5. **Adjust anytime:** drag, chat or change durations; everything is re-checked after each change, and one click undoes it.
+6. **Connect the whole route and take it with you:** fill in all real routes and generate a dedicated Amap App map (one loop per day), a mobile map page, WeChat-ready text or a GPX track.
+
 ## 🧩 Capabilities
 
 | Area | What it does |
 |---|---|
-| **Planning** | Automatic day assignment and in-day ordering (geography + capacity + opening hours), pace levels, locking confirmed items, day-trip detection |
-| **Checks** | Closed days, arriving after closing, past last entry, stay running past closing, overloaded days, long legs, missing reservations, budget, lodging too far, weather vs outdoor sights |
-| **Maps & routes** | Amap / Google Maps / OpenStreetMap; real transit/walk/drive times, transfers, intercity-leg hints, airport/station transfers (late-night legs switch to taxi) |
-| **Lodging & food** | Per-night / per-segment stay-area suggestions (multi-city aware), hotel candidates ranked by commute, restaurants near a stop, a named restaurant placed on the nearest day, "no lunch planned" reminders |
-| **Local events** | Once the dates are fixed, your personal agent automatically searches for events during the trip (concerts, sports such as figure skating, lantern festivals, exhibitions, food markets) following the skill, and lists them for you to pick — the search is the agent's own ability; TripSight itself does not go online for events. When one is added, code enforces a source URL, a date and a time slot; chosen events become date-locked stops, scheduled only on that day and checked for timing conflicts. Never books or pays for you. |
-| **Guides → trip** | Paste a travel note or guide → every quote verified against the original text → coordinates verified on the map → you pick → added; walking routes (e.g. a city walk) can be one item |
-| **Transport & weather** | Record arrival/departure flights or trains and derive first/last-day playable time; read-only flight/train/hotel reference prices; Open-Meteo and Amap weather |
-| **Take it with you** | WeChat-friendly text, mobile HTML map, Amap app personal map, GPX, local web workbench |
-| **Footprints** | A zoomable footprint map with photo-thumbnail pins; tick "Real routes" to online-query real road routes between same-day stops (your own Amap key, only the two endpoints' coordinates are sent, mainland only, cached); default is straight lines |
-| **Memory** | Remembers preferences you state explicitly (dislikes walking, budget cap, food) and applies them to new trips; post-trip review of actual costs and notes |
-| **Engineering** | Multiple trips, version history and undo, `tripcore doctor`, Apache-2.0, 600+ automated tests |
+| **Planning** | Automatic day assignment and in-day ordering (geography + capacity + opening hours), pace (relaxed / moderate / packed), locking confirmed items, day-trip detection |
+| **Checks** | Closed days, arriving after closing, past last entry, staying past closing, too rushed, long legs, missing reservations, over budget, hotel too far, weather unsuitable for outdoor sights |
+| **Maps & routes** | Amap / Google Maps / OpenStreetMap; real route times, transfers and walking distance, intercity-leg hints, airport/station transfers (late-night legs switch to taxi) |
+| **Lodging & food** | Where to stay per night / segment (split automatically across cities), hotel candidates ranked by commute, restaurants along the way, a named restaurant placed on the nearest day, reminders for days missing meals |
+| **Local events for your dates** | Once dates are set, your personal agent follows the skill to search local concerts, sports (e.g. figure skating), lantern festivals, exhibitions and food festivals and lists them for you (the search is the agent's own ability; TripSight itself does not go online for events). When one is added, code requires a source URL, a date and a time slot; it becomes a date-locked stop scheduled only on that day and checked for timing. Never books tickets |
+| **Guides → trip** | Paste a travel note or guide → each quote verified verbatim against the original → places looked up on Amap on submit (matched / ambiguous / not found) with jump links → you pick, then they are added; "Day N" markers are detected so you can compare with, or follow, the guide's day plan; each stop keeps an expandable excerpt of the guide; a walking route (e.g. a city walk) can be one item |
+| **Transport & weather** | Record arrival/departure flights or trains and derive playable time on the first and last day; read-only flight / train / hotel reference prices; Amap and Open-Meteo forecasts (once the workbench is open, days within range are fetched in the background; weather shows on each day, the share page, handbook and calendar) |
+| **Take it with you** | All generated locally, no login needed:<br>· Mobile map page: a single HTML/PDF file with a route map and stop list per day, works offline<br>· Amap App map: each day's route as a loop, opened day by day for navigation in the Amap app<br>· Calendar (.ics): import into your phone calendar, with times and weather per day<br>· GPX track: import into sports or other map apps |
+| **After the trip: photo restore & handbook** | Rebuild the trip from a photo folder or a Mac Photos album (cluster into stay points by time and place, merge and rename, use a GPX/KML track to place photos without location); spans multiple years or just a date range; in **auto mode** (one switch in the workbench) the assistant imports, names, tags cities and fills in photos, then stops at the preview for you to export, while the left panel follows its actions and slow steps run in the background; up to 6 photos per stop, can be referenced instead of copied; produces a web handbook, one travel card per day, a **long-page PDF with clickable links** (tap "navigate" on your phone), Obsidian notes, a per-day zoomed route map and a per-day route animation GIF, optionally on an Amap basemap with line styles per transport mode and thumbnail pins; AI-assisted descriptions of photo content; **handbook and cards are editable**: stop names, notes, one line per day, cover subtitle, afterword; delete photos, change the cover, reorder; each card can get its own title, photo, line and style (tool `edit_handbook`) |
+| **Spending** | Import WeChat / Alipay bills (parsed locally, never sent to the model), including from iCloud Drive; log Apple Pay via an iPhone Shortcut; stats by category, editable categories remembered per merchant, optionally added to the handbook afterword |
+| **Video & footprints** | Clips assigned to stops by capture time and location and cut into a travel film in trip order, with an optional Jianying draft; footprint summary (trips, cities, approximate km) and a **zoomable footprint map** whose pins are local photo thumbnails, click to view; tick "real routes" to go online and join same-day stops along real roads |
+| **Long-term memory** | Remembers preferences you state (dislike walking, no spicy food, hotel budget) and applies them to new trips; after the trip, record actual costs and ratings and get preference suggestions |
+| **Engineering** | Multiple trips, version history and undo, `tripcore doctor` self-check, Apache-2.0, 600+ automated tests |
 
-## 🔍 Feature details
+## 🔎 Data sources and verification
 
-1. **Scheduling.** `schedule_days` clusters places by geography, improves the assignment with cross-day moves and swaps, and orders each day (exact search up to 7 stops, nearest-neighbour + 2-opt beyond). With known dates, opening hours are part of the cost: closed days are skipped, orders that miss closing time are penalised, and places that can never fit are reported with a reason. Locked items never move; the same input always gives the same result.
-2. **Opening-hours checks.** One timeline computes the expected arrival and departure of every stop and compares it with opening hours (closed, arrives after closing, past last entry, stay beyond closing, too early, day running late). The parser is conservative: it understands forms like "Tue–Sun 09:00-17:00", "Mar–Oct" or "closed Mondays from Nov 15", and says "cannot be determined" instead of guessing.
-3. **Proposals, confirmation, undo.** The assistant cannot edit the trip directly. It creates a proposal (move, remove, set status, lock, set duration) and you see "before → after" plus a 4-digit code to confirm. Every change goes into version history; applying checks the revision so nothing is overwritten.
-4. **Real routes and preferences.** With an Amap key, `refine_routes` upgrades estimates to real routes (time, transfers, walking distance, fares). Preferences (max transfers, prefer subway, max walking, taxi OK) change which option is chosen; `compare_transport` compares modes and `set_leg_mode` pins one leg. Legs over ~80 km are flagged as intercity. Overseas trips can use Google Maps; without keys OpenStreetMap is the fallback.
-5. **Stay areas.** `suggest_lodging` works per night: it uses the last stop of one day and the first stop of the next, merges neighbouring nights into one stay, and splits into several stays when places lie in different cities. One-day excursions (e.g. a mountain 100 km away) are detected so the hotel stays in the main area. Each segment gives a centre, radius and a "search near X" hint for the assistant.
-6. **Food.** `suggest_food` searches restaurants near a stop (rating, per-person price, hours, distance); nothing is added until you choose. `find_food` places a restaurant you name on the nearest day. The workbench shows "lunch not planned" per day with a one-click "find lunch" button.
-7. **Guides → candidates.** The model reads and lists; code verifies. Each candidate's quote must appear verbatim in the pasted text and contain the place name, otherwise it is rejected. Only after you pick are coordinates looked up, and only unambiguous, non-duplicate matches are added. Prices and hours in a guide are treated as unverified hints. On submit, code looks every place up on the map (when an Amap/Google key is set) and labels it matched (with address and map link) / ambiguous / not found, plus jump links to Xiaohongshu, Dianping and Mafengwo. Day markers ("Day 2", "第二天") are detected by code, so you can compare a guide's day-by-day plan with yours (`compare_with_source`, read-only) or, only when you say so, lay it out as written (`follow_source_days`: places guide day N on your day N, locks them, lists what cannot work such as closed days, one undoable version). Every place also gets an expandable "what the guide says" box holding a verbatim excerpt (max 300 characters, verified against the pasted text, marked as someone else's claim) — the model never writes it. *Input today is pasted text; there is no Xiaohongshu scraper in this repo.* Want to browse other people's guides first? `search_links` (and the "look up guides" links under every stop in the workbench; hotel rows have "check hotel prices" links to Ctrip, Dianping and Xiaohongshu — hotel prices depend on dates and room type, so pick your dates after opening; tell the assistant the price you see and it records it as user-provided) opens search pages on Xiaohongshu, Dianping, Mafengwo and others — you click and log in with your own account; TripSight never scrapes or touches your accounts. Copy a guide's text back to continue. URL formats are not verified against real accounts.
-8. **Transport, weather, prices.** `set_connection` derives when the first day can start and when the last day must leave. `get_weather` covers days with confirmed dates and warns about rain or heat for outdoor sights. Flight/train/hotel reference prices use the flyai and RollingGo command-line tools through read-only skills — no booking, no payment.
-9. **Take it with you.** `export_text` makes plain text for phones and chat apps (including WeChat via nanobot's `weixin` channel) with an outbound check that rejects keys and local paths; `export_map` makes a mobile-friendly HTML map; `create_amap_map` hands each day's loop to Amap's official service for a link that opens in the Amap app; `export_gpx` exports daily tracks.
-10. **Web workbench.** `python -m tripcore web --open`: itinerary list, map and chat in three resizable columns. View mode shows details and problems; edit mode lets you move stops, edit stay times, add places (chosen from map search results, never typed coordinates), pick dates, switch or create trips, and preview every change before confirming. Listens on 127.0.0.1 with a one-time token, Host/Origin checks and revision checks.
-11. **Preferences and review.** Preferences you explicitly state are kept across trips; after the trip you can record actual costs and notes, and `show_review` compares plan vs reality.
-12. **Final checklist.** `final_check` lists everything still open: plan issues, nights without lodging, unbooked transport, stale weather, unverified data, estimated routes, days without meals. Read-only.
-
-## 🚀 Quick start
-
-Python 3.10 or newer is required.
-
-```bash
-git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
-./setup.sh      # one step: venv + install + nanobot check + register + skills + self-check
-                # (asks before touching your nanobot config; never installs nanobot or writes keys)
-tripcore doctor # read-only self-check (never prints key values)
-tripcore demo   # full demo on the sample data, no keys needed
-```
-
-**Use it in chat:** follow [docs/SETUP.md](docs/SETUP.md) (Chinese) to connect nanobot, run `nanobot`, then just say where you want to go. When you want to drag things around, see the map or export, tell the assistant **"open the workbench"** — it returns a URL with a one-time token; open it in a browser on the same computer.
-
-**Other MCP agents:** TripSight is a standard stdio MCP server (command `tripcore-mcp`, put your own `AMAP_KEY` in its `env`) plus skills in `skills/` (`python scripts/install_skills.py --dest <your agent's skills dir>`). For WorkBuddy: Expert skills → Connectors → Add connector, paste the `mcpServers` JSON (it edits `~/.workbuddy-ai/mcp.json`), then install `skills/` into `~/.workbuddy-ai/skills`; see [docs/WORKBUDDY.md](docs/WORKBUDDY.md) (Chinese; verified on a real WorkBuddy install). Claude Code / Claude Desktop / Cursor follow the same pattern, untested one by one.
-
-**Workbench only:** no chat needed — `tripcore web --open`.
-
-Keep Amap / Google keys in your own local configuration; never commit them.
-
-<details>
-<summary>Manual install, tests and Docker</summary>
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"        # provides the `tripcore` and `tripcore-mcp` commands
-python -m pytest -q            # run the tests
-```
-
-**Docker (optional, not yet verified in a real environment):** the `Dockerfile` runs the CLI and the MCP server. The workbench deliberately listens on 127.0.0.1 only and is not containerised.
-
-```bash
-docker build -t tripsight .
-docker run --rm tripsight python -m tripcore demo
-docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
-```
-
-</details>
+> - ✅ **Tested with a real key:** Amap (routes, opening hours, coordinate checks, weather).
+> - 🌤️ **Weather:** in mainland China Amap weather is used first (about 4 days ahead); dates Amap doesn't cover and trips abroad use [Open-Meteo](https://open-meteo.com/) (free, no key, up to about 16 days). Every forecast is labelled with its source and query date.
+> - 💰 **Prices (read-only):** flight, train and hotel reference prices come from the [Fliggy FlyAI](https://github.com/alibaba-flyai/flyai-skill) and [RollingGo](https://clawhub.ai/rollinggo-ai/skills/rollinggo-search-hotel-skill) command-line tools via skills; query only, each price labelled with source and date.
+> - Prices, opening hours and weather are reference values; check official information before you go.
+> The assistant **never** books tickets or hotels and never pays.
 
 ## 🏗️ Architecture and capability split
 
@@ -193,32 +151,59 @@ docker run -i --rm -v "$PWD/data:/data" -e AMAP_KEY tripsight   # MCP over stdio
 
 | Stage | Tools | Skills | Highlights |
 |---|---|---|---|
-| **Before · Plan** | 47 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-events` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guide import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
-| **After · Restore** | 17 | `trip-restore` | photo restore, place names, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook` `edit_handbook`…) |
-| **Record & share** | 13 | `trip-export` | mobile map, WeChat text, Amap app map, calendar, GPX, share images, travel film |
-| **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preferences (3) |
+| **Before · Plan** | 47 | `trip-planner` `trip-routes` `trip-hours-weather` `trip-food` `trip-events` `trip-sources` `flyai-search` | trip basics, stops and lodging, scheduling and checks, routes and transport, food, guides and import (`schedule_days` `check_plan` `refine_routes` `submit_candidates`…) |
+| **After · Restore** | 17 | `trip-restore` | photo restore, naming, districts, day titles, handbook (`import_photo_trip` `autoname_stops` `tag_regions` `export_handbook`…) |
+| **Record & share** | 13 | `trip-export` | mobile map, WeChat text, Amap App map, calendar, GPX, share images, travel film |
+| **Long term** | 15 | `trip-review` | footprints, bills and spending, review, travelogue (12); preference memory (3) |
+
+**Project layout**
 
 ```
-tripcore/   core library and MCP server (mcp_server.py: 92 tools; scheduler / validator / changes;
-            amap / routemap / weather; phototrip / photoslib / stays; handbook / share / video; web + webpage: workbench)
-skills/     manuals for the agent
-nanobot/    example config (no secrets)
-scripts/    install_skills.py · merge_nanobot_config.py
-tests/  docs/
+tripcore/                core library and MCP server
+├─ mcp_server.py         entry point for the 92 tools
+├─ scheduler.py · validator.py · changes.py   day scheduling / rule checks / versions and undo
+├─ amap.py · routemap.py · weather.py         Amap routes and maps, weather
+├─ phototrip.py · photoslib.py · stays.py     photo clustering into stay points, Mac Photos reader
+├─ handbook.py · share.py · video.py          handbook and cards, sharing, travel film
+└─ web.py · webpage.py   web workbench (single-file page, listens on 127.0.0.1 only)
+skills/                  manuals for the agent
+nanobot/                 example integration config (no secrets)
+scripts/                 install_skills.py · merge_nanobot_config.py
+tests/                   automated tests
+docs/                    setup, WorkBuddy integration, tool list, reference
 ```
+
+- nanobot is not in this repo; install it yourself. The repo only provides the skills, example config and scripts needed to connect, so upgrading nanobot never conflicts with this project.
+- Data is local JSON (`trip.json`, versioned and undoable); API keys live only in your own config.
 
 ## 🔐 Safety
 
-The assistant never books, pays or installs anything. The workbench is local-only with a one-time token and revision checks. Keys are read from environment variables or your local nanobot config and are never printed. Prices, hours and weather carry their source and date.
+- The assistant **never books, pays or installs anything**; price lookups use read-only commands only.
+- The web workbench listens locally only, with a one-time token; every write is checked against the revision.
+- API keys are read only from environment variables or your local nanobot config; `tripcore doctor` only reports "configured / not configured"; exported text is rejected if it contains a key or a local path.
+- Prices, opening hours and weather carry their source and date; when unsure, it says so instead of making things up.
 
-## ⚠️ Known limitations
+## 🚀 Quick start
 
-- **Maturity:** early-stage. Amap features are tested by the author with a real key; Google Maps, the WeChat channel, the Docker image and `doctor` have limited real-world verification (automated tests mostly use fake services). How well the chat assistant follows the skill rules depends on the model and has not been systematically evaluated.
-- **Data:** prices, hours, weather and ratings are reference values, not live data; public holidays and temporary closures are unknown. Opening-hours parsing is conservative and says "cannot be determined" for forms it does not understand. Without real routes, commute times are straight-line estimates (labelled as such); transit late at night (23:00–05:30) is treated as stopped and switched to taxi by a rule of thumb.
-- **Cost:** only recorded items are counted — tickets, chosen restaurants, long-distance transport, lodging. Unchosen meals and local transit are not estimated.
-- **Planning:** the scheduler is a heuristic (deterministic, not guaranteed optimal); pace limits are hard, so with many places and few days some are listed as unscheduled with a reason. Locked items are never moved. Stay-area suggestions are rough: when two consecutive days are far apart the suggested centre can lean towards the far side; day-trip detection uses fixed distance thresholds. "Missing lunch/dinner" uses fixed meal windows.
-- **Sources:** no scraping of Xiaohongshu or other platforms — you paste guide text; the "look up" link formats are not verified against real accounts.
-- **Usage:** the workbench works only on the machine running it (127.0.0.1); no multi-user or cloud sync. The assistant never books, pays or installs anything. Docs and UI are mostly Chinese.
+Requires Python 3.10+.
+
+```bash
+git clone https://github.com/lvshangke/TripSight.git tripcore && cd tripcore
+./setup.sh                  # create .venv, install, connect nanobot, install skills, self-check
+source .venv/bin/activate
+tripcore demo               # full demo on sample data, no keys or model needed
+tripcore web --open         # web workbench only
+```
+
+Connect a chat agent: [nanobot](docs/SETUP.md) · [WorkBuddy](docs/WORKBUDDY.md) · [Claude Code and other MCP agents](docs/SETUP.md#其他-mcp-agent) (guides in Chinese). Then just say where you want to go; to see the map or export, say **"open the workbench"**.
+
+## 📚 More docs
+
+- [docs/SETUP.md](docs/SETUP.md): install; connect nanobot and other MCP agents; WeChat; Google Maps
+- [docs/WORKBUDDY.md](docs/WORKBUDDY.md): connect WorkBuddy
+- [docs/reference.md](docs/reference.md): CLI, Docker, trip data format, code structure, MCP tools and APIs in detail
+- [docs/TOOLS.md](docs/TOOLS.md): the full list of 92 tools
+- [DESIGN.md](DESIGN.md): design principles and algorithms
 
 ## 📄 License
 
