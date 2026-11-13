@@ -12,8 +12,7 @@
 
 <p>
 <a href="README.en.md">English</a> ·
-<a href="docs/SETUP.md">安装与接入</a> ·
-<a href="DESIGN.md">设计说明</a>
+<a href="docs/SETUP.md">安装与接入</a>
 </p>
 
 <p>
@@ -211,7 +210,7 @@ skills/                  给 Agent 的说明书
 nanobot/                 接入配置样例（不含密钥）
 scripts/                 install_skills.py · merge_nanobot_config.py
 tests/                   自动化测试
-docs/                    安装、WorkBuddy 接入、工具清单、参考手册
+docs/                    安装、WorkBuddy 接入、工具清单
 ```
 
 - nanobot 不在本仓库里，由你自己安装；仓库只提供接入所需的技能、配置样例和脚本，升级 nanobot 不会和本项目冲突。
@@ -242,9 +241,7 @@ tripcore web --open         # 只开网页工作台
 
 - [docs/SETUP.md](docs/SETUP.md)：安装、接入 nanobot 与其他 MCP Agent、微信、Google Maps
 - [docs/WORKBUDDY.md](docs/WORKBUDDY.md)：接入 WorkBuddy
-- [docs/reference.md](docs/reference.md)：命令行、Docker、行程数据格式、代码结构、MCP 工具与接口详解
 - [docs/TOOLS.md](docs/TOOLS.md)：全部 92 个工具清单
-- [DESIGN.md](DESIGN.md)：设计原则与算法
 
 ## 📄 许可证
 

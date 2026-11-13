@@ -6,8 +6,7 @@
 
 <p>
 <a href="README.md">中文</a> ·
-<a href="docs/SETUP.md">Setup (Chinese)</a> ·
-<a href="DESIGN.md">Design notes</a>
+<a href="docs/SETUP.md">Setup (Chinese)</a>
 </p>
 
 <p>
@@ -170,7 +169,7 @@ skills/                  manuals for the agent
 nanobot/                 example integration config (no secrets)
 scripts/                 install_skills.py · merge_nanobot_config.py
 tests/                   automated tests
-docs/                    setup, WorkBuddy integration, tool list, reference
+docs/                    setup, WorkBuddy integration, tool list
 ```
 
 - nanobot is not in this repo; install it yourself. The repo only provides the skills, example config and scripts needed to connect, so upgrading nanobot never conflicts with this project.
@@ -201,9 +200,7 @@ Connect a chat agent: [nanobot](docs/SETUP.md) · [WorkBuddy](docs/WORKBUDDY.md)
 
 - [docs/SETUP.md](docs/SETUP.md): install; connect nanobot and other MCP agents; WeChat; Google Maps
 - [docs/WORKBUDDY.md](docs/WORKBUDDY.md): connect WorkBuddy
-- [docs/reference.md](docs/reference.md): CLI, Docker, trip data format, code structure, MCP tools and APIs in detail
 - [docs/TOOLS.md](docs/TOOLS.md): the full list of 92 tools
-- [DESIGN.md](DESIGN.md): design principles and algorithms
 
 ## 📄 License
 
